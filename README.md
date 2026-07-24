@@ -99,3 +99,4 @@ with the final statement, and calls `finalize_function`. A malformed mutation is
 rejected atomically and does not advance the branch revision.
 
 See [`docs/architecture.md`](docs/architecture.md) for the complete design.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before submitting changes.
