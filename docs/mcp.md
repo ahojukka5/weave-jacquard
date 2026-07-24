@@ -13,23 +13,24 @@ is generated deterministically when needed.
 
 The MCP server deliberately does not duplicate the full Weave grammar.
 
-`grammar_help` scans the configured `weavec2` checkout under
+`grammar_help` scans the configured `weavec` checkout under
 `test/correctness/surface` and indexes the forms actually used there. For each
 form it reports:
 
 - observed argument counts;
 - observed parent forms;
 - compact examples;
-- the source files containing those examples.
+- source files containing those examples.
 
 This index is guidance for incremental construction. The authoritative check is
 `program_validate`, which renders canonical source and runs:
 
 ```text
-weavec2 --frontend output.wir input.weave
+weavec --frontend output.wir input.weave
 ```
 
-Set `WEAVEC2_SOURCE_ROOT` and `WEAVEC2_BIN` to enable both parts.
+Set `WEAVEC_SOURCE_ROOT` to enable corpus-backed grammar help. Set
+`WEAVEC_BIN` when the compiler is not available as `weavec` on `PATH`.
 
 ## Stable IDs
 
@@ -49,7 +50,7 @@ omits the annotations.
 ### Help and grammar
 
 - `weave_help(topic)` explains workflows, IDs, writes, reads, and validation.
-- `grammar_help(form, query, parent_form)` searches the weavec2 surface corpus.
+- `grammar_help(form, query, parent_form)` searches the `weavec` surface corpus.
 
 Recommended calls include:
 
@@ -60,7 +61,7 @@ grammar_help(parent_form="program")
 grammar_help(query="ptr")
 ```
 
-### Project and branches
+### Projects and branches
 
 - `project_initialize`
 - `branch_create`
@@ -77,7 +78,7 @@ incompatible edits to the same atom or subtree produce a conflict.
 - `program_create` creates the program, name, and version forms.
 - `program_list` lists documents and root IDs.
 - `program_render` returns canonical or annotated Weave.
-- `program_validate` runs structural checks and the configured weavec2 frontend.
+- `program_validate` runs structural checks and the configured `weavec` frontend.
 - `program_import` imports complete source for migration and fixtures.
 
 `program_import` is not the preferred agent write path.
@@ -91,8 +92,8 @@ incompatible edits to the same atom or subtree produce a conflict.
 - `node_wrap(node_id, head)`
 - `node_delete(node_id)`
 
-Atom kinds are `symbol`, `string`, `integer`, `float`, and `boolean`.
-Positions are zero-based and default to append.
+Atom kinds are `symbol`, `string`, `integer`, `float`, and `boolean`. Positions
+are zero-based and default to append.
 
 ### Inspection
 
@@ -133,5 +134,5 @@ shapes, ordered children, and no move cycles. A partially constructed Weave form
 may still be incomplete. Use `grammar_help` while building and
 `program_validate` when a coherent unit is ready.
 
-A later weavec2 change may expose a machine-readable grammar registry. The MCP
-help provider can consume that registry without changing its public tool API.
+A future machine-readable grammar registry in `weavec` can replace corpus
+inference without changing the public MCP tool API.
