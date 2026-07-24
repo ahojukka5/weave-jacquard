@@ -1,4 +1,4 @@
-"""Grammar discovery from the authoritative weavec2 source and test corpus."""
+"""Grammar discovery from the authoritative weavec source and test corpus."""
 
 from __future__ import annotations
 
@@ -23,14 +23,14 @@ class FormInfo:
             "observed_parents": sorted(self.parents),
             "examples": self.examples[:limit],
             "note": (
-                "Observed from the weavec2 surface corpus. This is guidance, not a "
-                "second normative grammar; validate completed programs with weavec2."
+                "Observed from the weavec surface corpus. This is guidance, not a "
+                "second normative grammar; validate completed programs with weavec."
             ),
         }
 
 
 class GrammarIndex:
-    """Searchable examples inferred from weavec2's own surface programs."""
+    """Searchable examples inferred from weavec's own surface programs."""
 
     def __init__(self, source_root: str | Path | None = None) -> None:
         self.source_root = self._resolve_source_root(source_root)
@@ -47,9 +47,9 @@ class GrammarIndex:
             candidates.append(Path(source_root))
         candidates.extend(
             [
-                Path.cwd() / "weavec2",
-                Path.cwd().parent / "weavec2",
-                Path(__file__).resolve().parents[3] / "weavec2",
+                Path.cwd() / "weavec",
+                Path.cwd().parent / "weavec",
+                Path(__file__).resolve().parents[3] / "weavec",
             ]
         )
         for candidate in candidates:
@@ -174,7 +174,7 @@ class GrammarIndex:
             return {
                 "form": name,
                 "known": False,
-                "message": "Form was not observed in the configured weavec2 surface corpus.",
+                "message": "Form was not observed in the configured weavec surface corpus.",
             }
         actual_arity = len(node["children"]) - 1
         return {
@@ -193,5 +193,5 @@ class GrammarIndex:
             "files_scanned": self.files_scanned,
             "forms_indexed": len(self.forms),
             "parse_failure_count": len(self.parse_failures),
-            "authority": "weavec2 surface sources and the weavec2 frontend validator",
+            "authority": "weavec surface sources and the weavec frontend validator",
         }
