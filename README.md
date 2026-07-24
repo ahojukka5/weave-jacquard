@@ -2,44 +2,19 @@
 
 `weave_frontend` is an experimental **agent-native programming frontend** for
 Weave. Instead of asking a language model to maintain a large text file, an
-agent discovers, inspects, and mutates a typed program tree through small,
+agent discovers, inspects, and mutates a versioned program tree through small,
 validated operations.
 
-The repository is a runnable Python prototype for the architectural idea. It is
-not yet a replacement for `weavefront` or `weavec2`.
+The repository contains two related prototypes:
 
-## Why
+- the original typed AST workspace, which demonstrates validation, immutable
+  revisions, branches, context, and semantic merge;
+- `weave-mcp`, a grammar-neutral S-expression workspace exposed through the
+  Model Context Protocol.
 
-Small and inexpensive coding models often understand an algorithm but lose
-reliability when they must also maintain punctuation, source locations, scope,
-and a large textual context. This prototype moves the mechanical work into the
-programming environment:
-
-- every AST mutation is grammar-checked before commit;
-- explicit syntax holes make incomplete drafts structurally valid;
-- SQLite stores immutable revisions and branch heads;
-- functions and modules are found through semantic identities, not line numbers;
-- multiple agents work on independent branches;
-- three-way merge happens at module and symbol granularity;
-- merged programs are type-checked as a whole;
-- contracts and design documents are stored as versioned context;
-- canonical Weave text is a deterministic view of the database state.
-
-## Current prototype
-
-The first version supports:
-
-- modules and imports;
-- scalar types `i32`, `i64`, `bool`, and `void`;
-- functions, parameters, locals, calls, binary expressions, `if`, `while`, and
-  `return`;
-- immediate structural validation;
-- semantic validation and symbol resolution;
-- stable AST node IDs;
-- immutable revision history, checkout, and branches;
-- symbol-level three-way merge;
-- project-, module-, and symbol-scoped design context;
-- deterministic surface-Weave rendering.
+The MCP write API is deliberately atomic. An agent creates one form, atom, move,
+wrap, or deletion per call rather than emitting a deeply nested JSON subtree.
+Larger local subtrees may be returned for inspection.
 
 ## Install and test
 
@@ -47,11 +22,63 @@ The first version supports:
 python -m venv .venv
 . .venv/bin/activate
 python -m pip install -e '.[dev]'
-pytest
+python -m compileall -q src tests
 ruff check .
+pytest
 ```
 
-## Minimal example
+## Run weave-mcp
+
+Place a `weavec2` checkout next to this repository, build it, and configure the
+server:
+
+```bash
+export WEAVE_DB_PATH="$PWD/weave.db"
+export WEAVEC2_SOURCE_ROOT="../weavec2"
+export WEAVEC2_BIN="../weavec2/build/weavec2"
+weave-mcp
+```
+
+The default transport is MCP stdio. Configure an MCP client to execute the
+`weave-mcp` command with the environment variables above.
+
+The core agent workflow is:
+
+```text
+project_initialize
+→ program_create
+→ grammar_help
+→ node_create_form / node_add_atom
+→ node_inspect
+→ program_validate
+→ branch_merge
+```
+
+Writes are intentionally atomic. The agent creates one form or atom per tool
+call and receives stable `n_*` node IDs immediately. `program_render` can return
+an annotated view such as:
+
+```lisp
+(@n_a1b2 (program
+  (@n_c3d4 (name "demo"))
+  (@n_e5f6 (version "0.1"))))
+```
+
+The metadata is an agent view; canonical source omits the wrappers before being
+passed to `weavec2`.
+
+`grammar_help` does not maintain a second handwritten Weave grammar. It indexes
+examples from `weavec2/test/correctness/surface`, reports observed arities and
+parents, and links each example to its source file. `program_validate` then
+invokes `weavec2 --frontend` as the normative check.
+
+See [`docs/mcp.md`](docs/mcp.md) for tool details and
+[`docs/architecture.md`](docs/architecture.md) for the broader design.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before submitting changes.
+
+## Typed AST example
+
+The earlier typed workspace remains available:
 
 ```python
 from weave_frontend import Workspace
@@ -78,25 +105,3 @@ with Workspace("demo.db") as workspace:
     )
     print(workspace.render("demo", "main", "app"))
 ```
-
-## Agent workflow
-
-A draft function is born with a syntactically valid hole:
-
-```python
-result = workspace.create_function(
-    "demo",
-    "agent/factorial",
-    "app",
-    "factorial",
-    params=[{"name": "n", "type": "i32"}],
-    returns="i32",
-)
-```
-
-The agent inserts valid statement subtrees before the hole, replaces the hole
-with the final statement, and calls `finalize_function`. A malformed mutation is
-rejected atomically and does not advance the branch revision.
-
-See [`docs/architecture.md`](docs/architecture.md) for the complete design.
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before submitting changes.
