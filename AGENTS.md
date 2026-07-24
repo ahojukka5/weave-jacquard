@@ -17,7 +17,7 @@ server for Weave. The central object is a versioned program tree. Textual
    large nested JSON payload.
 5. **Larger reads are acceptable.** Inspection may return a local subtree when it
    helps an agent understand context.
-6. **Do not duplicate the Weave grammar.** `weavec2` is authoritative. Grammar
+6. **Do not duplicate the Weave grammar.** `weavec` is authoritative. Grammar
    help is derived from its source corpus and completed programs are validated
    by its frontend.
 7. **Merge structurally, validate semantically.** Non-overlapping node changes
@@ -49,11 +49,11 @@ The generic S-expression layer validates tree integrity after every mutation:
 - no move cycles.
 
 Do not add a second handwritten copy of the surface grammar. The MCP
-`grammar_help` index reads `weavec2/test/correctness/surface`. The
+`grammar_help` index reads `weavec/test/correctness/surface`. The
 `program_validate` tool renders canonical source and invokes
-`weavec2 --frontend`.
+`weavec --frontend`.
 
-A later machine-readable grammar registry in weavec2 should replace corpus
+A later machine-readable grammar registry in weavec should replace corpus
 inference without changing the public MCP API.
 
 ## Code layout
@@ -62,8 +62,8 @@ inference without changing the public MCP API.
 - `src/weave_frontend/service.py`: original typed workspace and revision model.
 - `src/weave_frontend/sexpr.py`: generic S-expression nodes, parser, and renderer.
 - `src/weave_frontend/sexpr_service.py`: atomic node operations and node merge.
-- `src/weave_frontend/grammar_help.py`: help derived from weavec2 examples.
-- `src/weave_frontend/weavec2.py`: authoritative frontend validation adapter.
+- `src/weave_frontend/grammar_help.py`: help derived from weavec examples.
+- `src/weave_frontend/weavec.py`: authoritative frontend validation adapter.
 - `src/weave_frontend/mcp_server.py`: MCP tools and server entry point.
 - `docs/architecture.md`: broad design and roadmap.
 - `docs/mcp.md`: MCP workflow and tool contract.
@@ -88,5 +88,5 @@ pytest
 ## Merge expectations
 
 A passing text merge is not enough. After merge, preserve unique node IDs, run
-structural validation, invoke weavec2 for complete programs, and execute affected
+structural validation, invoke weavec for complete programs, and execute affected
 tests.
