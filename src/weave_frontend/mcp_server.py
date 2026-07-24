@@ -19,7 +19,7 @@ Build Weave programs atomically. Read larger annotated subtrees when useful, but
 write one form, atom, edge, or move at a time. Call grammar_help before using an
 unfamiliar Weave form. Every mutation returns stable node IDs and a new immutable
 revision. Call program_validate after completing a coherent program unit; the
-configured weavec2 frontend is the authoritative language validator.
+configured weavec frontend is the authoritative language validator.
 """.strip()
 
 mcp = FastMCP("weave-mcp", instructions=INSTRUCTIONS)
@@ -29,8 +29,8 @@ mcp = FastMCP("weave-mcp", instructions=INSTRUCTIONS)
 def workspace() -> SExpressionWorkspace:
     return SExpressionWorkspace(
         os.environ.get("WEAVE_DB_PATH", "weave.db"),
-        weavec2_source_root=os.environ.get("WEAVEC2_SOURCE_ROOT"),
-        weavec2_binary=os.environ.get("WEAVEC2_BIN"),
+        weavec_source_root=os.environ.get("WEAVEC_SOURCE_ROOT"),
+        weavec_binary=os.environ.get("WEAVEC_BIN"),
     )
 
 
@@ -44,9 +44,7 @@ def _close_workspace() -> None:
 def _jsonable(value: Any) -> Any:
     if is_dataclass(value):
         return asdict(value)
-    if isinstance(value, tuple):
-        return [_jsonable(item) for item in value]
-    if isinstance(value, list):
+    if isinstance(value, (tuple, list)):
         return [_jsonable(item) for item in value]
     if isinstance(value, dict):
         return {key: _jsonable(item) for key, item in value.items()}
@@ -55,8 +53,7 @@ def _jsonable(value: Any) -> Any:
 
 def _result(call: Callable[[], Any]) -> dict[str, Any]:
     try:
-        value = call()
-        return {"ok": True, "result": _jsonable(value)}
+        return {"ok": True, "result": _jsonable(call())}
     except ValidationError as exc:
         return {"ok": False, "error": exc.as_dict()}
     except ConflictError as exc:
@@ -74,7 +71,6 @@ def _result(call: Callable[[], Any]) -> dict[str, Any]:
 @mcp.tool()
 def weave_help(topic: str = "workflow") -> dict[str, Any]:
     """Explain the atomic MCP workflow and identify the right tool for a task."""
-
     topics: dict[str, Any] = {
         "workflow": {
             "steps": [
@@ -90,17 +86,11 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
         },
         "write": {
             "tools": {
-                "node_create_form": (
-                    "Attach one new list whose first child is the form head."
-                ),
-                "node_add_atom": (
-                    "Attach one symbol, string, integer, float, or boolean."
-                ),
-                "node_set_atom": (
-                    "Change one existing atom while preserving its node ID."
-                ),
-                "node_move": "Move one existing node to a new parent and position.",
-                "node_wrap": "Wrap one existing node in a new form.",
+                "node_create_form": "Attach one list whose first child is the form head.",
+                "node_add_atom": "Attach one symbol, string, integer, float, or boolean.",
+                "node_set_atom": "Change one atom while preserving its node ID.",
+                "node_move": "Move one node to a new parent and position.",
+                "node_wrap": "Wrap one node in a new form.",
                 "node_delete": "Delete one node and its subtree.",
             },
             "positions": "Child positions are zero-based; omit position to append.",
@@ -110,31 +100,23 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
                 "node_inspect": "Return an ID-bearing local subtree and grammar hint.",
                 "node_find": "Find forms or atoms by head, kind, or value.",
                 "program_render": "Render canonical source or an annotated agent view.",
-                "grammar_help": (
-                    "Search the weavec2 surface corpus for exact examples."
-                ),
+                "grammar_help": "Search the weavec surface corpus for exact examples.",
             }
         },
         "ids": {
-            "rule": (
-                "Use returned n_* IDs in later calls; never locate code by line number."
-            ),
+            "rule": "Use returned n_* IDs; never locate code by line number.",
             "lifecycle": [
                 "editing an atom preserves its ID",
                 "moving a node preserves its ID",
                 "new forms and atoms receive new IDs",
                 "branches preserve base IDs",
-                "annotated renderings show IDs without changing canonical program meaning",
+                "annotated renderings expose IDs without changing program meaning",
             ],
         },
         "validation": {
-            "structural": (
-                "Every mutation checks tree shape, unique IDs, and cycle safety."
-            ),
-            "grammar": "grammar_help is guidance derived from weavec2 examples.",
-            "authoritative": (
-                "program_validate invokes weavec2 --frontend when configured."
-            ),
+            "structural": "Every mutation checks tree shape, unique IDs, and cycles.",
+            "grammar": "grammar_help is guidance derived from weavec examples.",
+            "authoritative": "program_validate invokes weavec --frontend.",
         },
         "bulk": {
             "tool": "program_import",
@@ -155,7 +137,6 @@ def grammar_help(
     limit: int = 8,
 ) -> dict[str, Any]:
     """Find observed Weave grammar forms and examples from the surface corpus."""
-
     return _result(
         lambda: workspace().grammar_help(
             form=form,
@@ -169,7 +150,6 @@ def grammar_help(
 @mcp.tool()
 def project_initialize(project: str, author: str = "agent") -> dict[str, Any]:
     """Create a versioned Weave project with an empty main branch."""
-
     return _result(lambda: workspace().initialize(project, author=author))
 
 
@@ -180,20 +160,14 @@ def branch_create(
     from_branch: str = "main",
 ) -> dict[str, Any]:
     """Create an independent agent branch from an existing branch head."""
-
     return _result(
-        lambda: workspace().create_branch(
-            project,
-            branch,
-            from_branch=from_branch,
-        )
+        lambda: workspace().create_branch(project, branch, from_branch=from_branch)
     )
 
 
 @mcp.tool()
 def branch_list(project: str) -> dict[str, Any]:
     """List branch heads for a project."""
-
     return _result(lambda: workspace().list_branches(project))
 
 
@@ -204,7 +178,6 @@ def branch_history(
     limit: int = 50,
 ) -> dict[str, Any]:
     """List immutable revisions reachable from a branch head."""
-
     return _result(lambda: workspace().list_history(project, branch, limit=limit))
 
 
@@ -215,7 +188,6 @@ def branch_merge(
     source_branch: str,
 ) -> dict[str, Any]:
     """Three-way merge stable node IDs and validate the resulting tree."""
-
     return _result(
         lambda: workspace().merge(
             project,
@@ -234,7 +206,6 @@ def program_create(
     version: str = "0.1",
 ) -> dict[str, Any]:
     """Create the program, name, and version forms and return the root ID."""
-
     return _result(
         lambda: workspace().create_program(
             project,
@@ -255,7 +226,6 @@ def program_import(
     replace: bool = False,
 ) -> dict[str, Any]:
     """Import source for migration; prefer atomic node tools for agent writing."""
-
     return _result(
         lambda: workspace().import_program(
             project,
@@ -270,7 +240,6 @@ def program_import(
 @mcp.tool()
 def program_list(project: str, branch: str = "main") -> dict[str, Any]:
     """List program documents and their root node IDs."""
-
     return _result(lambda: workspace().list_documents(project, branch))
 
 
@@ -284,7 +253,6 @@ def node_create_form(
     position: int | None = None,
 ) -> dict[str, Any]:
     """Create and attach one form such as fn, params, while, or return."""
-
     return _result(
         lambda: workspace().create_form(
             project,
@@ -308,7 +276,6 @@ def node_add_atom(
     position: int | None = None,
 ) -> dict[str, Any]:
     """Attach one atom: symbol, string, integer, float, or boolean."""
-
     return _result(
         lambda: workspace().add_atom(
             project,
@@ -331,15 +298,8 @@ def node_set_atom(
     value: Any,
 ) -> dict[str, Any]:
     """Change one atom value while preserving its stable node ID."""
-
     return _result(
-        lambda: workspace().set_atom(
-            project,
-            branch,
-            document,
-            node_id,
-            value,
-        )
+        lambda: workspace().set_atom(project, branch, document, node_id, value)
     )
 
 
@@ -351,10 +311,7 @@ def node_delete(
     node_id: str,
 ) -> dict[str, Any]:
     """Delete one node and its contained subtree."""
-
-    return _result(
-        lambda: workspace().delete_node(project, branch, document, node_id)
-    )
+    return _result(lambda: workspace().delete_node(project, branch, document, node_id))
 
 
 @mcp.tool()
@@ -367,7 +324,6 @@ def node_move(
     position: int | None = None,
 ) -> dict[str, Any]:
     """Move one node to a list parent without changing its stable ID."""
-
     return _result(
         lambda: workspace().move_node(
             project,
@@ -389,10 +345,7 @@ def node_wrap(
     head: str,
 ) -> dict[str, Any]:
     """Wrap one existing node in a newly created form."""
-
-    return _result(
-        lambda: workspace().wrap_node(project, branch, document, node_id, head)
-    )
+    return _result(lambda: workspace().wrap_node(project, branch, document, node_id, head))
 
 
 @mcp.tool()
@@ -404,7 +357,6 @@ def node_inspect(
     depth: int = 3,
 ) -> dict[str, Any]:
     """Inspect a local ID-bearing subtree without loading the full program."""
-
     return _result(
         lambda: workspace().inspect_node(
             project,
@@ -427,7 +379,6 @@ def node_find(
     limit: int = 50,
 ) -> dict[str, Any]:
     """Find exact node IDs by form head, atom kind, or atom value."""
-
     return _result(
         lambda: workspace().find_nodes(
             project,
@@ -450,7 +401,6 @@ def program_render(
     annotate_atoms: bool = False,
 ) -> dict[str, Any]:
     """Render canonical Weave or an agent view exposing stable node IDs."""
-
     return _result(
         lambda: {
             "document": document,
@@ -472,8 +422,7 @@ def program_validate(
     branch: str,
     document: str,
 ) -> dict[str, Any]:
-    """Validate a completed program with the configured weavec2 frontend."""
-
+    """Validate a completed program with the configured weavec frontend."""
     return _result(lambda: workspace().validate_program(project, branch, document))
 
 
@@ -487,7 +436,6 @@ def context_add(
     body: str,
 ) -> dict[str, Any]:
     """Version a design rule, contract, or interface note with the branch."""
-
     return _result(
         lambda: workspace().add_context(
             project,
@@ -507,7 +455,6 @@ def context_get(
     scope_name: str,
 ) -> dict[str, Any]:
     """Retrieve design context pinned to the current branch revision."""
-
     return _result(
         lambda: workspace().get_context(
             project,
@@ -519,7 +466,6 @@ def context_get(
 
 def main() -> None:
     """Run the server using the standard MCP stdio transport."""
-
     mcp.run()
 
 
