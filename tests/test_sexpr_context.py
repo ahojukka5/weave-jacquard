@@ -25,7 +25,7 @@ def test_context_is_versioned_with_branch(sexpr_workspace):
     assert context[0]["title"] == "Interface rule"
 
 
-def test_validation_reports_missing_weavec2_without_guessing(sexpr_workspace):
+def test_validation_reports_missing_weavec_without_guessing(sexpr_workspace):
     sexpr_workspace.create_program(
         "sexpr-demo",
         "main",
