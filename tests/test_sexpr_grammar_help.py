@@ -3,7 +3,7 @@ from __future__ import annotations
 from weave_frontend.grammar_help import GrammarIndex
 
 
-def test_help_is_derived_from_weavec2_surface_examples(tmp_path):
+def test_help_is_derived_from_weavec_surface_examples(tmp_path):
     surface = tmp_path / "test" / "correctness" / "surface"
     surface.mkdir(parents=True)
     (surface / "sample.weave").write_text(
