@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rename the active weavec2 integration to canonical weavec interfaces."""
+"""Replace the active ``weavec2`` integration with canonical ``weavec`` names."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = Path(__file__).resolve()
+WORKFLOW = ROOT / ".github/workflows/ci.yml"
 OLD_MODULE = ROOT / "src/weave_frontend/weavec2.py"
 NEW_MODULE = ROOT / "src/weave_frontend/weavec.py"
 
@@ -20,6 +22,7 @@ replacements = (
     ("Weavec2Validator", "WeavecValidator"),
     ("weavec2_source_root", "weavec_source_root"),
     ("weavec2_binary", "weavec_binary"),
+    ("WEAVEC2_SOURCE_ROOT", "WEAVEC_SOURCE_ROOT"),
     ("WEAVEC2_BIN", "WEAVEC_BIN"),
     ("weavec2.py", "weavec.py"),
     (".weavec2", ".weavec"),
@@ -33,7 +36,7 @@ for item in raw.split(b"\0"):
         continue
     relative = Path(item.decode())
     path = ROOT / relative
-    if relative == Path(".github/workflows/ci.yml") or not path.is_file():
+    if path in {SCRIPT, WORKFLOW} or not path.is_file():
         continue
     try:
         text = path.read_text(encoding="utf-8")
@@ -142,12 +145,60 @@ class WeavecValidator:
     encoding="utf-8",
 )
 
-# The old path and active names must disappear completely from the current tree.
+WORKFLOW.write_text(
+    '''name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python 3.12
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package and test tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install pytest pytest-cov ruff
+
+      - name: Check Python syntax
+        run: python -m compileall -q src tests
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: pytest --cov=weave_frontend --cov-report=term-missing
+''',
+    encoding="utf-8",
+)
+
+SCRIPT.unlink()
+
 remaining: list[str] = []
 for path in ROOT.rglob("*"):
     if not path.is_file() or ".git" in path.parts:
-        continue
-    if path == ROOT / ".github/workflows/ci.yml":
         continue
     try:
         text = path.read_text(encoding="utf-8")
@@ -159,5 +210,3 @@ if remaining:
     raise SystemExit("legacy active names remain: " + ", ".join(sorted(remaining)))
 if OLD_MODULE.exists():
     raise SystemExit("legacy module path still exists")
-
-Path(__file__).unlink()
