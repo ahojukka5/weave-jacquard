@@ -3,7 +3,8 @@
 ## 1. Thesis
 
 A coding agent should not have to emit and maintain a complete source file.
-Instead, it should operate on a typed program tree through a small set of tools:
+Instead, it should operate on a versioned program tree through a compact tool
+surface:
 
 ```text
 DISCOVER → INSPECT → MUTATE → VALIDATE → TEST → COMMIT → MERGE
@@ -12,146 +13,147 @@ DISCOVER → INSPECT → MUTATE → VALIDATE → TEST → COMMIT → MERGE
 The environment owns syntax, stable identities, scope, revision history, and
 transactional safety. The model concentrates on local algorithmic decisions.
 
-The authoritative representation is a versioned abstract syntax tree stored in
-a database. Surface Weave, WIR, Rust, C, LLVM IR, and other forms are derived
-artifacts.
+The authoritative editing representation is a versioned abstract syntax tree in
+a database. Surface Weave, WIR, LLVM IR, and native objects are deterministic
+derivatives. The canonical language implementation and completed-program
+validator is [`weavec`](https://github.com/ahojukka5/weavec).
 
 ## 2. Program structure
 
 An S-expression is an ordered rooted n-ary tree. A first-child/next-sibling
 encoding may implement it in memory, but that encoding is not the semantic
-model. The database stores module snapshots and stable node IDs; future compact
-snapshots may use a contiguous node array and string/type tables.
+model. The database stores immutable snapshots and stable node IDs.
 
 ```text
 workspace
 └── project
-    ├── program
-    ├── module app
-    │   ├── imports
-    │   └── functions
-    ├── module stdlib.arrays
-    ├── contracts and documents
+    ├── program documents
+    ├── modules and functions
+    ├── contracts and design context
     ├── branches
     └── immutable revisions
 ```
 
 ## 3. Agent API
 
-The intended MCP surface remains small:
+The intended MCP surface is deliberately small.
 
 ### Discovery and inspection
 
-- `find_symbols`
-- `inspect_function`
-- `inspect_node`
-- `find_references`
-- `get_context`
-- `get_diagnostics`
+- `grammar_help`
+- `program_list`
+- `program_render`
+- `node_find`
+- `node_inspect`
+- `context_get`
 
 ### Mutation
 
-- `create_module`
-- `create_function`
-- `insert_node`
-- `replace_node`
-- `delete_node`
-- `add_import`
+- `program_create`
+- `program_import`
+- `node_create_form`
+- `node_add_atom`
+- `node_set_atom`
+- `node_move`
+- `node_wrap`
+- `node_delete`
+- `context_add`
 
 ### Verification and history
 
-- `validate`
-- `compile`
-- `run_tests`
-- `create_branch`
-- `commit`
-- `merge`
-- `checkout`
-- `semantic_diff`
+- `program_validate`
+- `branch_create`
+- `branch_list`
+- `branch_history`
+- `branch_merge`
 
-The prototype exposes these ideas as Python methods. An MCP adapter should be a
-thin transport layer over the same service.
+The MCP server is a transport layer over the same workspace services used by the
+Python API.
 
-## 4. Immediate validation and syntax holes
+## 4. Validation and incomplete programs
 
-Every inserted subtree must satisfy the grammar before it is persisted. A
-malformed tool call returns a structured error and the branch head remains
-unchanged.
+Every persisted mutation must preserve structural validity. A failed operation
+returns a structured error and does not advance the branch head.
 
-Incomplete programs are represented with explicit holes:
+The generic S-expression layer guarantees:
 
-```json
-{"kind": "hole", "category": "statement", "expected_type": "i32"}
+- legal node shapes and atom values;
+- stable, unique node IDs;
+- ordered children;
+- no move cycles;
+- deterministic rendering.
+
+A partially constructed form may be structurally valid but semantically
+incomplete. Grammar help guides construction; `program_validate` performs the
+normative completed-program check through:
+
+```text
+weavec --frontend output.wir input.weave
 ```
 
-A hole is valid syntax but prevents finalization. This separates two questions:
-
-1. Is the tree structurally well formed?
-2. Is the program complete and semantically valid?
-
-This allows an agent to build a function incrementally without ever storing a
-broken parser state.
+The MCP environment must not maintain a second handwritten copy of the complete
+surface grammar. Until `weavec` exposes a machine-readable registry, grammar
+help is inferred from its `test/correctness/surface` corpus.
 
 ## 5. Modules, imports, and externs
 
-`import stdlib.arrays` is a semantic dependency, not textual inclusion. It
-resolves a module identity and a pinned interface version. Imports should
-ultimately record:
+An import is a semantic dependency, not textual inclusion. A production module
+reference should record:
 
 - module identity;
 - exact or compatible revision;
 - public interface hash;
 - alias and visibility;
-- target/platform constraints.
+- target and platform constraints.
 
 An `extern` declares an ABI contract whose implementation is outside the Weave
 program. A precompiled Weave module is different: it has a known interface,
-optional AST/IR, and cached object artifact.
+optional semantic representation, and cached compiled artifacts.
 
 ## 6. Persistence model
 
 The prototype uses SQLite because it is embedded, transactional, portable, and
-supports rich queries over symbols, revisions, and context.
+supports rich queries over revisions and context.
 
-Current core tables:
+Core concepts include:
 
 ```text
 projects
 revisions
 branches
-module_snapshots
+module snapshots
 operations
 documents
-revision_documents
+revision documents
 ```
 
-Each mutation creates a full immutable module snapshot. This is intentionally
-simple. A production implementation can deduplicate immutable nodes or modules
-by content hash.
+Each mutation currently creates a complete immutable snapshot. This is simple
+and auditable. A production implementation can deduplicate immutable nodes or
+modules by content hash.
 
-### Fast compilation path
+### Compilation boundary
 
-Compilation must not query one AST node at a time and must not regenerate text
-only to lex and parse it again. The target path is:
+Compilation must not query one AST node at a time or regenerate source only to
+parse it again. The target path is:
 
 ```text
 SQLite revision
-→ load changed module snapshot in one operation
-→ canonical semantic IR
-→ backend
+→ load changed module snapshot
+→ canonical semantic representation
+→ weavec compiler boundary
 → cached object
 → link
 ```
 
-A future `ast_blob` can contain a compact node array, string table, type table,
-and symbol table. The normalized/queryable representation serves agent edits;
-the snapshot serves compilation.
+A future compact snapshot can contain a node array, string table, type table,
+and symbol table. The normalized representation serves agent edits; the compact
+snapshot serves compilation.
 
 ## 7. History and backup
 
-Revisions are immutable and form a DAG. A branch is only a named pointer to a
-revision. Checkout moves a branch pointer; a user-facing revert should normally
-create a new revision so the revert itself is reversible.
+Revisions are immutable and form a DAG. A branch is a named pointer to a
+revision. User-facing revert normally creates a new revision so the revert is
+itself reversible.
 
 ```text
 R0 ── R1 ── R2
@@ -160,10 +162,9 @@ R0 ── R1 ── R2
 ```
 
 The operation log explains how each revision was produced. Snapshot plus log
-enables audit, semantic diff, undo of drafts, and reconstruction.
-
-Internal history is not a physical backup. Production operation also requires
-consistent database backups, integrity checks, and periodic canonical exports.
+enables semantic diff, audit, merge, and reconstruction. Internal history is not
+a physical backup; production operation also requires consistent database
+backups and integrity checks.
 
 ## 8. Parallel agents
 
@@ -173,82 +174,61 @@ Every agent receives:
 - a private branch;
 - an edit scope;
 - pinned interfaces;
-- relevant contracts and design documents;
+- relevant contracts and design context;
 - tests and acceptance criteria.
 
-Agents may read broadly but should write only inside the declared scope.
-Interfaces can exist before implementations, allowing one agent to write
-`foo()` against the declared `bar()` contract while another implements `bar()`.
-
-The context used for a branch must be reproducible. Documents and interface
-versions are therefore linked to revisions by hash or immutable identity.
+Agents may read broadly but should write only inside their declared scope.
+Interfaces can exist before implementations, allowing parallel work against
+pinned contracts.
 
 ## 9. Semantic three-way merge
 
-Merge compares:
+Merge compares a base revision with both branch heads.
 
-```text
-base revision
-our revision
-their revision
-```
-
-The first prototype merges at module and function granularity:
-
-- one branch changed and the other did not: take the change;
+- one branch changed a node and the other did not: take the change;
 - both produced identical content: take either;
-- both changed the same symbol differently: conflict;
-- different symbols: merge automatically.
+- both changed the same identity differently: conflict;
+- independent node changes: merge automatically.
 
-After structural merge, the complete program must pass:
+A text-level clean merge is insufficient. The merged program must pass
+structural validation and, when coherent, compiler validation through `weavec`.
+Later stages should also perform symbol resolution, type checking, contract
+checks, compilation, and affected tests.
 
-1. grammar validation;
-2. symbol resolution;
-3. type checking;
-4. contract/invariant checks;
-5. compilation;
-6. affected unit tests;
-7. integration tests.
-
-A text-level clean merge is insufficient.
-
-## 10. Design context
+## 10. Versioned design context
 
 Contracts and architecture documents are first-class immutable objects. They
-may apply to a project, module, symbol, interface, test, or task.
+may apply to a project, document, module, symbol, interface, test, or task.
 
-An agent implementing `app.foo` receives only the relevant context closure:
+An agent receives the relevant context closure rather than the entire repository:
 
 ```text
 project invariants
-+ app module design
-+ app.foo contract
++ module design
++ symbol contract
 + imported interfaces
 + directly relevant tests
 ```
 
-This provides shared context without flooding a small model with the entire
-repository.
+Because context is pinned to revisions, later review can reproduce the rules an
+agent saw while it worked.
 
-## 11. Deterministic backends
+## 11. Deterministic compiler boundary
 
-The same validated AST, language version, backend version, target, and options
-must produce byte-identical canonical output. Candidate backends include:
+The same validated program, language version, compiler version, target, and
+options must produce byte-identical canonical output. The active compiler chain
+is external to this repository:
 
-- surface Weave for human inspection and Git export;
-- WIR for the current compiler pipeline;
-- safe Rust for readable, memory-safe validation;
-- C for portability and FFI;
-- LLVM IR for production performance;
-- WebAssembly for sandboxed execution.
+```text
+weavec0 → weavec1 → weavec-bootstrap → weavec
+```
 
-Safe Weave should distinguish owned values, shared borrows, mutable borrows,
-slices, arrays, and raw pointers. Only the explicitly unsafe subset should
-require unsafe Rust or direct low-level code generation.
+Only the final user-facing `weavec` command is part of the MCP validation
+contract. Bootstrap stages must not leak into this repository's public API.
 
 ## 12. Incremental compilation
 
-Cache keys should include:
+Artifact cache keys should include:
 
 ```text
 module implementation hash
@@ -258,53 +238,52 @@ module implementation hash
 + optimization settings
 ```
 
-Changing a private function changes the implementation hash but not necessarily
-the interface hash. Dependents then reuse their object artifacts. Changing a
-public signature invalidates dependent modules.
+Changing a private implementation changes its implementation hash but not
+necessarily its public interface hash. Changing a public signature invalidates
+dependent modules.
 
 ## 13. Prototype boundaries
 
 The current implementation deliberately omits:
 
-- a networked MCP server;
-- parsing existing `.weave` files into the database;
-- WIR/LLVM compilation;
+- direct AST-to-compiler integration;
+- a formal machine-readable grammar registry;
 - content-addressed node deduplication;
 - ownership and borrow checking;
 - fine-grained expression-level merge;
 - executable contract checking;
-- distributed writers.
+- distributed writers;
+- build, run, package, and artifact management.
 
-These should be added only after the core editing and merge experiments show
-clear value with real agents.
+These should be added only after the editing and merge experiments demonstrate
+clear value with real coding agents.
 
 ## 14. Next milestones
 
-### M1 — prove editing ergonomics
+### M1 — editing ergonomics
 
-- MCP adapter over `Workspace`;
-- import/export for the current surface grammar;
-- Fibonacci, GCD, Collatz, factorial, power, Ackermann, and sorting tasks;
-- record tool calls, validation failures, repairs, tokens, and correctness.
+- evaluate atomic tools on representative Weave programs;
+- record tool calls, validation failures, repairs, and correctness;
+- improve bounded inspection and grammar guidance.
 
-### M2 — real compiler bridge
+### M2 — canonical compiler bridge
 
-- emit current WIR deterministically;
-- invoke `weavec2` for compile and run;
-- cache artifacts by revision and target;
-- compare direct text generation against AST tools.
+- consume a machine-readable grammar registry from `weavec` when available;
+- invoke `weavec --frontend` through the stable adapter;
+- add compile, run, and test tools around released compiler binaries;
+- cache artifacts by revision and target.
 
 ### M3 — robust parallel development
 
 - explicit interface objects and versions;
 - edit scopes;
-- semantic diffs;
-- merge previews and conflict diagnostics;
+- semantic diffs and merge previews;
+- conflict diagnostics;
 - affected-test selection.
 
 ### M4 — safe systems model
 
 - arrays, slices, structs, ownership, borrows, and effects;
-- safe Rust backend;
 - extern and precompiled module support;
-- compact binary AST snapshots.
+- compact binary snapshots;
+- auditable sandboxed execution.
