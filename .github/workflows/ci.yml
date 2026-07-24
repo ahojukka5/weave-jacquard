@@ -24,9 +24,6 @@ jobs:
           ref: canonical-weavec-integration
           fetch-depth: 0
 
-      - name: Apply canonical migration
-        run: python scripts/refactor-canonical-weavec.py
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -35,17 +32,26 @@ jobs:
       - name: Install package and test tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .
           python -m pip install pytest pytest-cov ruff
 
-      - name: Check Python syntax
-        run: python -m compileall -q src tests
+      - name: Apply migration and validate final tree
+        run: |
+          set -o pipefail
+          {
+            python scripts/refactor-canonical-weavec.py
+            python -m pip install -e .
+            python -m compileall -q src tests
+            ruff check .
+            pytest --cov=weave_frontend --cov-report=term-missing
+          } 2>&1 | tee canonical-migration.log
 
-      - name: Lint final tree
-        run: ruff check .
-
-      - name: Test final tree
-        run: pytest --cov=weave_frontend --cov-report=term-missing
+      - name: Upload migration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-weavec-migration-log
+          path: canonical-migration.log
+          if-no-files-found: warn
 
       - name: Commit final migration
         run: |
