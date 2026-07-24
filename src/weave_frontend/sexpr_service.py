@@ -23,7 +23,7 @@ from .sexpr import (
     validate_tree,
     walk_nodes,
 )
-from .weavec2 import Weavec2Validator
+from .weavec import WeavecValidator
 
 
 class SExpressionWorkspace(Workspace):
@@ -33,12 +33,12 @@ class SExpressionWorkspace(Workspace):
         self,
         path: str | Path,
         *,
-        weavec2_source_root: str | Path | None = None,
-        weavec2_binary: str | Path | None = None,
+        weavec_source_root: str | Path | None = None,
+        weavec_binary: str | Path | None = None,
     ) -> None:
         super().__init__(path)
-        self.grammar = GrammarIndex(weavec2_source_root)
-        self.validator = Weavec2Validator(weavec2_binary, self.grammar.source_root)
+        self.grammar = GrammarIndex(weavec_source_root)
+        self.validator = WeavecValidator(weavec_binary, self.grammar.source_root)
 
     def list_branches(self, project: str) -> list[dict[str, str]]:
         rows = self.db.connection.execute(
