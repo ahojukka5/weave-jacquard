@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Weave contributors" }]
-keywords = ["weave", "compiler", "ast", "agents", "sqlite"]
+keywords = ["weave", "compiler", "ast", "agents", "sqlite", "mcp"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "License :: OSI Approved :: Apache Software License",
@@ -19,7 +19,9 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
-dependencies = []
+dependencies = [
+  "mcp>=1.27,<2",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -30,6 +32,7 @@ dev = [
 
 [project.scripts]
 weave-front = "weave_frontend.cli:main"
+weave-mcp = "weave_frontend.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
