@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, refactor/canonical-weavec-integration]
   pull_request:
   workflow_dispatch:
 
@@ -15,7 +15,9 @@ concurrency:
 
 jobs:
   refactor:
-    if: github.event_name == 'pull_request' && github.actor != 'github-actions[bot]'
+    if: >-
+      github.ref == 'refs/heads/refactor/canonical-weavec-integration' &&
+      github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check out migration branch
@@ -36,7 +38,10 @@ jobs:
           git push origin HEAD:refactor/canonical-weavec-integration
 
   test:
-    if: github.event_name == 'push' || github.actor == 'github-actions[bot]'
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      github.actor == 'github-actions[bot]' ||
+      github.event_name == 'pull_request'
     name: Python 3.12
     runs-on: ubuntu-latest
     timeout-minutes: 10
