@@ -2,92 +2,72 @@
 
 ## Purpose
 
-`weave_frontend` owns immutable program revisions and stable `n_*` node
-identities. `weavec` owns the language and the complete native toolchain. The
-bridge converts one ordered set of database documents from one exact revision
-into a native executable without exposing agent annotations, LLVM phases, the
-linker, or the private runtime to callers.
+`weave_frontend` owns immutable revisions, stable node identities, canonical
+source materialization, and build provenance. `weavec` owns the language and
+the complete native toolchain.
+
+The bridge converts one ordered source set from one exact database revision into
+a native executable:
 
 ```text
-immutable database revision
-        ↓
+immutable revision
+    ↓
 ordered canonical sources + one node map per source
-        ↓  weavec build
-native executable + manifests + mapped diagnostics
+    ↓  weavec build
+executable + compiler manifest + mapped diagnostics
 ```
 
-## Stored, agent, and compiler views
+Agent annotations, LLVM phases, linker selection, and the private runtime remain
+hidden from callers.
 
-The database tree is authoritative for editing. Agent-facing rendering may show
-stable-ID wrappers such as:
+## Revision and source selection
 
-```lisp
-(@n_function
-  (fn main
-    (@n_params (params))
-    (@n_returns (returns i32))))
-```
+A request supplies either:
 
-Those wrappers are transport metadata, not Weave syntax. Each selected document
-is rendered independently into canonical source with no `@n_*` wrappers:
+- a primary `document` plus optional ordered `additional_documents`; or
+- a revisioned named build target containing that same information.
 
-```lisp
-(fn main
-  (params)
-  (returns i32))
-```
-
-`weavec` therefore remains independent of the database and MCP protocol.
-
-## Ordered document set
-
-A build request identifies a primary `document` and optionally an ordered
-`additional_documents` list. The compiler receives:
-
-```text
-document
-additional_documents[0]
-additional_documents[1]
-...
-```
-
-The bridge does not silently add every project document and does not sort the
-list. Input order is explicit, deterministic, and part of the build identity.
-Duplicate names are rejected. Every selected document must exist in the same
-pinned revision.
-
-The single-document API remains the special case where
-`additional_documents` is omitted.
-
-## Revision pinning
-
-A branch request is resolved to one immutable revision before rendering:
+A branch is resolved once before rendering:
 
 ```text
 project + branch
-        ↓ resolve once
-revision_id + revision root hash
-        ↓
-read every selected document from that revision
+    ↓ resolve once
+revision ID + revision root hash
+    ↓
+read target metadata and every source from that revision
 ```
 
-If the branch advances during compilation, the running build is unaffected.
-Building never creates a source revision or advances a branch.
+An explicit revision ID bypasses branch-head resolution but must belong to the
+same project. A branch may advance during compilation without affecting the
+running build. Building never creates a source revision or advances a branch.
+
+The compiler input order is always:
+
+```text
+primary document
+additional document 0
+additional document 1
+...
+```
+
+The bridge does not sort the list or silently include all project documents.
+Duplicate names and missing revision documents are rejected before compiler
+startup.
 
 ## Canonical source and node maps
 
-Each selected document is rendered with its own `weave-node-map-v1` document.
-The map records:
+Each selected document is independently rendered without agent `@n_*`
+annotations. A matching `weave-node-map-v1` records:
 
-- original database document name;
+- the database document name;
 - pinned revision ID;
-- canonical-source SHA-256;
+- canonical source SHA-256;
 - UTF-8 byte spans with exclusive ends;
 - one-based line and column spans;
-- stable `n_*` node identities.
+- stable node IDs.
 
-Materialized filenames are deterministic and indexed to avoid basename
-collisions:
+Materialized filenames are deterministic and indexed so equal basenames cannot
+collide:
 
 ```text
 sources/000-main.weave
@@ -96,12 +76,12 @@ source-maps/000-main.weave.map.json
 source-maps/001-library.weave.map.json
 ```
 
-The database document names remain in the build manifest and node maps. The
-indexed filenames are build-local compiler inputs only.
+The database document names remain in the frontend manifest and node maps. The
+indexed names are build-local compiler inputs only.
 
 ## Public compiler invocation
 
-The bridge invokes one public compiler contract:
+The bridge invokes one public native-build contract:
 
 ```text
 weavec build \
@@ -112,21 +92,25 @@ weavec build \
   --diagnostics-json compiler-diagnostics.json
 ```
 
-An optional target is appended with `--target`. The bridge never invokes LLVM,
-`--backend`, a target linker, or a runtime archive during a native build.
-`weavec` owns surface lowering, WIR, LLVM IR, object generation, private runtime
-selection, target linking, and atomic executable publication.
+An optional compiler target is appended with `--target`.
+
+The bridge never invokes LLVM, `--backend`, a platform linker, or a runtime
+archive. `weavec` owns surface lowering, WIR, LLVM IR, object generation,
+runtime selection, target linking, and executable publication.
+
+Target validation uses the same ordered canonical source representation but
+calls:
+
+```text
+weavec --frontend output.wir source0.weave source1.weave ...
+```
 
 ## Artifact layout
 
 ```text
 .weave-build/<build-id>/
 ├── sources/
-│   ├── 000-main.weave
-│   └── 001-library.weave
 ├── source-maps/
-│   ├── 000-main.weave.map.json
-│   └── 001-library.weave.map.json
 ├── compiler-manifest.json
 ├── compiler-diagnostics.json
 ├── diagnostics.json
@@ -134,57 +118,61 @@ selection, target linking, and atomic executable publication.
 └── program
 ```
 
-The executable exists only after a successful compiler process and a valid
-`weavec-diagnostics-v1` response.
+The executable is retained only when the compiler returns success and produces
+a valid `weavec-diagnostics-v1` response.
 
-## Frontend build manifest
+## Frontend manifest
 
 `weave-frontend-build-manifest-v2` records:
 
-- build ID, status, and `weave-build-key-v3` cache contract;
+- build ID, status, and build-key contract;
 - project, requested branch, pinned revision ID, and revision root hash;
-- primary document and the complete ordered document list;
-- one source record per document with canonical source, node-map path, and hash;
+- primary document and complete ordered document list;
+- one source record per document with canonical hash and node-map path;
 - compiler path and SHA-256;
-- compiler diagnostics protocol validity;
 - target, normalized compiler command, and return code;
+- compiler diagnostics protocol validity;
 - relative artifact names and SHA-256 values.
 
-For backward-compatible single-document consumers, `artifacts.source` and
-`artifacts.node_map` still point to the primary source. New consumers should use
+For single-document compatibility, `artifacts.source` and
+`artifacts.node_map` identify the primary source. Multi-document consumers use
 `artifacts.sources` and `artifacts.node_maps`.
 
-`build_get` recursively expands string, list, and object artifact references into
-absolute `artifact_paths` without requiring the compiler to remain installed.
+`build_get` adds absolute `artifact_paths` for stored artifacts and does not
+require the compiler to remain installed. Manifest path containment and cached
+artifact hash verification are tracked as required hardening in issue #17.
 
-## Cache identity
+## Build identity and cache
 
 `weave-build-key-v3` includes:
 
 ```text
 bridge contract version
-+ immutable revision root hash and ID
++ immutable revision root hash and revision ID
 + ordered (document name, canonical source hash) records
-+ weavec binary hash
++ compiler binary hash
 + target
 ```
 
-Changing source order changes the build ID. Branch names are provenance rather
-than cache identity. Only successful builds with a valid compiler diagnostics
-artifact and complete source/map artifacts are reused.
+Changing source order, compiler binary, revision, or target changes the build
+ID. Branch names are provenance rather than cache identity.
 
-## Multi-source diagnostics
+Only a successful build with a valid compiler-diagnostics artifact and complete
+source/map artifacts is eligible for reuse. Full artifact-integrity admission
+and non-destructive concurrent publication are not yet complete; see issue #17.
 
-The bridge validates the complete `weavec-diagnostics-v1` document before
-trusting any entry. For every diagnostic:
+## Diagnostics mapping
 
-1. identify which materialized canonical source the compiler named;
-2. choose that source's node map;
-3. verify the byte span is within that source;
-4. select the smallest stable node containing the span;
-5. add both the original database `document` and `node_id`.
+The bridge validates the complete compiler diagnostics document before trusting
+an entry. For each diagnostic it:
 
-A mapped entry therefore includes separate identities:
+1. identifies the exact materialized source named by the compiler;
+2. selects that source's node map;
+3. checks that the byte span fits within the canonical source;
+4. selects the smallest stable node containing the span;
+5. adds the original database `document` and `node_id`.
+
+A mapped secondary-source diagnostic therefore retains both identities:
 
 ```json
 {
@@ -196,31 +184,42 @@ A mapped entry therefore includes separate identities:
 ```
 
 Spanless, ambiguous, generated-WIR, and other non-canonical locations remain
-valid diagnostics with `document: null` and `node_id: null`; the bridge does not
-guess. `span_origin` is preserved unchanged.
+valid but unmapped. The bridge does not guess.
 
 Missing, malformed, unsupported, or internally inconsistent compiler output
-produces a structured bridge error and prevents executable publication, even if
-an untrusted compiler process returned zero. Raw malformed diagnostics are kept
-byte-for-byte for investigation.
+creates a structured bridge error and prevents executable publication even if
+the compiler process returned zero. Raw compiler output remains available for
+investigation.
 
 ## MCP and CLI
 
-MCP:
+Ad hoc MCP build:
 
 ```text
 program_build(
-  project,
-  document,
+  project="demo",
+  document="main.weave",
   additional_documents=["library.weave", "platform.weave"],
   branch="main"
 )
-build_get(build_id)
+→ build_get(build_id)
 ```
 
-CLI:
+Revisioned target flow:
 
 ```text
+build_target_set(...)
+→ build_target_validate(...)
+→ build_target_build(...)
+→ build_get(build_id)
+```
+
+CLI equivalents:
+
+```bash
+weave-build --db weave.db target-validate demo application
+weave-build --db weave.db target-build demo application
+
 weave-build --db weave.db build demo main.weave \
   --source library.weave \
   --source platform.weave
@@ -228,23 +227,24 @@ weave-build --db weave.db build demo main.weave \
 weave-build --db weave.db get <build-id>
 ```
 
-Each repeated `--source` preserves its command-line order.
-
 ## Failure and publication semantics
 
-- Rendering or compiler failure never mutates the database revision.
-- A missing selected document fails before starting the compiler.
-- Duplicate selected documents are rejected.
-- Compiler or protocol failure publishes diagnostics but no executable.
-- Build files are prepared in a temporary sibling directory.
-- The complete artifact directory is published with an atomic rename.
-- Compilation remains separate from future sandboxed execution.
+- Rendering or compiler failure never mutates a database revision.
+- Missing or duplicate selected documents fail before compiler startup.
+- Compiler or diagnostics-protocol failure publishes diagnostics but no
+  executable.
+- Build work occurs in a temporary sibling directory.
+- A completed artifact directory is installed with a rename.
+- Non-destructive publication under concurrent identical builds remains tracked
+  in issue #17.
+- Compilation is separate from future sandboxed execution.
 
-## Remaining refinements
+## Remaining work
 
-- propagate exact surface locations explicitly through WIR where backend
-  diagnostics currently rely on conservative inference;
-- expose richer compiler/toolchain capability metadata;
-- define persistent named build targets instead of requiring callers to repeat
-  a long document order;
-- implement separately sandboxed `program_run`.
+- issue #14: remove the typed-AST prototype from the production workspace path;
+- issue #17: verify cached artifact hashes, enforce path containment, and make
+  concurrent publication non-destructive;
+- propagate exact surface locations through WIR where backend diagnostics still
+  rely on conservative inference;
+- expose richer compiler and target capability metadata;
+- add separately sandboxed program execution.

@@ -1,166 +1,187 @@
 # weave-mcp
 
-## Goal
+## Purpose
 
-`weave-mcp` lets an agent construct, validate, merge, and build Weave programs
-without emitting a large nested JSON tree or balancing S-expression parentheses.
-The write API is atomic: one form, atom, move, wrap, or deletion per call.
+`weave-mcp` is the primary agent interface to `weave_frontend`. It lets coding
+agents construct, inspect, validate, merge, and build Weave programs without
+replacing complete source files or balancing large S-expressions in one call.
 
-The database owns node identity and revision history. Canonical `.weave` sources
-are generated deterministically when validation or compilation requires them.
+The database owns node identity, immutable revisions, branches, context, and
+build provenance. `weavec` remains the authoritative language frontend and
+native compiler.
 
-## Grammar and compiler authority
+## Compiler authority
 
-The MCP server deliberately does not duplicate the full Weave grammar or native
-toolchain.
+Grammar help is derived from the configured compiler checkout. It is
+construction guidance, not a duplicate language specification.
 
-`grammar_help` scans the configured `weavec` checkout under
-`test/correctness/surface` and indexes forms actually used there. This index is
-construction guidance. The authoritative language check is:
-
-```text
-program_validate
-  → canonical source
-  → weavec --frontend
-```
-
-The authoritative native build is:
+Authoritative validation is:
 
 ```text
-program_build
-  → pin immutable revision
-  → ordered canonical sources + one weave-node-map-v1 per source
-  → weavec build
-  → executable and manifests
+canonical ordered source set
+→ weavec --frontend output.wir source0.weave source1.weave ...
 ```
 
-`weave_frontend` never invokes LLVM tools or selects a runtime archive. The
-compiler package owns those details.
+Authoritative native compilation is:
 
-Set `WEAVEC_SOURCE_ROOT` to enable corpus-backed grammar help. Set `WEAVEC_BIN`
-when the compiler is not available as `weavec` on `PATH`. `WEAVE_BUILD_ROOT`
-selects the artifact store.
+```text
+canonical ordered source set
+→ weavec build source0.weave source1.weave ... -o program
+```
 
-## Stable IDs and compiler source
+`weave_frontend` does not invoke LLVM tools, choose runtime archives, or link
+programs itself.
 
-Every list and atom receives a stable ID such as `n_3a12cce48fe14f99`.
+## Stable node identities
 
-- editing an atom preserves its ID;
+Every list and atom has an ID such as `n_3a12cce48fe14f99`.
+
+- changing an atom preserves its ID;
 - moving a node preserves its ID;
 - new nodes receive new IDs;
 - branches retain IDs inherited from their base revision;
-- merge uses IDs rather than line numbers.
+- structural merge compares IDs rather than line numbers.
 
-`program_render(annotated=true)` and `node_inspect` expose IDs. Canonical source
-omits annotations. `program_build` generates a separate canonical source and
-sidecar map for every selected database document. Each map contains UTF-8 byte
-and line/column spans for every node in that document.
+`program_render(annotated=true)` and `node_inspect` can expose these IDs.
+Compiler sources never include the annotations. Each built source receives a
+separate `weave-node-map-v1` sidecar.
 
-## Tools
+## Projects and branches
 
-### Help and grammar
+### `project_initialize`
 
-- `weave_help(topic)` explains workflows, IDs, writes, reads, and validation.
-- `grammar_help(form, query, parent_form)` searches the `weavec` surface corpus.
+Create a project, its initial revision, and the `main` branch.
 
-Recommended calls include:
+### `branch_create`
 
-```text
-grammar_help(form="fn")
-grammar_help(form="while")
-grammar_help(parent_form="program")
-grammar_help(query="ptr")
-```
+Create a branch from another branch head.
 
-### Projects and branches
+### `branch_list`
 
-- `project_initialize`
-- `branch_create`
-- `branch_list`
-- `branch_history`
-- `branch_merge`
+List branches and their current immutable revision IDs.
 
-Each mutation creates an immutable revision. Branch merge is a three-way merge
-of stable node identities. Independent insertions into the same list are kept;
-incompatible edits to the same atom or subtree produce a conflict.
+### `branch_history`
 
-### Program documents
+Follow a branch's first-parent revision history.
 
-- `program_create` creates the program, name, and version forms.
-- `program_list` lists documents and root IDs.
-- `program_render` returns canonical or annotated Weave.
-- `program_validate` runs structural checks and the configured compiler frontend.
-- `program_import` imports complete source for migration and fixtures.
-- `program_build` builds an ordered document set from a pinned revision.
+### `branch_merge`
 
-`program_import` is not the preferred agent write path.
+Run a stable-ID three-way merge. Independent changes are retained;
+incompatible edits produce a conflict and do not advance the target branch.
 
-### Builds
+## Program documents
 
-#### `program_build`
+### `program_create`
+
+Create a `(program ...)` document with name and version forms.
+
+### `program_import`
+
+Import one complete source document. This is intended for migration and test
+fixtures; agents should prefer atomic writes for normal work.
+
+### `program_list`
+
+List all database documents, including reserved structural metadata.
+
+### `program_source_list`
+
+List only compiler source documents. Revisioned build-target metadata is
+excluded.
+
+### `program_render`
+
+Render canonical compiler source or an annotated agent view.
+
+### `program_validate`
+
+Validate one document from the current branch head through `weavec --frontend`.
+For multi-document programs, use a named target and `build_target_validate`.
+
+### `program_build`
+
+Build an explicit ordered document set from one pinned revision.
 
 Inputs:
 
 ```text
 project
-document                         primary source
-additional_documents = optional ordered list
-branch = "main"
-revision_id = optional exact revision
-target = optional target triple
+ document                         primary source
+ additional_documents            optional ordered sources
+ branch = "main"
+ revision_id = optional exact revision
+ target = optional compiler target triple
 ```
 
-Example:
+The primary document is always first. Additional documents retain the supplied
+order. Duplicates are rejected and the server never silently includes all
+project documents.
+
+## Revisioned named targets
+
+A named target stores the compiler input order and target triple in the same
+immutable revision graph as its source documents.
+
+### `build_target_set`
+
+Create or update a target definition.
 
 ```text
-program_build(
+build_target_set(
   project="demo",
+  name="application",
   document="main.weave",
   additional_documents=["library.weave", "platform.weave"],
-  branch="main"
+  compiler_target="native"
 )
 ```
 
-The primary document is always first. Additional documents are passed to
-`weavec build` in exactly the supplied order. The server does not sort them and
-does not silently include every document in the project. Duplicates are rejected.
-Every selected document must exist in the same pinned revision.
+### `build_target_list`
 
-When `revision_id` is omitted, the branch head is resolved once before rendering.
-The operation returns `weave-frontend-build-manifest-v2`, containing the build
-ID, pinned revision, ordered document records, status, hashes, and artifact
-paths. It does not execute the output program.
+List targets from a branch head or exact revision.
 
-The corresponding CLI form is:
+### `build_target_get`
+
+Read one target definition from a branch head or exact revision.
+
+### `build_target_delete`
+
+Delete a target in a new immutable revision.
+
+### `build_target_validate`
+
+Resolve the target definition and all ordered source documents from one pinned
+revision, render canonical sources, and invoke `weavec --frontend`.
+
+### `build_target_build`
+
+Build the exact same revisioned target through the native compiler bridge.
+
+Recommended multi-document flow:
 
 ```text
-weave-build --db weave.db build demo main.weave \
-  --source library.weave \
-  --source platform.weave
+build_target_set
+→ atomic source edits
+→ build_target_validate
+→ branch_merge
+→ build_target_build
+→ build_get
 ```
 
-Each repeated `--source` preserves order.
+## Build inspection
 
-#### `build_get`
+### `build_get`
 
-Returns a stored build manifest and artifact paths by hexadecimal build ID.
-Inspecting an existing build does not require the compiler binary.
+Read a stored frontend build manifest and absolute artifact paths by build ID.
+The compiler does not need to remain installed for inspection.
 
-A successful build contains:
+A successful build contains canonical sources, node maps, compiler manifest,
+raw compiler diagnostics, mapped bridge diagnostics, frontend manifest, and
+the executable.
 
-- all canonical sources under `sources/`;
-- all node maps under `source-maps/`;
-- compiler manifest;
-- raw compiler diagnostics;
-- node-mapped bridge diagnostics;
-- frontend build manifest;
-- executable.
+Cache-integrity and concurrent-publication hardening is tracked in issue #17.
 
-A failed build contains diagnostic artifacts but no executable. For compatibility,
-`artifacts.source` and `artifacts.node_map` still identify the primary document;
-`artifacts.sources` and `artifacts.node_maps` contain the complete ordered set.
-
-### Atomic node writes
+## Atomic writes
 
 - `node_create_form(parent_id, head, position)`
 - `node_add_atom(parent_id, kind, value, position)`
@@ -172,54 +193,53 @@ A failed build contains diagnostic artifacts but no executable. For compatibilit
 Atom kinds are `symbol`, `string`, `integer`, `float`, and `boolean`. Positions
 are zero-based and default to append.
 
-### Inspection
+Each successful write creates one immutable revision. A rejected write does not
+advance the branch.
 
-- `node_inspect(node_id, depth)` returns a local annotated subtree.
-- `node_find(head, kind, value)` locates exact node IDs.
+## Inspection
 
-Reading may return a larger local subtree. Writing remains atomic.
+### `node_inspect`
 
-### Shared context
+Return a bounded annotated subtree, parent information, position, and grammar
+hint.
 
-- `context_add` stores project-, document-, or symbol-scoped design material.
-- `context_get` retrieves context pinned to the current branch revision.
+### `node_find`
 
-This lets parallel agents share interface contracts and design decisions without
+Find stable IDs by form head, atom kind, or exact value.
+
+Reading may return a useful local subtree. Writing remains atomic.
+
+## Shared context
+
+### `context_add`
+
+Store project-, document-, or symbol-scoped design material in revision
+history.
+
+### `context_get`
+
+Retrieve context visible at the current branch revision.
+
+This lets parallel agents share interface contracts and decisions without
 relying on an unversioned prompt.
-
-## Recommended complete workflow
-
-```text
-project_initialize
-→ program_create / program_import
-→ grammar_help
-→ atomic node edits
-→ node_inspect
-→ program_validate
-→ branch_merge
-→ program_build
-→ build_get
-```
 
 ## Failure semantics
 
-- Validation or build failure does not mutate the program revision.
-- `program_build` never advances a branch.
+- Validation and build failures do not mutate program revisions.
+- Builds never advance branches.
 - Missing or duplicate selected documents fail before compilation.
-- The final executable exists only on compiler and protocol success.
-- Build diagnostics preserve compiler stdout, stderr, timeout state, and return
-  code.
-- Every canonical compiler span is matched against the node map for the exact
-  source document named by the compiler.
-- A secondary-document diagnostic receives that document's `document` and
-  `node_id`, not the primary document's mapping.
+- A final executable exists only after compiler and diagnostics-protocol success.
+- Diagnostics preserve compiler stdout, stderr, timeout state, and return code.
+- Source spans map only through the exact canonical source named by the compiler.
 - Spanless, ambiguous, and non-canonical locations remain unmapped.
-- Program execution remains a separate future sandboxed operation.
+- Program execution is intentionally separate from compilation and is not yet a
+  general MCP operation.
 
-## Current boundary
+## Configuration
 
-Atomic mutations guarantee a structurally sound tree: unique IDs, valid node
-shapes, ordered children, and no move cycles. A partially constructed Weave form
-may still be incomplete. Use `grammar_help` while building,
-`program_validate` when a coherent unit is ready, and `program_build` only for a
-revision intended to become a native artifact.
+| Variable | Purpose |
+|---|---|
+| `WEAVE_DB_PATH` | SQLite program database |
+| `WEAVE_BUILD_ROOT` | Immutable build artifact root |
+| `WEAVEC_BIN` | Compiler used for validation and builds |
+| `WEAVEC_SOURCE_ROOT` | Compiler checkout used by grammar help |
