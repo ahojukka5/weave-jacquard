@@ -16,20 +16,26 @@ BUILD_DIAGNOSTICS_FORMAT = "weave-build-diagnostics-v1"
 def collect_build_diagnostics(
     compiler_diagnostics_path: Path,
     *,
-    node_map: dict[str, Any],
-    canonical_source_path: Path,
     returncode: int | None,
     timed_out: bool,
     stdout: str,
     stderr: str,
+    canonical_sources: list[tuple[Path, dict[str, Any]]] | None = None,
+    node_map: dict[str, Any] | None = None,
+    canonical_source_path: Path | None = None,
 ) -> tuple[dict[str, Any], bool]:
     """Return mapped bridge diagnostics and compiler-protocol validity.
 
-    A compiler document is treated as a protocol boundary rather than trusted
-    arbitrary JSON. Invalid or missing output becomes a structured bridge
-    diagnostic and never raises out of the build operation.
+    ``canonical_sources`` is the ordered set of compiler inputs and their node
+    maps. The legacy single-source keyword pair remains accepted for callers
+    that build one document.
     """
 
+    sources = _normalize_canonical_sources(
+        canonical_sources=canonical_sources,
+        node_map=node_map,
+        canonical_source_path=canonical_source_path,
+    )
     compiler_document: dict[str, Any] | None = None
     protocol_errors: list[str] = []
     entries: list[dict[str, Any]] = []
@@ -45,11 +51,7 @@ def collect_build_diagnostics(
                 protocol_errors.extend(_validate_document(value, returncode=returncode))
                 if not protocol_errors:
                     entries = [
-                        _map_entry(
-                            entry,
-                            node_map=node_map,
-                            canonical_source_path=canonical_source_path,
-                        )
+                        _map_entry(entry, canonical_sources=sources)
                         for entry in value["diagnostics"]
                     ]
             else:
@@ -96,6 +98,23 @@ def collect_build_diagnostics(
         "entries": entries,
     }
     return diagnostics, protocol_valid
+
+
+def _normalize_canonical_sources(
+    *,
+    canonical_sources: list[tuple[Path, dict[str, Any]]] | None,
+    node_map: dict[str, Any] | None,
+    canonical_source_path: Path | None,
+) -> list[tuple[Path, dict[str, Any]]]:
+    if canonical_sources is not None:
+        if node_map is not None or canonical_source_path is not None:
+            raise ValueError(
+                "use canonical_sources or the legacy single-source arguments, not both"
+            )
+        return list(canonical_sources)
+    if node_map is None or canonical_source_path is None:
+        raise ValueError("canonical source path and node map are required")
+    return [(canonical_source_path, node_map)]
 
 
 def _validate_document(
@@ -184,18 +203,21 @@ def _validate_entry(value: Any, *, index: int) -> list[str]:
 def _map_entry(
     entry: dict[str, Any],
     *,
-    node_map: dict[str, Any],
-    canonical_source_path: Path,
+    canonical_sources: list[tuple[Path, dict[str, Any]]],
 ) -> dict[str, Any]:
     mapped = dict(entry)
     mapped["compiler_source"] = entry.get("source")
+    mapped["document"] = None
     mapped["node_id"] = None
 
-    if not _refers_to_canonical_source(entry.get("source"), canonical_source_path):
+    selected = _select_canonical_source(entry.get("source"), canonical_sources)
+    if selected is None:
         return mapped
+    canonical_source_path, node_map = selected
 
     mapped["source"] = canonical_source_path.name
     mapped["compiler_source"] = canonical_source_path.name
+    mapped["document"] = node_map.get("document")
     span = entry.get("span")
     if span is None:
         return mapped
@@ -215,19 +237,33 @@ def _map_entry(
     return mapped
 
 
-def _refers_to_canonical_source(value: Any, canonical_source_path: Path) -> bool:
+def _select_canonical_source(
+    value: Any,
+    canonical_sources: list[tuple[Path, dict[str, Any]]],
+) -> tuple[Path, dict[str, Any]] | None:
     if not isinstance(value, str) or not value:
-        return False
+        return None
     candidate = Path(value)
     if candidate.is_absolute():
         try:
-            return candidate.resolve() == canonical_source_path.resolve()
+            resolved = candidate.resolve()
         except OSError:
-            return False
-    return candidate.as_posix() in {
-        canonical_source_path.name,
-        f"./{canonical_source_path.name}",
-    }
+            return None
+        for source_path, node_map in canonical_sources:
+            try:
+                if source_path.resolve() == resolved:
+                    return source_path, node_map
+            except OSError:
+                continue
+        return None
+
+    normalized = candidate.as_posix()
+    matches = [
+        (source_path, node_map)
+        for source_path, node_map in canonical_sources
+        if normalized in {source_path.name, f"./{source_path.name}"}
+    ]
+    return matches[0] if len(matches) == 1 else None
 
 
 def _bridge_protocol_entry(
@@ -252,6 +288,7 @@ def _bridge_protocol_entry(
         "message": message,
         "source": None,
         "compiler_source": None,
+        "document": None,
         "span_origin": "none",
         "span": None,
         "node_id": None,
