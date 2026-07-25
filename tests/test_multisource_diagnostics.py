@@ -33,7 +33,7 @@ def _entry(source: str) -> dict[str, object]:
         "phase": "backend",
         "message": "example",
         "source": source,
-        "span_origin": "compiler-test",
+        "span_origin": "inferred-unique-token",
         "span": {
             "start_byte": 2,
             "end_byte": 4,
