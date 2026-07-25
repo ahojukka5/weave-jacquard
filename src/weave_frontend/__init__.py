@@ -1,4 +1,9 @@
-"""Agent-native frontend and revision build environment for Weave."""
+"""Internal implementation package for Jacquard.
+
+Public applications should import :mod:`weave_jacquard`. The historical
+``weave_frontend`` namespace remains internal while stored protocol identifiers
+and existing implementation modules retain compatibility.
+"""
 
 from .compiler_bridge import CompilerBridge
 from .errors import ConflictError, NotFoundError, ValidationError, WeaveFrontendError
