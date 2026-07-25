@@ -92,7 +92,7 @@ def main() -> int:
                             "phase": "backend",
                             "message": "unknown expression operator: unknown_form",
                             "source": str(source),
-                            "span_origin": "compiler-test",
+                            "span_origin": "inferred-unique-token",
                             "span": {
                                 "start_byte": start_byte,
                                 "end_byte": end_byte,
