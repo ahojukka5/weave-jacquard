@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+SCHEMA_VERSION = 2
 _SNAPSHOT_RAW = b"WJR1"
 _SNAPSHOT_ZLIB = b"WJZ1"
 
@@ -151,6 +152,15 @@ class Database:
         self.connection = sqlite3.connect(self.path)
         self.connection.row_factory = sqlite3.Row
         self.connection.execute("PRAGMA foreign_keys = ON")
+        current_version = int(
+            self.connection.execute("PRAGMA user_version").fetchone()[0]
+        )
+        if current_version > SCHEMA_VERSION:
+            self.connection.close()
+            raise RuntimeError(
+                "database schema version "
+                f"{current_version} is newer than supported version {SCHEMA_VERSION}"
+            )
         self.connection.create_function(
             "weave_compress_json",
             1,
