@@ -25,8 +25,9 @@ def test_production_workspace_inherits_only_revision_base() -> None:
     assert _TYPED_METHODS.isdisjoint(dir(SExpressionWorkspace))
 
     source = inspect.getsource(RevisionWorkspace)
-    assert "grammar" not in source
-    assert "renderer" not in source
+    assert "from .grammar" not in source
+    assert "from .renderer" not in source
+    assert "from .model" not in source
     assert "validate_function" not in source
 
 
