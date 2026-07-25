@@ -111,6 +111,8 @@ def _normalize_canonical_sources(
             raise ValueError(
                 "use canonical_sources or the legacy single-source arguments, not both"
             )
+        if not canonical_sources:
+            raise ValueError("at least one canonical source is required")
         return list(canonical_sources)
     if node_map is None or canonical_source_path is None:
         raise ValueError("canonical source path and node map are required")
@@ -257,11 +259,11 @@ def _select_canonical_source(
                 continue
         return None
 
-    normalized = candidate.as_posix()
+    basename = candidate.name
     matches = [
         (source_path, node_map)
         for source_path, node_map in canonical_sources
-        if normalized in {source_path.name, f"./{source_path.name}"}
+        if basename == source_path.name
     ]
     return matches[0] if len(matches) == 1 else None
 
