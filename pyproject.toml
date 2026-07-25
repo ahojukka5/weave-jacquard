@@ -43,6 +43,10 @@ where = ["src"]
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers"
 testpaths = ["tests"]
+markers = [
+  "real_mcp: launches the actual stdio MCP server and uses the public protocol",
+  "real_e2e: requires an executable final weavec and produces a native program",
+]
 
 [tool.ruff]
 target-version = "py311"
