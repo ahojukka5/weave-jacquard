@@ -129,6 +129,10 @@ class CompilerBridge:
             if isinstance(stderr, bytes):
                 stderr = stderr.decode(errors="replace")
             stderr += f"\nweavec build timed out after {exc.timeout} seconds\n"
+        except OSError as exc:
+            returncode = None
+            stdout = ""
+            stderr = f"weavec build could not start: {exc}\n"
 
         status = (
             "succeeded"
