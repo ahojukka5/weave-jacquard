@@ -32,6 +32,20 @@ build_target_set(
 → build_target_build(project="demo", name="application")
 ```
 
+The equivalent CLI operation is:
+
+```bash
+weave-build --db weave.db target-validate demo application
+```
+
+An exact historical target can be selected without moving the branch:
+
+```bash
+weave-build --db weave.db target-validate demo application \
+  --branch main \
+  --revision <revision-id>
+```
+
 The returned result records the pinned revision, ordered documents, target
 configuration, root node IDs, frontend status, diagnostics streams, and WIR when
 validation succeeds.
