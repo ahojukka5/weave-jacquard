@@ -99,9 +99,20 @@ def test_new_snapshots_are_transparently_compressed_and_reopen(tmp_path):
         assert object_type == "view"
         assert bytes(prefix) == b"WJZ1"
         assert stored_size < raw_size // 4
+        assert workspace.db.connection.execute("PRAGMA user_version").fetchone()[0] == 2
 
     with SExpressionWorkspace(path) as reopened:
         assert reopened.render("demo", "main", "main.weave") == canonical
+
+    raw_connection = sqlite3.connect(path)
+    try:
+        count, raw_prefix = raw_connection.execute(
+            "SELECT count(*), substr(min(ast_blob), 1, 4) FROM module_snapshots_compressed"
+        ).fetchone()
+        assert count == 1
+        assert bytes(raw_prefix) == b"WJZ1"
+    finally:
+        raw_connection.close()
 
 
 def test_legacy_snapshot_table_migrates_without_changing_history(tmp_path):
@@ -149,6 +160,7 @@ def test_legacy_snapshot_table_migrates_without_changing_history(tmp_path):
         assert workspace.db.connection.execute(
             "SELECT count(*) FROM sqlite_master WHERE name = 'module_snapshots_legacy'"
         ).fetchone()[0] == 0
+        assert workspace.db.connection.execute("PRAGMA user_version").fetchone()[0] == 2
 
 
 def test_snapshot_view_preserves_transactional_insert_update_delete(tmp_path):
