@@ -27,7 +27,8 @@ class CompilerBridge:
         timeout_seconds: int = 120,
     ) -> None:
         self.workspace = workspace
-        self.compiler = self._resolve_compiler(compiler)
+        self._configured_compiler = compiler
+        self._compiler: Path | None = None
         default_root = workspace.db.path.parent / ".weave-build"
         configured_root = build_root or os.environ.get("WEAVE_BUILD_ROOT")
         self.build_root = Path(configured_root or default_root).resolve()
@@ -46,7 +47,7 @@ class CompilerBridge:
         """Build one document from an exact revision and return its manifest."""
 
         revision = revision_id or self.workspace.branch_head(project, branch)
-        self._require_project_revision(project, revision)
+        revision_hash = self._require_project_revision(project, revision)
         state = self.workspace._state_at_revision(revision)
         try:
             root = state[document]
@@ -60,9 +61,11 @@ class CompilerBridge:
             revision_id=revision,
             document=document,
         )
-        compiler_hash = self._sha256_file(self.compiler)
+        compiler = self._compiler_path()
+        compiler_hash = self._sha256_file(compiler)
         cache_payload = {
             "format": "weave-build-key-v1",
+            "revision_hash": revision_hash,
             "revision_id": revision,
             "document": document,
             "source_sha256": node_map["source_sha256"],
@@ -93,7 +96,7 @@ class CompilerBridge:
         self._write_json(map_path, node_map)
 
         command = [
-            str(self.compiler),
+            str(compiler),
             "build",
             str(source_path),
             "-o",
@@ -127,9 +130,16 @@ class CompilerBridge:
                 stderr = stderr.decode(errors="replace")
             stderr += f"\nweavec build timed out after {exc.timeout} seconds\n"
 
-        status = "succeeded" if returncode == 0 and executable_path.is_file() else "failed"
+        status = (
+            "succeeded"
+            if returncode == 0 and executable_path.is_file()
+            else "failed"
+        )
         if status == "failed":
             executable_path.unlink(missing_ok=True)
+
+        if compiler_manifest_path.is_file():
+            self._relativize_json_file(compiler_manifest_path, temporary_directory)
 
         diagnostics = {
             "format": "weave-build-diagnostics-v1",
@@ -161,12 +171,13 @@ class CompilerBridge:
             "project": project,
             "branch": branch,
             "revision_id": revision,
+            "revision_hash": revision_hash,
             "document": document,
             "source_sha256": node_map["source_sha256"],
-            "compiler": str(self.compiler),
+            "compiler": str(compiler),
             "compiler_sha256": compiler_hash,
             "target": target or "native",
-            "command": command,
+            "command": self._relative_command(command, temporary_directory),
             "returncode": returncode,
             "artifacts": {
                 "source": "program.weave",
@@ -186,19 +197,22 @@ class CompilerBridge:
     def get(self, build_id: str) -> dict[str, Any]:
         """Return a stored build manifest with absolute artifact paths."""
 
-        if not build_id or any(character not in "0123456789abcdef" for character in build_id):
+        valid = build_id and all(
+            character in "0123456789abcdef" for character in build_id
+        )
+        if not valid:
             raise ValidationError("INVALID_BUILD_ID", "build ID must be hexadecimal")
         directory = self.build_root / build_id
         manifest_path = directory / "manifest.json"
         if not manifest_path.is_file():
             raise NotFoundError(f"build {build_id!r} not found")
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        manifest["build_directory"] = str(directory)
-        manifest["artifact_paths"] = {
-            key: str(directory / relative) if relative else None
-            for key, relative in manifest["artifacts"].items()
-        }
-        return manifest
+        return self._with_artifact_paths(manifest, directory)
+
+    def _compiler_path(self) -> Path:
+        if self._compiler is None:
+            self._compiler = self._resolve_compiler(self._configured_compiler)
+        return self._compiler
 
     def _resolve_compiler(self, compiler: str | Path | None) -> Path:
         configured = compiler or os.environ.get("WEAVEC_BIN")
@@ -220,9 +234,9 @@ class CompilerBridge:
             )
         return path
 
-    def _require_project_revision(self, project: str, revision_id: str) -> None:
+    def _require_project_revision(self, project: str, revision_id: str) -> str:
         row = self.workspace.db.connection.execute(
-            """SELECT 1
+            """SELECT r.root_hash
                FROM revisions r
                JOIN projects p ON p.id = r.project_id
                WHERE r.id = ? AND p.name = ?""",
@@ -232,6 +246,7 @@ class CompilerBridge:
             raise NotFoundError(
                 f"revision {revision_id!r} does not belong to project {project!r}"
             )
+        return str(row["root_hash"])
 
     @staticmethod
     def _sha256_file(path: Path) -> str:
@@ -248,8 +263,44 @@ class CompilerBridge:
             encoding="utf-8",
         )
 
-    @staticmethod
-    def _read_successful_manifest(directory: Path) -> dict[str, Any] | None:
+    @classmethod
+    def _relativize_json_file(cls, path: Path, base: Path) -> None:
+        value = json.loads(path.read_text(encoding="utf-8"))
+        cls._write_json(path, cls._relativize_value(value, base))
+
+    @classmethod
+    def _relativize_value(cls, value: Any, base: Path) -> Any:
+        if isinstance(value, str):
+            prefix = str(base) + os.sep
+            return value[len(prefix) :] if value.startswith(prefix) else value
+        if isinstance(value, list):
+            return [cls._relativize_value(item, base) for item in value]
+        if isinstance(value, dict):
+            return {
+                key: cls._relativize_value(item, base)
+                for key, item in value.items()
+            }
+        return value
+
+    @classmethod
+    def _relative_command(cls, command: list[str], base: Path) -> list[str]:
+        return [str(cls._relativize_value(argument, base)) for argument in command]
+
+    @classmethod
+    def _with_artifact_paths(
+        cls,
+        manifest: dict[str, Any],
+        directory: Path,
+    ) -> dict[str, Any]:
+        manifest["build_directory"] = str(directory)
+        manifest["artifact_paths"] = {
+            key: str(directory / relative) if relative else None
+            for key, relative in manifest["artifacts"].items()
+        }
+        return manifest
+
+    @classmethod
+    def _read_successful_manifest(cls, directory: Path) -> dict[str, Any] | None:
         manifest_path = directory / "manifest.json"
         if not manifest_path.is_file():
             return None
@@ -259,12 +310,7 @@ class CompilerBridge:
             return None
         if not (directory / executable).is_file():
             return None
-        manifest["build_directory"] = str(directory)
-        manifest["artifact_paths"] = {
-            key: str(directory / relative) if relative else None
-            for key, relative in manifest["artifacts"].items()
-        }
-        return manifest
+        return cls._with_artifact_paths(manifest, directory)
 
     @staticmethod
     def _publish_directory(temporary: Path, final: Path) -> None:
