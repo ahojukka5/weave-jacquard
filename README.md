@@ -1,10 +1,21 @@
-# weave_frontend
+# Jacquard
 
-`weave_frontend` is the agent-facing programming environment for Weave. Coding
+**Jacquard is the agent-native programming environment for Weave.** Coding
 agents edit a versioned S-expression tree through small MCP operations instead
 of repeatedly replacing complete source files.
 
-The primary executable is **`weave-mcp`**. It provides:
+The name refers to the Jacquard loom: a programmable mechanism that turns a
+stored pattern into coordinated weaving operations. Here, agents modify the
+program pattern, Jacquard preserves its structure and history, and `weavec`
+turns the canonical result into a native executable.
+
+Repository and Python distribution: **`weave-jacquard`**  
+Public Python namespace: **`weave_jacquard`**  
+Primary executables: **`weave-mcp`** and **`weave-build`**
+
+## Responsibilities
+
+Jacquard owns:
 
 - atomic form and atom edits with stable node identities;
 - immutable revisions, parallel branches, and structural three-way merge;
@@ -16,26 +27,25 @@ The primary executable is **`weave-mcp`**. It provides:
 - compiler diagnostics mapped back to database nodes;
 - verified, content-derived native build artifacts.
 
-`weave_frontend` is not another compiler. It owns editing, identity, history,
-canonical source materialization, and build provenance. The user-facing
-[`weavec`](https://github.com/ahojukka5/weavec) compiler owns the language,
+Jacquard is not another compiler. The user-facing
+[`weavec`](https://github.com/ahojukka5/weavec) compiler owns the Weave language,
 surface lowering, WIR, LLVM generation, runtime selection, object generation,
 and linking.
 
 ## Architecture
 
 The supported workspace is `SExpressionWorkspace`. It inherits a small internal
-grammar-neutral revision service that knows only about:
+grammar-neutral revision service responsible only for:
 
 - SQLite lifecycle;
 - projects, branches, checkout, and history;
 - immutable state load and commit;
 - common-ancestor discovery;
-- merge orchestration through workspace-specific validation and merge hooks.
+- merge orchestration through workspace-specific hooks.
 
-The earlier typed-AST prototype and its `weave-front` command have been removed.
-Language structure is no longer duplicated in Python; `weavec` remains the
-language authority.
+Language structure is not duplicated in Python; `weavec` remains authoritative.
+The current implementation package remains internal, while new public imports
+use `weave_jacquard`.
 
 ## Installation
 
@@ -57,10 +67,9 @@ export WEAVEC_SOURCE_ROOT="../weavec"
 ```
 
 `WEAVEC_BIN` is optional when `weavec` is on `PATH`.
-`WEAVEC_SOURCE_ROOT` is needed only for compiler-corpus-backed grammar help.
+`WEAVEC_SOURCE_ROOT` is required only for compiler-corpus-backed grammar help.
 
-Native builds require `weavec >= 0.3.0`, or another compiler implementing the
-same public contracts:
+Native builds require `weavec >= 0.3.0`, or another compiler implementing:
 
 - `weavec build`;
 - `weavec-build-manifest-v1`;
@@ -72,22 +81,9 @@ Run the stdio MCP server:
 weave-mcp
 ```
 
-### Environment variables
-
-| Variable | Purpose | Default |
-|---|---|---|
-| `WEAVE_DB_PATH` | SQLite program database | `weave.db` |
-| `WEAVE_BUILD_ROOT` | Verified build artifact store | `.weave-build` beside the database |
-| `WEAVEC_BIN` | Compiler used for validation and native builds | `weavec` from `PATH` |
-| `WEAVEC_SOURCE_ROOT` | Compiler checkout used by grammar help | unset |
-
-Tree editing, history, merge, and verified stored-build inspection do not
-require a compiler checkout. Validation and new builds require the compiler
-binary.
-
 ## Recommended agent workflows
 
-For a single-document program:
+Single-document program:
 
 ```text
 project_initialize
@@ -101,7 +97,7 @@ project_initialize
 → build_get
 ```
 
-For a multi-document program:
+Multi-document program:
 
 ```text
 program_source_list
@@ -119,13 +115,13 @@ stored order.
 
 ## Compiler boundary
 
-Validation materializes ordered canonical `.weave` sources and invokes:
+Validation invokes only the public compiler frontend:
 
 ```text
 weavec --frontend output.wir source0.weave source1.weave ...
 ```
 
-Native builds invoke only the public compiler command:
+Native builds invoke only the public build command:
 
 ```text
 weavec build source0.weave source1.weave ... -o program \
@@ -133,14 +129,13 @@ weavec build source0.weave source1.weave ... -o program \
   --diagnostics-json compiler-diagnostics.json
 ```
 
-The bridge never invokes LLVM tools, a linker, or a runtime archive directly.
+Jacquard never invokes LLVM tools, a linker, or a runtime archive directly.
 
 ## Stable node identities
 
-Every list and atom has a stable ID such as `n_3a12cce48fe14f99`.
-Editing or moving an existing node preserves its ID. Branches inherit IDs from
-their base revision, and merge compares stable identities rather than line
-numbers.
+Every list and atom has a stable ID such as `n_3a12cce48fe14f99`. Editing or
+moving an existing node preserves its ID. Branches inherit IDs from their base
+revision, and merge compares stable identities rather than line numbers.
 
 Agent rendering may expose transport wrappers:
 
@@ -179,10 +174,14 @@ source hashes, compiler binary hash, and requested target. Concurrent builds use
 a per-build advisory lock. An existing verified successful build wins; failed
 or incomplete candidates cannot erase it.
 
+The historical protocol identifier `weave-frontend-build-manifest-v2` remains
+unchanged for stored-build compatibility. It names a data format, not the
+current product.
+
 ## Revision storage
 
-Each mutation creates an immutable revision. Snapshot JSON is stored in an
-adaptive versioned BLOB representation:
+Each mutation creates an immutable revision. Snapshot JSON uses an adaptive,
+versioned BLOB representation:
 
 - `WJZ1` for zlib-compressed canonical JSON;
 - `WJR1` when raw canonical JSON is smaller.
@@ -191,9 +190,6 @@ Legacy databases migrate transactionally. Databases with a newer schema version
 are rejected without modification.
 
 ## CLI
-
-The companion `weave-build` command exposes revisioned target and build
-operations without starting MCP:
 
 ```bash
 weave-build --db weave.db target-set demo application main.weave \

@@ -3,14 +3,14 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "weave-frontend"
+name = "weave-jacquard"
 version = "0.1.0"
-description = "Agent-native, versioned S-expression workspace for Weave programs"
+description = "Jacquard: the agent-native programming environment for Weave"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Weave contributors" }]
-keywords = ["weave", "compiler", "s-expression", "agents", "sqlite", "mcp"]
+keywords = ["weave", "jacquard", "compiler", "s-expression", "agents", "sqlite", "mcp"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "License :: OSI Approved :: Apache Software License",
@@ -23,6 +23,9 @@ dependencies = [
   "mcp>=1.27,<2",
 ]
 
+[project.urls]
+Repository = "https://github.com/ahojukka5/weave-jacquard"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.2",
@@ -31,8 +34,8 @@ dev = [
 ]
 
 [project.scripts]
-weave-mcp = "weave_frontend.mcp_build:main"
-weave-build = "weave_frontend.build_cli:main"
+weave-mcp = "weave_jacquard.mcp_build:main"
+weave-build = "weave_jacquard.build_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
