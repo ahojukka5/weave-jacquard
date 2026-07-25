@@ -53,7 +53,7 @@ def _entry(*, source: str | None, span: dict[str, int] | None) -> dict[str, obje
         "phase": "backend",
         "message": "example diagnostic",
         "source": source,
-        "span_origin": "compiler-test",
+        "span_origin": "inferred-unique-token" if span is not None else "none",
         "span": span,
     }
 
