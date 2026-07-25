@@ -158,7 +158,7 @@ class CompilerBridge:
 
         if compiler_manifest_path.is_file():
             self._relativize_json_file(compiler_manifest_path, temporary_directory)
-        if compiler_diagnostics_path.is_file():
+        if compiler_diagnostics_path.is_file() and protocol_valid:
             self._relativize_json_file(compiler_diagnostics_path, temporary_directory)
         self._write_json(diagnostics_path, diagnostics)
 
