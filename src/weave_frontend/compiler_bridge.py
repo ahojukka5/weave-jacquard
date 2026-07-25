@@ -16,6 +16,9 @@ from .errors import NotFoundError, ValidationError
 from .source_map import render_with_node_map
 
 
+BUILD_KEY_FORMAT = "weave-build-key-v2"
+
+
 class CompilerBridge:
     """Build immutable database revisions through the public compiler interface."""
 
@@ -65,7 +68,7 @@ class CompilerBridge:
         compiler = self._compiler_path()
         compiler_hash = self._sha256_file(compiler)
         cache_payload = {
-            "format": "weave-build-key-v1",
+            "format": BUILD_KEY_FORMAT,
             "revision_hash": revision_hash,
             "revision_id": revision,
             "document": document,
@@ -180,6 +183,7 @@ class CompilerBridge:
 
         manifest: dict[str, Any] = {
             "format": "weave-frontend-build-manifest-v1",
+            "build_key_format": BUILD_KEY_FORMAT,
             "build_id": build_id,
             "status": status,
             "cached": False,
@@ -326,10 +330,20 @@ class CompilerBridge:
         if not manifest_path.is_file():
             return None
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        executable = manifest.get("artifacts", {}).get("executable")
+        artifacts = manifest.get("artifacts", {})
+        executable = artifacts.get("executable")
+        compiler_diagnostics = artifacts.get("compiler_diagnostics")
         if manifest.get("status") != "succeeded" or not executable:
             return None
+        if manifest.get("build_key_format") != BUILD_KEY_FORMAT:
+            return None
+        if manifest.get("compiler_diagnostics_protocol_valid") is not True:
+            return None
+        if not compiler_diagnostics:
+            return None
         if not (directory / executable).is_file():
+            return None
+        if not (directory / compiler_diagnostics).is_file():
             return None
         return cls._with_artifact_paths(manifest, directory)
 
