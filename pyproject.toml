@@ -32,7 +32,8 @@ dev = [
 
 [project.scripts]
 weave-front = "weave_frontend.cli:main"
-weave-mcp = "weave_frontend.mcp_server:main"
+weave-mcp = "weave_frontend.mcp_build:main"
+weave-build = "weave_frontend.build_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
