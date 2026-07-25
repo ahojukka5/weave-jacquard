@@ -98,6 +98,11 @@ def _manifest_path(value: Any, *, base: Path) -> Path | None:
         return None
     path = Path(value)
     try:
-        return (path if path.is_absolute() else base / path).resolve()
-    except OSError:
+        if path.is_absolute():
+            return path.resolve()
+        root = base.resolve()
+        resolved = (root / path).resolve()
+        resolved.relative_to(root)
+        return resolved
+    except (OSError, ValueError):
         return None
