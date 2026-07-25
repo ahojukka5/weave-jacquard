@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
+from typing import Any
 
 from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
+from .errors import ConflictError, ValidationError, WeaveFrontendError
 from .sexpr_service import SExpressionWorkspace
 from .target_validation import BuildTargetValidator
 
@@ -108,8 +111,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
-    args = build_parser().parse_args()
+def _execute(args: argparse.Namespace) -> Any:
     with SExpressionWorkspace(args.db, weavec_binary=args.weavec) as workspace:
         targets = BuildTargetRegistry(workspace)
         bridge_instance: CompilerBridge | None = None
@@ -125,7 +127,7 @@ def main() -> None:
             return bridge_instance
 
         if args.command == "build":
-            result = bridge().build(
+            return bridge().build(
                 args.project,
                 args.document,
                 additional_documents=args.additional_documents,
@@ -133,8 +135,8 @@ def main() -> None:
                 revision_id=args.revision,
                 target=args.target,
             )
-        elif args.command == "target-set":
-            result = targets.set(
+        if args.command == "target-set":
+            return targets.set(
                 args.project,
                 args.branch,
                 args.name,
@@ -142,48 +144,71 @@ def main() -> None:
                 additional_documents=args.additional_documents,
                 compiler_target=args.compiler_target,
             )
-        elif args.command == "target-list":
-            result = targets.list(
+        if args.command == "target-list":
+            return targets.list(
                 args.project,
                 branch=args.branch,
                 revision_id=args.revision,
             )
-        elif args.command == "target-get":
-            result = targets.get(
+        if args.command == "target-get":
+            return targets.get(
                 args.project,
                 args.name,
                 branch=args.branch,
                 revision_id=args.revision,
             )
-        elif args.command == "target-delete":
-            result = targets.delete(
+        if args.command == "target-delete":
+            return targets.delete(
                 args.project,
                 args.branch,
                 args.name,
             )
-        elif args.command == "target-validate":
-            result = BuildTargetValidator(targets).validate(
+        if args.command == "target-validate":
+            return BuildTargetValidator(targets).validate(
                 args.project,
                 args.name,
                 branch=args.branch,
                 revision_id=args.revision,
             )
-        elif args.command == "target-build":
-            result = targets.build(
+        if args.command == "target-build":
+            return targets.build(
                 bridge(),
                 args.project,
                 args.name,
                 branch=args.branch,
                 revision_id=args.revision,
             )
-        elif args.command == "source-list":
-            result = targets.program_documents(
+        if args.command == "source-list":
+            return targets.program_documents(
                 args.project,
                 branch=args.branch,
                 revision_id=args.revision,
             )
-        else:
-            result = bridge().get(args.build_id)
+        return bridge().get(args.build_id)
+
+
+def _error_payload(exc: WeaveFrontendError) -> dict[str, Any]:
+    if isinstance(exc, ValidationError):
+        return exc.as_dict()
+    if isinstance(exc, ConflictError):
+        return {"code": "MERGE_CONFLICT", "conflicts": exc.conflicts}
+    return {"code": type(exc).__name__, "message": str(exc)}
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    try:
+        result = _execute(args)
+    except WeaveFrontendError as exc:
+        print(
+            json.dumps(
+                {"ok": False, "error": _error_payload(exc)},
+                indent=2,
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
+        raise SystemExit(2) from None
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
