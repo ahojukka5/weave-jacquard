@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import json
+import stat
+
 from weave_frontend.build_targets import BuildTargetRegistry
 from weave_frontend.target_validation import BuildTargetValidator
+from weave_frontend.weavec import WeavecValidator
 
 
 MAIN_SOURCE = """(program
@@ -87,10 +91,39 @@ def test_target_validation_uses_pinned_revision_and_source_order(sexpr_workspace
     assert "const_i32 3" not in validated_sources[1][1]
 
 
-def test_single_source_validator_api_remains_compatible():
-    recording = RecordingValidator()
+def test_weavec_validator_preserves_order_and_deterministic_names(tmp_path):
+    compiler = tmp_path / "weavec"
+    compiler.write_text(
+        """#!/usr/bin/env python3
+import json
+from pathlib import Path
+import sys
 
-    result = recording.validate_sources([("program.weave", MAIN_SOURCE)])
+assert sys.argv[1] == "--frontend"
+output = Path(sys.argv[2])
+sources = [Path(value) for value in sys.argv[3:]]
+Path(__file__).with_suffix(".json").write_text(json.dumps({
+    "names": [path.name for path in sources],
+    "contents": [path.read_text() for path in sources],
+}))
+output.write_text("(core-module (core-version 1) (decls))\\n")
+""",
+        encoding="utf-8",
+    )
+    compiler.chmod(compiler.stat().st_mode | stat.S_IXUSR)
+
+    validator = WeavecValidator(compiler)
+    result = validator.validate_sources(
+        [
+            ("src/main.weave", MAIN_SOURCE),
+            ("library helper.weave", LIB_SOURCE),
+        ]
+    )
 
     assert result["valid"] is True
-    assert recording.calls == [[("program.weave", MAIN_SOURCE)]]
+    assert result["documents"] == ["src/main.weave", "library helper.weave"]
+    assert result["wir"] == "(core-module (core-version 1) (decls))\n"
+
+    invocation = json.loads(compiler.with_suffix(".json").read_text(encoding="utf-8"))
+    assert invocation["names"] == ["000-main.weave", "001-library_helper.weave"]
+    assert invocation["contents"] == [MAIN_SOURCE, LIB_SOURCE]
