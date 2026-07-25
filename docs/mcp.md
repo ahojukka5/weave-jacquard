@@ -2,37 +2,46 @@
 
 ## Goal
 
-`weave-mcp` lets an agent construct and edit Weave programs without emitting a
-large nested JSON tree or balancing S-expression parentheses. The write API is
-atomic: one form, atom, move, wrap, or deletion per call.
+`weave-mcp` lets an agent construct, validate, merge, and build Weave programs
+without emitting a large nested JSON tree or balancing S-expression parentheses.
+The write API is atomic: one form, atom, move, wrap, or deletion per call.
 
 The database owns node identity and revision history. Canonical `.weave` source
-is generated deterministically when needed.
+is generated deterministically when validation or compilation requires it.
 
-## Grammar authority
+## Grammar and compiler authority
 
-The MCP server deliberately does not duplicate the full Weave grammar.
+The MCP server deliberately does not duplicate the full Weave grammar or native
+toolchain.
 
 `grammar_help` scans the configured `weavec` checkout under
-`test/correctness/surface` and indexes the forms actually used there. For each
-form it reports:
-
-- observed argument counts;
-- observed parent forms;
-- compact examples;
-- source files containing those examples.
-
-This index is guidance for incremental construction. The authoritative check is
-`program_validate`, which renders canonical source and runs:
+`test/correctness/surface` and indexes forms actually used there. This index is
+construction guidance. The authoritative language check is:
 
 ```text
-weavec --frontend output.wir input.weave
+program_validate
+  → canonical source
+  → weavec --frontend
 ```
 
-Set `WEAVEC_SOURCE_ROOT` to enable corpus-backed grammar help. Set
-`WEAVEC_BIN` when the compiler is not available as `weavec` on `PATH`.
+The authoritative native build is:
 
-## Stable IDs
+```text
+program_build
+  → pin immutable revision
+  → canonical source + weave-node-map-v1
+  → weavec build
+  → executable and manifests
+```
+
+`weave_frontend` never invokes LLVM tools or selects a runtime archive. The
+compiler package owns those details.
+
+Set `WEAVEC_SOURCE_ROOT` to enable corpus-backed grammar help. Set `WEAVEC_BIN`
+when the compiler is not available as `weavec` on `PATH`. `WEAVE_BUILD_ROOT`
+selects the artifact store.
+
+## Stable IDs and compiler source
 
 Every list and atom receives a stable ID such as `n_3a12cce48fe14f99`.
 
@@ -43,7 +52,8 @@ Every list and atom receives a stable ID such as `n_3a12cce48fe14f99`.
 - merge uses IDs rather than line numbers.
 
 `program_render(annotated=true)` and `node_inspect` expose IDs. Canonical source
-omits the annotations.
+omits annotations. `program_build` generates the canonical source and a sidecar
+map containing UTF-8 byte and line/column spans for every node.
 
 ## Tools
 
@@ -78,10 +88,38 @@ incompatible edits to the same atom or subtree produce a conflict.
 - `program_create` creates the program, name, and version forms.
 - `program_list` lists documents and root IDs.
 - `program_render` returns canonical or annotated Weave.
-- `program_validate` runs structural checks and the configured `weavec` frontend.
+- `program_validate` runs structural checks and the configured compiler frontend.
 - `program_import` imports complete source for migration and fixtures.
+- `program_build` builds a pinned revision into a native executable.
 
 `program_import` is not the preferred agent write path.
+
+### Builds
+
+#### `program_build`
+
+Inputs:
+
+```text
+project
+document
+branch = "main"
+revision_id = optional exact revision
+target = optional target triple
+```
+
+When `revision_id` is omitted, the branch head is resolved once before rendering.
+The operation returns a build manifest containing the build ID, pinned revision,
+status, hashes, and artifact paths. It does not execute the output program.
+
+#### `build_get`
+
+Returns a stored build manifest and artifact paths by hexadecimal build ID.
+Inspecting an existing build does not require the compiler binary.
+
+A successful build contains canonical source, node map, compiler manifest,
+diagnostics, frontend manifest, and executable. A failed build contains the
+diagnostic artifacts but no executable.
 
 ### Atomic node writes
 
@@ -110,29 +148,35 @@ Reading may return a larger local subtree. Writing remains atomic.
 This lets parallel agents share interface contracts and design decisions without
 relying on an unversioned prompt.
 
-## Example construction
-
-To create `(return (const_i32 42))` inside a known `do` block:
+## Recommended complete workflow
 
 ```text
-node_create_form(parent_id=do_id, head="return")
-→ return_id
-
-node_create_form(parent_id=return_id, head="const_i32")
-→ constant_id
-
-node_add_atom(parent_id=constant_id, kind="integer", value=42)
+project_initialize
+→ program_create
+→ grammar_help
+→ atomic node edits
+→ node_inspect
+→ program_validate
+→ branch_merge
+→ program_build
+→ build_get
 ```
 
-No call contains a nested subtree. Each step returns a new revision, node IDs,
-and a local grammar hint.
+## Failure semantics
+
+- Validation or build failure does not mutate the program revision.
+- `program_build` never advances a branch.
+- The final executable exists only on success.
+- Build diagnostics preserve compiler stdout, stderr, timeout state, and return
+  code.
+- Machine-readable compiler spans will later be mapped to node IDs through the
+  source map.
+- Program execution remains a separate future sandboxed operation.
 
 ## Current boundary
 
 Atomic mutations guarantee a structurally sound tree: unique IDs, valid node
 shapes, ordered children, and no move cycles. A partially constructed Weave form
-may still be incomplete. Use `grammar_help` while building and
-`program_validate` when a coherent unit is ready.
-
-A future machine-readable grammar registry in `weavec` can replace corpus
-inference without changing the public MCP tool API.
+may still be incomplete. Use `grammar_help` while building,
+`program_validate` when a coherent unit is ready, and `program_build` only for a
+revision intended to become a native artifact.
