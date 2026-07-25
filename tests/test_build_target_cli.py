@@ -30,6 +30,26 @@ def test_target_set_preserves_source_order() -> None:
     assert args.branch == "release"
 
 
+def test_target_validate_accepts_exact_revision() -> None:
+    args = build_parser().parse_args(
+        [
+            "target-validate",
+            "demo",
+            "app",
+            "--branch",
+            "release",
+            "--revision",
+            "revision-789",
+        ]
+    )
+
+    assert args.command == "target-validate"
+    assert args.project == "demo"
+    assert args.name == "app"
+    assert args.branch == "release"
+    assert args.revision == "revision-789"
+
+
 def test_target_build_accepts_exact_revision() -> None:
     args = build_parser().parse_args(
         [

@@ -9,6 +9,7 @@ from pathlib import Path
 from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
 from .sexpr_service import SExpressionWorkspace
+from .target_validation import BuildTargetValidator
 
 
 def _add_revision_selector(parser: argparse.ArgumentParser) -> None:
@@ -79,6 +80,14 @@ def build_parser() -> argparse.ArgumentParser:
     target_delete.add_argument("name")
     target_delete.add_argument("--branch", default="main")
 
+    target_validate = subcommands.add_parser(
+        "target-validate",
+        help="validate one named target from a pinned revision",
+    )
+    target_validate.add_argument("project")
+    target_validate.add_argument("name")
+    _add_revision_selector(target_validate)
+
     target_build = subcommands.add_parser(
         "target-build",
         help="build one named target from a pinned revision",
@@ -108,6 +117,7 @@ def main() -> None:
             build_root=args.build_root,
         )
         targets = BuildTargetRegistry(workspace)
+        target_validator = BuildTargetValidator(targets)
         if args.command == "build":
             result = bridge.build(
                 args.project,
@@ -144,6 +154,13 @@ def main() -> None:
                 args.project,
                 args.branch,
                 args.name,
+            )
+        elif args.command == "target-validate":
+            result = target_validator.validate(
+                args.project,
+                args.name,
+                branch=args.branch,
+                revision_id=args.revision,
             )
         elif args.command == "target-build":
             result = targets.build(
