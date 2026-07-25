@@ -14,23 +14,28 @@ The primary executable is **`weave-mcp`**. It provides:
 - revisioned named build targets and ordered multi-document builds;
 - deterministic canonical sources and per-document node maps;
 - compiler diagnostics mapped back to database nodes;
-- verified, content-derived build artifacts.
+- verified, content-derived native build artifacts.
 
 `weave_frontend` is not another compiler. It owns editing, identity, history,
-source materialization, and build provenance. The user-facing
+canonical source materialization, and build provenance. The user-facing
 [`weavec`](https://github.com/ahojukka5/weavec) compiler owns the language,
 surface lowering, WIR, LLVM generation, runtime selection, object generation,
 and linking.
 
-## Status
+## Architecture
 
-The grammar-neutral S-expression workspace and `weave-mcp` are the supported
-product direction.
+The supported workspace is `SExpressionWorkspace`. It inherits a small internal
+grammar-neutral revision service that knows only about:
 
-The repository still contains an earlier typed-AST prototype and the legacy
-`weave-front` command. They are not part of the intended production path and
-are scheduled for removal after their shared revision mechanics are extracted;
-see issue #14.
+- SQLite lifecycle;
+- projects, branches, checkout, and history;
+- immutable state load and commit;
+- common-ancestor discovery;
+- merge orchestration through workspace-specific validation and merge hooks.
+
+The earlier typed-AST prototype and its `weave-front` command have been removed.
+Language structure is no longer duplicated in Python; `weavec` remains the
+language authority.
 
 ## Installation
 
@@ -52,17 +57,14 @@ export WEAVEC_SOURCE_ROOT="../weavec"
 ```
 
 `WEAVEC_BIN` is optional when `weavec` is on `PATH`.
-`WEAVEC_SOURCE_ROOT` is needed only for corpus-backed grammar help.
+`WEAVEC_SOURCE_ROOT` is needed only for compiler-corpus-backed grammar help.
 
-`program_build` and `build_target_build` require `weavec >= 0.3.0`, or another
-compiler that implements the same public contracts:
+Native builds require `weavec >= 0.3.0`, or another compiler implementing the
+same public contracts:
 
 - `weavec build`;
 - `weavec-build-manifest-v1`;
 - `weavec-diagnostics-v1`.
-
-Validation-only operations that invoke `weavec --frontend` remain separate from
-this native-build requirement.
 
 Run the stdio MCP server:
 
@@ -75,12 +77,13 @@ weave-mcp
 | Variable | Purpose | Default |
 |---|---|---|
 | `WEAVE_DB_PATH` | SQLite program database | `weave.db` |
-| `WEAVE_BUILD_ROOT` | Immutable build artifact store | `.weave-build` beside the database |
-| `WEAVEC_BIN` | Compiler used for validation and builds | `weavec` from `PATH` |
+| `WEAVE_BUILD_ROOT` | Verified build artifact store | `.weave-build` beside the database |
+| `WEAVEC_BIN` | Compiler used for validation and native builds | `weavec` from `PATH` |
 | `WEAVEC_SOURCE_ROOT` | Compiler checkout used by grammar help | unset |
 
-Tree editing, history, merge, and verified stored-build inspection work without
-a compiler checkout. Validation and new builds require the compiler binary.
+Tree editing, history, merge, and verified stored-build inspection do not
+require a compiler checkout. Validation and new builds require the compiler
+binary.
 
 ## Recommended agent workflows
 
@@ -98,109 +101,48 @@ project_initialize
 → build_get
 ```
 
-For a multi-document program, define the compiler input set once as a named
-target:
+For a multi-document program:
 
 ```text
 program_source_list
 → build_target_set
+→ atomic source edits
 → build_target_validate
 → branch_merge
 → build_target_build
 → build_get
 ```
 
-A target definition and all source documents are resolved from one immutable
-revision. The primary document is first; additional documents retain their
+A target definition and every selected source are resolved from one immutable
+revision. The primary document is first and additional documents retain their
 stored order.
-
-## MCP client configuration
-
-```json
-{
-  "mcpServers": {
-    "weave": {
-      "command": "/path/to/venv/bin/weave-mcp",
-      "env": {
-        "WEAVE_DB_PATH": "/path/to/project/weave.db",
-        "WEAVE_BUILD_ROOT": "/path/to/project/.weave-build",
-        "WEAVEC_BIN": "/path/to/weavec/build/weavec",
-        "WEAVEC_SOURCE_ROOT": "/path/to/weavec"
-      }
-    }
-  }
-}
-```
-
-The outer configuration format depends on the MCP client. The executable and
-environment variables are the relevant contract.
 
 ## Compiler boundary
 
-Validation materializes canonical sources and invokes the public compiler
-frontend:
+Validation materializes ordered canonical `.weave` sources and invokes:
 
 ```text
-immutable revision
-    ↓
-ordered canonical .weave sources
-    ↓
 weavec --frontend output.wir source0.weave source1.weave ...
 ```
 
-A native build follows the same order:
+Native builds invoke only the public compiler command:
 
 ```text
-immutable revision + compiler hash + target
-    ↓
-weavec build source0.weave source1.weave ... -o program
-    ↓
-validated compiler manifest + validated diagnostics + executable
+weavec build source0.weave source1.weave ... -o program \
+  --manifest-json compiler-manifest.json \
+  --diagnostics-json compiler-diagnostics.json
 ```
 
-The bridge never invokes LLVM or `clang` directly and never selects a runtime
-archive.
+The bridge never invokes LLVM tools, a linker, or a runtime archive directly.
 
-## Named targets and CLI
+## Stable node identities
 
-```bash
-weave-build --db weave.db target-set demo application main.weave \
-  --source library.weave \
-  --source platform.weave
-
-weave-build --db weave.db target-validate demo application
-weave-build --db weave.db target-build demo application
-```
-
-Use an exact historical revision without moving a branch:
-
-```bash
-weave-build --db weave.db target-validate demo application \
-  --branch main \
-  --revision <revision-id>
-```
-
-An ad hoc ordered build remains available:
-
-```bash
-weave-build --db weave.db build demo main.weave \
-  --source library.weave \
-  --source platform.weave
-
-weave-build --db weave.db get <build-id>
-```
-
-Each repeated `--source` preserves command-line order. Duplicate documents are
-rejected, and no command silently includes every project document.
-
-## Stable IDs and compiler source
-
-Every list and atom receives a stable ID such as `n_3a12cce48fe14f99`.
+Every list and atom has a stable ID such as `n_3a12cce48fe14f99`.
 Editing or moving an existing node preserves its ID. Branches inherit IDs from
 their base revision, and merge compares stable identities rather than line
 numbers.
 
-Agent rendering may expose ID wrappers:
+Agent rendering may expose transport wrappers:
 
 ```lisp
 (@n_function
@@ -210,13 +152,12 @@ Agent rendering may expose ID wrappers:
     (@n_body (do (return (const_i32 42))))))
 ```
 
-Those wrappers are transport metadata, not Weave syntax. Compiler input is
-canonical `.weave` text without annotations. A separate `weave-node-map-v1`
-records UTF-8 byte and line/column spans for every node.
+Those wrappers are not Weave syntax. Compiler sources are canonical unannotated
+text. A separate `weave-node-map-v1` records node IDs and UTF-8 source spans.
 
-## Builds, provenance, and integrity
+## Builds and integrity
 
-A successful multi-document build contains:
+A successful build contains:
 
 ```text
 .weave-build/<build-id>/
@@ -229,26 +170,14 @@ A successful multi-document build contains:
 └── program
 ```
 
-`weave-frontend-build-manifest-v2` records the pinned revision, ordered source
-documents, source hashes, compiler hash, requested and effective target,
-compiler command, return code, protocol validity, artifact paths, and SHA-256
-hashes.
+The bridge validates both compiler protocol documents before retaining an
+executable. `build_get` and cache admission verify the frontend manifest, build
+ID, path containment, regular-file status, and every SHA-256 hash.
 
-The bridge validates both public compiler documents before retaining an
-executable. The compiler manifest must name the exact ordered inputs, output,
-target, compiler, runtime, code generator, and linker. Diagnostics are mapped
-only when a source and span unambiguously match one canonical source map.
-
-`build_get` and cache admission verify that every referenced path remains below
-the build directory and that every artifact still matches its recorded hash.
-A malformed path, missing file, changed file, incomplete manifest, or build-ID
-mismatch is rejected rather than returned as a valid build.
-
-`weave-build-key-v4` derives the build ID from the exact revision, ordered source
-hashes, compiler binary hash, and requested target. Identical concurrent builds
-use a per-build advisory lock. An already verified successful build wins;
-failed or incomplete candidates cannot erase it. Temporary and replaced
-candidate directories are cleaned on success, failure, and lost races.
+`weave-build-key-v4` derives the build ID from the immutable revision, ordered
+source hashes, compiler binary hash, and requested target. Concurrent builds use
+a per-build advisory lock. An existing verified successful build wins; failed
+or incomplete candidates cannot erase it.
 
 ## Revision storage
 
@@ -258,9 +187,23 @@ adaptive versioned BLOB representation:
 - `WJZ1` for zlib-compressed canonical JSON;
 - `WJR1` when raw canonical JSON is smaller.
 
-Legacy databases migrate transactionally on first open and are vacuumed once
-after migration. Databases with a newer schema version are rejected without
-modification. See [snapshot storage](docs/snapshot-storage.md).
+Legacy databases migrate transactionally. Databases with a newer schema version
+are rejected without modification.
+
+## CLI
+
+The companion `weave-build` command exposes revisioned target and build
+operations without starting MCP:
+
+```bash
+weave-build --db weave.db target-set demo application main.weave \
+  --source library.weave
+weave-build --db weave.db target-validate demo application
+weave-build --db weave.db target-build demo application
+weave-build --db weave.db get <build-id>
+```
+
+Failures are emitted as structured JSON on stderr with exit status 2.
 
 ## MCP tools
 
