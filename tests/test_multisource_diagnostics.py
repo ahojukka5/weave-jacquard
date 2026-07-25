@@ -90,6 +90,36 @@ def test_each_compiler_source_uses_its_own_node_map(tmp_path: Path) -> None:
     ]
 
 
+def test_relative_compiler_source_uses_unique_indexed_basename(tmp_path: Path) -> None:
+    source_directory = tmp_path / "sources"
+    source_directory.mkdir()
+    main = source_directory / "000-main.weave"
+    library = source_directory / "001-library.weave"
+    main.write_text("abcdefghijklmnopqrst", encoding="utf-8")
+    library.write_text("ABCDEFGHIJKLMNOPQRST", encoding="utf-8")
+    raw = tmp_path / "compiler-diagnostics.json"
+    raw.write_text(
+        json.dumps(_document([_entry("sources/001-library.weave")])),
+        encoding="utf-8",
+    )
+
+    result, valid = collect_build_diagnostics(
+        raw,
+        canonical_sources=[
+            (main, _node_map("main.weave", "n_main")),
+            (library, _node_map("library.weave", "n_library")),
+        ],
+        returncode=11,
+        timed_out=False,
+        stdout="",
+        stderr="",
+    )
+
+    assert valid is True
+    assert result["entries"][0]["document"] == "library.weave"
+    assert result["entries"][0]["node_id"] == "n_library"
+
+
 def test_noncanonical_source_remains_unmapped(tmp_path: Path) -> None:
     main = tmp_path / "000-main.weave"
     main.write_text("abcdefghijklmnopqrst", encoding="utf-8")
