@@ -1,0 +1,162 @@
+"""Deterministic canonical Weave rendering with stable node source spans."""
+
+from __future__ import annotations
+
+import hashlib
+from dataclasses import dataclass
+from typing import Any
+
+from .sexpr import JsonObject, validate_tree
+
+
+@dataclass(frozen=True)
+class SourcePosition:
+    byte: int
+    line: int
+    column: int
+
+
+class _Writer:
+    def __init__(self) -> None:
+        self.parts: list[str] = []
+        self.byte = 0
+        self.line = 1
+        self.column = 1
+        self.spans: dict[str, dict[str, int | str]] = {}
+
+    def position(self) -> SourcePosition:
+        return SourcePosition(self.byte, self.line, self.column)
+
+    def append(self, text: str) -> None:
+        self.parts.append(text)
+        self.byte += len(text.encode("utf-8"))
+        if "\n" in text:
+            lines = text.split("\n")
+            self.line += len(lines) - 1
+            self.column = len(lines[-1]) + 1
+        else:
+            self.column += len(text)
+
+    def record(self, node_id: str, start: SourcePosition) -> None:
+        end = self.position()
+        self.spans[node_id] = {
+            "node_id": node_id,
+            "start_byte": start.byte,
+            "end_byte": end.byte,
+            "start_line": start.line,
+            "start_column": start.column,
+            "end_line": end.line,
+            "end_column": end.column,
+        }
+
+    def text(self) -> str:
+        return "".join(self.parts)
+
+
+def _render_atom(node: JsonObject) -> str:
+    kind = node["kind"]
+    value = node["value"]
+    if kind == "string":
+        escaped = (
+            value.replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+        )
+        return f'"{escaped}"'
+    if kind == "boolean":
+        return "true" if value else "false"
+    return str(value)
+
+
+def _flat_text(node: JsonObject) -> str:
+    if node["kind"] != "list":
+        return _render_atom(node)
+    return "(" + " ".join(_flat_text(child) for child in node["children"]) + ")"
+
+
+def _render(node: JsonObject, writer: _Writer, *, indent: int) -> None:
+    start = writer.position()
+    if node["kind"] != "list":
+        writer.append(_render_atom(node))
+        writer.record(node["id"], start)
+        return
+
+    children = node["children"]
+    if not children:
+        writer.append("()")
+        writer.record(node["id"], start)
+        return
+
+    flat = _flat_text(node)
+    if indent + len(flat) <= 88:
+        writer.append("(")
+        for index, child in enumerate(children):
+            if index:
+                writer.append(" ")
+            _render(child, writer, indent=indent + 2)
+        writer.append(")")
+        writer.record(node["id"], start)
+        return
+
+    writer.append("(")
+    _render(children[0], writer, indent=indent + 2)
+    padding = " " * (indent + 2)
+    for child in children[1:]:
+        writer.append("\n" + padding)
+        _render(child, writer, indent=indent + 2)
+    writer.append(")")
+    writer.record(node["id"], start)
+
+
+def render_with_node_map(
+    root: JsonObject,
+    *,
+    revision_id: str,
+    document: str,
+) -> tuple[str, dict[str, Any]]:
+    """Render compiler source and a sidecar mapping source spans to node IDs."""
+
+    validate_tree(root)
+    writer = _Writer()
+    _render(root, writer, indent=0)
+    source = writer.text() + "\n"
+    source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    node_map: dict[str, Any] = {
+        "format": "weave-node-map-v1",
+        "source_sha256": source_hash,
+        "revision_id": revision_id,
+        "document": document,
+        "nodes": sorted(
+            writer.spans.values(),
+            key=lambda span: (int(span["start_byte"]), -int(span["end_byte"])),
+        ),
+    }
+    return source, node_map
+
+
+def smallest_node_for_span(
+    node_map: dict[str, Any],
+    *,
+    start_byte: int,
+    end_byte: int,
+) -> str | None:
+    """Return the smallest mapped node containing an exclusive-end span."""
+
+    matches = [
+        span
+        for span in node_map.get("nodes", [])
+        if int(span["start_byte"]) <= start_byte
+        and int(span["end_byte"]) >= end_byte
+    ]
+    if not matches:
+        return None
+    match = min(
+        matches,
+        key=lambda span: (
+            int(span["end_byte"]) - int(span["start_byte"]),
+            -int(span["start_byte"]),
+        ),
+    )
+    return str(match["node_id"])
