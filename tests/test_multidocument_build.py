@@ -92,7 +92,7 @@ def main() -> int:
                             "phase": "backend",
                             "message": "unknown expression operator: unknown_form",
                             "source": str(source),
-                            "span_origin": "compiler-test",
+                            "span_origin": "inferred-unique-token",
                             "span": {
                                 "start_byte": start_byte,
                                 "end_byte": end_byte,
@@ -106,12 +106,12 @@ def main() -> int:
                 },
                 indent=2,
             )
-            + "\\n",
+            + "\n",
             encoding="utf-8",
         )
         return 11
 
-    output.write_text("#!/bin/sh\\nexit 42\\n", encoding="utf-8")
+    output.write_text("#!/bin/sh\nexit 42\n", encoding="utf-8")
     os.chmod(output, 0o755)
     manifest.write_text(
         json.dumps(
@@ -123,7 +123,7 @@ def main() -> int:
             },
             indent=2,
         )
-        + "\\n",
+        + "\n",
         encoding="utf-8",
     )
     diagnostics.write_text(
@@ -138,7 +138,7 @@ def main() -> int:
             },
             indent=2,
         )
-        + "\\n",
+        + "\n",
         encoding="utf-8",
     )
     return 0
