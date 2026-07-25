@@ -22,7 +22,7 @@ PROGRAM_V2 = PROGRAM_V1.replace('(version "0.1")', '(version "0.2")')
 
 def _fake_compiler(path: Path) -> Path:
     path.write_text(
-        """#!/usr/bin/env python3
+        r'''#!/usr/bin/env python3
 from __future__ import annotations
 
 import json
@@ -33,15 +33,11 @@ from pathlib import Path
 
 def position(text: str, offset: int) -> tuple[int, int]:
     prefix = text[:offset]
-    return prefix.count("\\n") + 1, len(prefix.rsplit("\\n", 1)[-1]) + 1
+    return prefix.count("\n") + 1, len(prefix.rsplit("\n", 1)[-1]) + 1
 
 
-def diagnostic_document(
-    *,
-    status: str,
-    phase: str,
-    exit_code: int,
-    raw_exit_code: int,
+def diagnostics_document(
+    *, status: str, phase: str, exit_code: int, raw_exit_code: int,
     diagnostics: list[dict[str, object]],
 ) -> dict[str, object]:
     return {
@@ -52,6 +48,27 @@ def diagnostic_document(
         "raw_exit_code": raw_exit_code,
         "diagnostics": diagnostics,
     }
+
+
+def build_manifest(
+    *, source: Path, output: Path, status: str, phase: str,
+) -> dict[str, object]:
+    return {
+        "format": "weavec-build-manifest-v1",
+        "status": status,
+        "phase": phase,
+        "target": "x86_64-unknown-linux-gnu",
+        "compiler": str(Path(sys.argv[0]).resolve()),
+        "runtime": "/opt/weavec/libweave-runtime.a",
+        "codegen": "clang",
+        "linker": "clang",
+        "output": str(output),
+        "sources": [str(source)],
+    }
+
+
+def write_json(path: Path, value: object) -> None:
+    path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> int:
@@ -70,8 +87,12 @@ def main() -> int:
     text = source.read_text(encoding="utf-8")
 
     if "malformed-diagnostics" in text:
-        output.write_text("#!/bin/sh\\nexit 42\\n", encoding="utf-8")
+        output.write_text("#!/bin/sh\nexit 42\n", encoding="utf-8")
         os.chmod(output, 0o755)
+        write_json(
+            manifest,
+            build_manifest(source=source, output=output, status="succeeded", phase="complete"),
+        )
         diagnostics.write_text("{not-json", encoding="utf-8")
         return 0
 
@@ -81,75 +102,57 @@ def main() -> int:
         end = start + len(token)
         start_line, start_column = position(text, start)
         end_line, end_column = position(text, end)
-        diagnostics.write_text(
-            json.dumps(
-                diagnostic_document(
-                    status="failed",
-                    phase="backend",
-                    exit_code=11,
-                    raw_exit_code=7,
-                    diagnostics=[
-                        {
-                            "code": "backend.fake-failure",
-                            "severity": "error",
-                            "phase": "backend",
-                            "message": "requested fake compiler failure",
-                            "source": str(source),
-                            "span_origin": "inferred-unique-token",
-                            "span": {
-                                "start_byte": len(text[:start].encode()),
-                                "end_byte": len(text[:end].encode()),
-                                "start_line": start_line,
-                                "start_column": start_column,
-                                "end_line": end_line,
-                                "end_column": end_column,
-                            },
-                        }
-                    ],
-                ),
-                indent=2,
-            )
-            + "\\n",
-            encoding="utf-8",
+        write_json(
+            manifest,
+            build_manifest(source=source, output=output, status="failed", phase="backend"),
+        )
+        write_json(
+            diagnostics,
+            diagnostics_document(
+                status="failed",
+                phase="backend",
+                exit_code=11,
+                raw_exit_code=7,
+                diagnostics=[{
+                    "code": "backend.fake-failure",
+                    "severity": "error",
+                    "phase": "backend",
+                    "message": "requested fake compiler failure",
+                    "source": str(source),
+                    "span_origin": "inferred-unique-token",
+                    "span": {
+                        "start_byte": len(text[:start].encode()),
+                        "end_byte": len(text[:end].encode()),
+                        "start_line": start_line,
+                        "start_column": start_column,
+                        "end_line": end_line,
+                        "end_column": end_column,
+                    },
+                }],
+            ),
         )
         print("requested fake compiler failure", file=sys.stderr)
         return 11
 
-    output.write_text("#!/bin/sh\\nexit 42\\n", encoding="utf-8")
+    output.write_text("#!/bin/sh\nexit 42\n", encoding="utf-8")
     os.chmod(output, 0o755)
-    manifest.write_text(
-        json.dumps(
-            {
-                "format": "weavec-build-manifest-v1",
-                "status": "succeeded",
-                "source": str(source),
-                "output": str(output),
-            },
-            indent=2,
-        )
-        + "\\n",
-        encoding="utf-8",
+    write_json(
+        manifest,
+        build_manifest(source=source, output=output, status="succeeded", phase="complete"),
     )
-    diagnostics.write_text(
-        json.dumps(
-            diagnostic_document(
-                status="succeeded",
-                phase="complete",
-                exit_code=0,
-                raw_exit_code=0,
-                diagnostics=[],
-            ),
-            indent=2,
-        )
-        + "\\n",
-        encoding="utf-8",
+    write_json(
+        diagnostics,
+        diagnostics_document(
+            status="succeeded", phase="complete", exit_code=0,
+            raw_exit_code=0, diagnostics=[],
+        ),
     )
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-""",
+''',
         encoding="utf-8",
     )
     path.chmod(0o755)
@@ -166,33 +169,17 @@ def test_build_is_pinned_to_requested_revision_and_reused(tmp_path: Path) -> Non
         first = workspace.import_program("demo", "main", "main.weave", PROGRAM_V1)
         first_revision = str(first["revision_id"])
         workspace.import_program(
-            "demo",
-            "main",
-            "main.weave",
-            PROGRAM_V2,
-            replace=True,
+            "demo", "main", "main.weave", PROGRAM_V2, replace=True
         )
-        current_revision = workspace.branch_head("demo", "main")
-        assert current_revision != first_revision
+        assert workspace.branch_head("demo", "main") != first_revision
 
-        bridge = CompilerBridge(
-            workspace,
-            compiler=compiler,
-            build_root=build_root,
-        )
-        result = bridge.build(
-            "demo",
-            "main.weave",
-            revision_id=first_revision,
-        )
-        cached = bridge.build(
-            "demo",
-            "main.weave",
-            revision_id=first_revision,
-        )
+        bridge = CompilerBridge(workspace, compiler=compiler, build_root=build_root)
+        result = bridge.build("demo", "main.weave", revision_id=first_revision)
+        cached = bridge.build("demo", "main.weave", revision_id=first_revision)
 
     assert result["status"] == "succeeded"
     assert result["compiler_diagnostics_protocol_valid"] is True
+    assert result["compiler_manifest_protocol_valid"] is True
     assert result["revision_id"] == first_revision
     assert result["cached"] is False
     assert cached["build_id"] == result["build_id"]
@@ -225,30 +212,24 @@ def test_build_is_pinned_to_requested_revision_and_reused(tmp_path: Path) -> Non
 def test_failed_build_maps_compiler_span_and_keeps_revision(tmp_path: Path) -> None:
     compiler = _fake_compiler(tmp_path / "weavec")
     database = tmp_path / "weave.db"
-
     failing_source = PROGRAM_V1.replace(
-        '(name "demo")',
-        '(name "force-build-failure")',
+        '(name "demo")', '(name "force-build-failure")'
     )
+
     with SExpressionWorkspace(database, weavec_binary=compiler) as workspace:
         workspace.initialize("demo")
         imported = workspace.import_program(
-            "demo",
-            "main",
-            "main.weave",
-            failing_source,
+            "demo", "main", "main.weave", failing_source
         )
         revision = str(imported["revision_id"])
-        bridge = CompilerBridge(
-            workspace,
-            compiler=compiler,
-            build_root=tmp_path / "builds",
-        )
-        result = bridge.build("demo", "main.weave")
+        result = CompilerBridge(
+            workspace, compiler=compiler, build_root=tmp_path / "builds"
+        ).build("demo", "main.weave")
         head_after = workspace.branch_head("demo", "main")
 
     assert result["status"] == "failed"
     assert result["returncode"] == 11
+    assert result["compiler_manifest_protocol_valid"] is True
     assert result["revision_id"] == revision
     assert result["artifact_paths"]["executable"] is None
     assert head_after == revision
@@ -262,9 +243,7 @@ def test_failed_build_maps_compiler_span_and_keeps_revision(tmp_path: Path) -> N
     entry = diagnostics["entries"][0]
     span = entry["span"]
     expected_node = smallest_node_for_span(
-        node_map,
-        start_byte=span["start_byte"],
-        end_byte=span["end_byte"],
+        node_map, start_byte=span["start_byte"], end_byte=span["end_byte"]
     )
 
     assert diagnostics["protocol_valid"] is True
@@ -286,9 +265,7 @@ def test_malformed_compiler_diagnostics_prevent_success(tmp_path: Path) -> None:
         workspace.initialize("demo")
         workspace.import_program("demo", "main", "main.weave", source)
         result = CompilerBridge(
-            workspace,
-            compiler=compiler,
-            build_root=tmp_path / "builds",
+            workspace, compiler=compiler, build_root=tmp_path / "builds"
         ).build("demo", "main.weave")
 
     diagnostics = json.loads(
@@ -297,6 +274,7 @@ def test_malformed_compiler_diagnostics_prevent_success(tmp_path: Path) -> None:
     assert result["status"] == "failed"
     assert result["returncode"] == 0
     assert result["compiler_diagnostics_protocol_valid"] is False
+    assert result["compiler_manifest_protocol_valid"] is True
     assert result["artifact_paths"]["executable"] is None
     assert diagnostics["protocol_valid"] is False
     assert diagnostics["entries"][0]["code"] == "bridge.invalid-compiler-diagnostics"
