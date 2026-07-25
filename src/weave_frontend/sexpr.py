@@ -138,19 +138,71 @@ def render_node(
     """Render canonical source or an ID-bearing agent view."""
 
     validate_tree(node)
-    rendered = _render_plain(
-        node,
-        indent=indent,
-        annotated=annotated,
-        annotate_atoms=annotate_atoms,
-    )
-    return rendered
+    if annotated:
+        return _render_annotated(
+            node,
+            indent=indent,
+            annotate_atoms=annotate_atoms,
+        )
+    parts: list[str] = []
+    _render_canonical(node, parts, indent=indent)
+    return "".join(parts)
 
 
-def _render_plain(node: JsonObject, *, indent: int, annotated: bool, annotate_atoms: bool) -> str:
+def _render_canonical(node: JsonObject, parts: list[str], *, indent: int) -> None:
+    if node["kind"] != "list":
+        parts.append(_render_atom(node))
+        return
+
+    children = node["children"]
+    if not children:
+        parts.append("()")
+        return
+
+    flat = _flat_text_if_fits(node, max(0, 88 - indent))
+    if flat is not None:
+        parts.append(flat)
+        return
+
+    parts.append("(")
+    _render_canonical(children[0], parts, indent=indent + 2)
+    padding = " " * (indent + 2)
+    for child in children[1:]:
+        parts.append("\n" + padding)
+        _render_canonical(child, parts, indent=indent + 2)
+    parts.append(")")
+
+
+def _flat_text_if_fits(node: JsonObject, remaining: int) -> str | None:
+    if remaining < 0:
+        return None
     if node["kind"] != "list":
         text = _render_atom(node)
-        if annotated and annotate_atoms:
+        return text if len(text) <= remaining else None
+
+    parts = ["("]
+    used = 1
+    for index, child in enumerate(node["children"]):
+        if index:
+            if used + 1 > remaining:
+                return None
+            parts.append(" ")
+            used += 1
+        child_text = _flat_text_if_fits(child, remaining - used)
+        if child_text is None:
+            return None
+        parts.append(child_text)
+        used += len(child_text)
+    if used + 1 > remaining:
+        return None
+    parts.append(")")
+    return "".join(parts)
+
+
+def _render_annotated(node: JsonObject, *, indent: int, annotate_atoms: bool) -> str:
+    if node["kind"] != "list":
+        text = _render_atom(node)
+        if annotate_atoms:
             return f"(@{node['id']} {text})"
         return text
 
@@ -159,10 +211,9 @@ def _render_plain(node: JsonObject, *, indent: int, annotated: bool, annotate_at
         core = "()"
     else:
         child_text = [
-            _render_plain(
+            _render_annotated(
                 child,
                 indent=indent + 2,
-                annotated=annotated,
                 annotate_atoms=annotate_atoms,
             )
             for child in children
@@ -179,8 +230,6 @@ def _render_plain(node: JsonObject, *, indent: int, annotated: bool, annotate_at
                 pad = " " * (indent + 2)
                 aligned = [(pad + text.replace("\n", "\n" + pad)) for text in rest]
                 core = f"({head}\n" + "\n".join(aligned) + ")"
-    if not annotated:
-        return core
     wrapper_pad = " " * (indent + 2)
     wrapped = core.replace("\n", "\n" + wrapper_pad)
     return f"(@{node['id']} {wrapped})"
