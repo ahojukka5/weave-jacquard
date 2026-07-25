@@ -6,8 +6,8 @@
 without emitting a large nested JSON tree or balancing S-expression parentheses.
 The write API is atomic: one form, atom, move, wrap, or deletion per call.
 
-The database owns node identity and revision history. Canonical `.weave` source
-is generated deterministically when validation or compilation requires it.
+The database owns node identity and revision history. Canonical `.weave` sources
+are generated deterministically when validation or compilation requires them.
 
 ## Grammar and compiler authority
 
@@ -29,7 +29,7 @@ The authoritative native build is:
 ```text
 program_build
   → pin immutable revision
-  → canonical source + weave-node-map-v1
+  → ordered canonical sources + one weave-node-map-v1 per source
   → weavec build
   → executable and manifests
 ```
@@ -52,8 +52,9 @@ Every list and atom receives a stable ID such as `n_3a12cce48fe14f99`.
 - merge uses IDs rather than line numbers.
 
 `program_render(annotated=true)` and `node_inspect` expose IDs. Canonical source
-omits annotations. `program_build` generates the canonical source and a sidecar
-map containing UTF-8 byte and line/column spans for every node.
+omits annotations. `program_build` generates a separate canonical source and
+sidecar map for every selected database document. Each map contains UTF-8 byte
+and line/column spans for every node in that document.
 
 ## Tools
 
@@ -90,7 +91,7 @@ incompatible edits to the same atom or subtree produce a conflict.
 - `program_render` returns canonical or annotated Weave.
 - `program_validate` runs structural checks and the configured compiler frontend.
 - `program_import` imports complete source for migration and fixtures.
-- `program_build` builds a pinned revision into a native executable.
+- `program_build` builds an ordered document set from a pinned revision.
 
 `program_import` is not the preferred agent write path.
 
@@ -102,24 +103,62 @@ Inputs:
 
 ```text
 project
-document
+document                         primary source
+additional_documents = optional ordered list
 branch = "main"
 revision_id = optional exact revision
 target = optional target triple
 ```
 
+Example:
+
+```text
+program_build(
+  project="demo",
+  document="main.weave",
+  additional_documents=["library.weave", "platform.weave"],
+  branch="main"
+)
+```
+
+The primary document is always first. Additional documents are passed to
+`weavec build` in exactly the supplied order. The server does not sort them and
+does not silently include every document in the project. Duplicates are rejected.
+Every selected document must exist in the same pinned revision.
+
 When `revision_id` is omitted, the branch head is resolved once before rendering.
-The operation returns a build manifest containing the build ID, pinned revision,
-status, hashes, and artifact paths. It does not execute the output program.
+The operation returns `weave-frontend-build-manifest-v2`, containing the build
+ID, pinned revision, ordered document records, status, hashes, and artifact
+paths. It does not execute the output program.
+
+The corresponding CLI form is:
+
+```text
+weave-build --db weave.db build demo main.weave \
+  --source library.weave \
+  --source platform.weave
+```
+
+Each repeated `--source` preserves order.
 
 #### `build_get`
 
 Returns a stored build manifest and artifact paths by hexadecimal build ID.
 Inspecting an existing build does not require the compiler binary.
 
-A successful build contains canonical source, node map, compiler manifest,
-diagnostics, frontend manifest, and executable. A failed build contains the
-diagnostic artifacts but no executable.
+A successful build contains:
+
+- all canonical sources under `sources/`;
+- all node maps under `source-maps/`;
+- compiler manifest;
+- raw compiler diagnostics;
+- node-mapped bridge diagnostics;
+- frontend build manifest;
+- executable.
+
+A failed build contains diagnostic artifacts but no executable. For compatibility,
+`artifacts.source` and `artifacts.node_map` still identify the primary document;
+`artifacts.sources` and `artifacts.node_maps` contain the complete ordered set.
 
 ### Atomic node writes
 
@@ -152,7 +191,7 @@ relying on an unversioned prompt.
 
 ```text
 project_initialize
-→ program_create
+→ program_create / program_import
 → grammar_help
 → atomic node edits
 → node_inspect
@@ -166,11 +205,15 @@ project_initialize
 
 - Validation or build failure does not mutate the program revision.
 - `program_build` never advances a branch.
-- The final executable exists only on success.
+- Missing or duplicate selected documents fail before compilation.
+- The final executable exists only on compiler and protocol success.
 - Build diagnostics preserve compiler stdout, stderr, timeout state, and return
   code.
-- Machine-readable compiler spans will later be mapped to node IDs through the
-  source map.
+- Every canonical compiler span is matched against the node map for the exact
+  source document named by the compiler.
+- A secondary-document diagnostic receives that document's `document` and
+  `node_id`, not the primary document's mapping.
+- Spanless, ambiguous, and non-canonical locations remain unmapped.
 - Program execution remains a separate future sandboxed operation.
 
 ## Current boundary

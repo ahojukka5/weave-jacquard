@@ -271,8 +271,9 @@ def test_failed_build_maps_compiler_span_and_keeps_revision(tmp_path: Path) -> N
     assert diagnostics["protocol_valid"] is True
     assert "requested fake compiler failure" in diagnostics["stderr"]
     assert entry["code"] == "backend.fake-failure"
-    assert entry["source"] == "program.weave"
-    assert entry["compiler_source"].endswith("program.weave")
+    assert entry["source"] == "000-main.weave"
+    assert entry["compiler_source"] == "000-main.weave"
+    assert entry["document"] == "main.weave"
     assert entry["node_id"] == expected_node
     assert entry["node_id"] is not None
 

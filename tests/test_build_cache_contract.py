@@ -12,13 +12,18 @@ def _write_cached_build(
     build_key_format: str,
     protocol_valid: bool = True,
     include_compiler_diagnostics: bool = True,
+    include_sources: bool = True,
 ) -> None:
     directory.mkdir()
     (directory / "program").write_text("executable", encoding="utf-8")
-    artifacts: dict[str, str | None] = {
+    artifacts: dict[str, object] = {
         "executable": "program",
         "compiler_diagnostics": (
             "compiler-diagnostics.json" if include_compiler_diagnostics else None
+        ),
+        "sources": ["sources/000-main.weave"] if include_sources else [],
+        "node_maps": (
+            ["source-maps/000-main.weave.map.json"] if include_sources else []
         ),
     }
     if include_compiler_diagnostics:
@@ -26,10 +31,21 @@ def _write_cached_build(
             '{"format":"weavec-diagnostics-v1"}\n',
             encoding="utf-8",
         )
+    if include_sources:
+        (directory / "sources").mkdir()
+        (directory / "source-maps").mkdir()
+        (directory / "sources/000-main.weave").write_text(
+            "(program)\n",
+            encoding="utf-8",
+        )
+        (directory / "source-maps/000-main.weave.map.json").write_text(
+            '{"format":"weave-node-map-v1"}\n',
+            encoding="utf-8",
+        )
     (directory / "manifest.json").write_text(
         json.dumps(
             {
-                "format": "weave-frontend-build-manifest-v1",
+                "format": "weave-frontend-build-manifest-v2",
                 "build_key_format": build_key_format,
                 "status": "succeeded",
                 "compiler_diagnostics_protocol_valid": protocol_valid,
@@ -61,9 +77,16 @@ def test_cache_requires_valid_compiler_diagnostics_artifact(tmp_path: Path) -> N
         build_key_format=BUILD_KEY_FORMAT,
         include_compiler_diagnostics=False,
     )
+    missing_sources = tmp_path / "missing-sources"
+    _write_cached_build(
+        missing_sources,
+        build_key_format=BUILD_KEY_FORMAT,
+        include_sources=False,
+    )
 
     assert CompilerBridge._read_successful_manifest(invalid_protocol) is None
     assert CompilerBridge._read_successful_manifest(missing_artifact) is None
+    assert CompilerBridge._read_successful_manifest(missing_sources) is None
 
 
 def test_cache_accepts_current_diagnostics_contract(tmp_path: Path) -> None:
@@ -77,3 +100,4 @@ def test_cache_accepts_current_diagnostics_contract(tmp_path: Path) -> None:
     assert manifest["artifact_paths"]["compiler_diagnostics"].endswith(
         "compiler-diagnostics.json"
     )
+    assert manifest["artifact_paths"]["sources"][0].endswith("000-main.weave")
