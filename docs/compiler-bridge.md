@@ -3,23 +3,23 @@
 ## Purpose
 
 `weave_frontend` owns a versioned program tree with stable node identities.
-`weavec` owns the Weave language, surface validation, lowering, and code
-generation. The bridge between them must preserve those responsibilities instead
-of making agent metadata part of the language.
+`weavec` owns the Weave language and the complete native toolchain. The bridge
+preserves those responsibilities instead of making agent metadata, LLVM phases,
+or runtime selection part of the database service.
 
-The target pipeline is:
+The implemented pipeline is:
 
 ```text
 immutable database revision
         ↓
 canonical surface Weave + node source map
-        ↓  weavec --frontend
-WIR
-        ↓  weavec --backend
-LLVM IR
-        ↓  clang + Weave runtime
-native executable
+        ↓  weavec build
+native executable + compiler manifest
 ```
+
+Internally `weavec build` performs surface lowering, WIR generation, LLVM IR
+emission, object generation, private target-runtime selection, and linking.
+Those implementation phases are not part of the `weave_frontend` contract.
 
 ## Three representations
 
@@ -31,7 +31,7 @@ revision IDs.
 
 ### 2. Annotated agent view
 
-The existing annotated syntax is a transport and inspection format:
+The annotated syntax is a transport and inspection format:
 
 ```lisp
 (@n_a1b2
@@ -42,8 +42,8 @@ The existing annotated syntax is a transport and inspection format:
 ```
 
 `weave_frontend` may render and parse this form to preserve identities during
-agent-facing round trips. It is not canonical Weave source and must never be
-required by `weavec`.
+agent-facing round trips. It is not canonical Weave source and is never passed
+to `weavec`.
 
 ### 3. Canonical compiler view
 
@@ -61,16 +61,15 @@ usable independently of the database and MCP server.
 
 ## Source-map contract
 
-Removing `@n_*` wrappers means compiler diagnostics no longer carry database
-node identities directly. `weave_frontend` must therefore produce two outputs in
-one deterministic render operation:
+Canonical source and the sidecar map are produced by one deterministic render
+operation:
 
 ```text
 program.weave
 program.weave.map.json
 ```
 
-The map records at least:
+The implemented map format is:
 
 ```json
 {
@@ -93,155 +92,196 @@ The map records at least:
 ```
 
 Offsets are UTF-8 byte offsets with an exclusive end. When a diagnostic covers
-several nested nodes, the bridge selects the smallest mapped node containing the
-diagnostic span and may also return its ancestor chain.
+nested nodes, the bridge selects the smallest mapped node containing the span.
+The map is independently verifiable because it includes the canonical source
+hash and pinned revision ID.
 
-The initial bridge can map surface parse and validation diagnostics. Later
-`weavec` may propagate source locations through WIR and LLVM debug metadata so
-backend and runtime diagnostics retain the same identity chain.
+## Public compiler invocation
 
-## Compiler invocation contract
-
-The bridge invokes explicit compiler modes only:
+The bridge invokes one public compiler contract:
 
 ```text
-weavec --frontend program.wir program.weave
-weavec --backend program.wir program.ll
-clang program.ll /path/to/libweave-runtime.a -o program
+weavec build program.weave \
+  -o program \
+  --manifest-json compiler-manifest.json
 ```
 
-The implicit backend spelling is not supported.
-
-For reliable automation, `weavec` should add machine-readable diagnostics:
+An explicit target may be added:
 
 ```text
-weavec --diagnostics-json diagnostics.json --frontend program.wir program.weave
-weavec --diagnostics-json diagnostics.json --backend program.wir program.ll
+weavec build program.weave \
+  -o program \
+  --target x86_64-unknown-linux-musl \
+  --manifest-json compiler-manifest.json
 ```
 
-Each diagnostic should include a stable code, severity, message, phase, source
-path, and UTF-8 byte or line/column span. `weave_frontend` maps that span back to
-node IDs using the sidecar map.
+`weave_frontend` does not invoke `--frontend`, `--backend`, LLVM tools, a target
+linker, or a runtime archive during a native build. Those remain private compiler
+implementation details. The low-level compiler modes continue to be useful for
+validation, bootstrap work, and compiler development.
 
-## Runtime boundary
+## Private runtime boundary
 
-Producing LLVM IR is not the same as producing a complete program. The `weavec`
-release must expose a versioned runtime link contract, preferably:
+The `weavec` product package contains its target runtime under a private path such
+as:
 
 ```text
-lib/libweave-runtime.a
-include/weave/runtime.h
+bin/weavec
+lib/weavec/<target>/libweave-runtime.a
 ```
 
-`weave_frontend` should link the runtime archive unconditionally. Static archive
-members that are not referenced are not pulled into the executable, while
-programs using contracts or runtime helpers remain supported. The runtime
-version and checksum belong in the build manifest.
+`weavec build` discovers that resource relative to its own executable. A caller
+never names the runtime. Source checkouts may use a compiler-development fallback,
+but that path is also resolved by the compiler rather than `weave_frontend`.
 
-Until the runtime archive is published, the bridge may accept an explicit
-`WEAVEC_RUNTIME` path. A source-tree-relative runtime path is a development
-fallback, not the production contract.
+This division permits target-specific runtimes, release checksums, and dead-code
+elimination without exposing a second user-facing build API.
 
 ## Revision-pinned build operation
 
-A build request identifies an immutable input:
+A request identifies:
 
 ```text
 project
 branch or exact revision_id
 document
-compiler/toolchain selection
+weavec selection
 target
-optimization profile
 ```
 
-The branch head is resolved to a revision before rendering. All later steps use
-that exact revision even if the branch advances during the build.
+The branch head is resolved to an immutable revision before rendering. All later
+steps use that exact revision even if the branch advances during compilation.
+Building never advances a branch or creates a source revision.
 
-Suggested artifact layout:
+The implemented artifact layout is content-derived:
 
 ```text
 .weave-build/
-└── <project>/
-    └── <revision-id>/
-        └── <document>/
-            └── <target>/
-                ├── program.weave
-                ├── program.weave.map.json
-                ├── program.wir
-                ├── program.ll
-                ├── program
-                ├── diagnostics.json
-                └── manifest.json
+└── <build-id>/
+    ├── program.weave
+    ├── program.weave.map.json
+    ├── compiler-manifest.json
+    ├── diagnostics.json
+    ├── manifest.json
+    └── program
 ```
 
-The manifest records:
+The executable exists only after a successful compiler build. A failed build
+keeps source, node map, diagnostics, and manifests but records no executable.
 
-- project, branch, revision, and document;
-- canonical source hash;
-- compiler path, version, and binary hash;
-- runtime path, version, and hash;
-- target and flags;
-- every command and exit status;
-- artifact paths and hashes;
-- timestamps and final status.
+## Frontend build manifest
+
+`weave-frontend-build-manifest-v1` records:
+
+- build ID and status;
+- project and branch used for the request;
+- pinned revision ID and immutable revision root hash;
+- document and canonical source hash;
+- compiler path and SHA-256;
+- requested target;
+- normalized public compiler command and return code;
+- relative artifact names and SHA-256 values.
+
+Build-local paths in the compiler manifest are normalized relative to the final
+artifact directory before publication, so the whole directory remains movable.
 
 ## Cache key
 
-A build is reusable only when this key is unchanged:
+The current build ID includes:
 
 ```text
-revision content hash
+immutable revision root hash and ID
 + document identity
-+ weavec binary hash/version
-+ runtime hash/version
-+ target triple
-+ optimization and compiler flags
++ canonical source hash
++ weavec binary hash
++ target
 ```
 
-Branch names are not cache keys because branch heads move.
+Branch names are provenance, not cache identity, because branch heads move.
+Successful identical requests are reused. Failed builds are not treated as cache
+hits and may be rebuilt.
 
-## MCP surface
+## MCP and CLI surface
 
-The current tools remain:
+The existing tools remain:
 
 - `program_render(annotated=true)` for agents;
 - `program_render(annotated=false)` for canonical source;
 - `program_validate` for structural and compiler validation.
 
-The bridge should add:
+The build bridge adds:
 
 ### `program_build`
 
-Pins the revision, renders canonical source and source map, runs the compiler and
-linker, stores artifacts, and returns a build ID plus mapped diagnostics.
+Pins the revision, renders canonical source and source map, invokes `weavec build`,
+publishes the artifact directory atomically, and returns the build manifest plus
+absolute artifact paths.
 
 ### `build_get`
 
-Returns manifest, status, diagnostics, and artifact metadata for a build ID.
+Returns a stored manifest and artifact paths by build ID. Compiler availability
+is not required merely to inspect an existing build.
 
-### `program_run`
+The same API is exposed through:
 
-A later operation that executes an already built artifact under an explicit
-sandbox and resource policy. Compilation and execution remain separate actions.
+```text
+weave-build --db weave.db build <project> <document>
+weave-build --db weave.db get <build-id>
+```
 
-## Failure semantics
+### Future `program_run`
 
-- A failed render, compiler phase, or link does not mutate program state.
-- Partial files remain under the build ID for diagnostics but are never reported
-  as a successful executable.
-- Diagnostics are returned both in compiler coordinates and mapped node IDs.
-- Building never advances a branch or creates a source revision.
-- Execution is never implicit in `program_build`.
+Execution remains a separate future operation with an explicit sandbox, resource
+limits, and target policy. `program_build` never executes the produced program.
 
-## Implementation order
+## Diagnostics
 
-1. Add deterministic canonical rendering with node spans.
-2. Add `weave-node-map-v1` serialization and tests.
-3. Add a revision-pinned local build service that produces `.weave`, WIR, and
-   LLVM IR.
-4. Publish a versioned runtime archive from `weavec` and add native linking.
-5. Add `program_build` and `build_get` MCP tools.
-6. Add JSON diagnostics to `weavec` and map them to node IDs.
-7. Add content-addressed build caching.
-8. Add separately sandboxed `program_run`.
+The first implementation stores:
+
+```json
+{
+  "format": "weave-build-diagnostics-v1",
+  "returncode": 1,
+  "timed_out": false,
+  "stdout": "...",
+  "stderr": "...",
+  "entries": []
+}
+```
+
+The `entries` array is reserved for machine-readable compiler diagnostics. Once
+`weavec` emits stable source spans, `weave_frontend` will map each span through
+`weave-node-map-v1` to the smallest containing `n_*` node and optionally its
+ancestor chain. Human-readable stderr remains preserved for compatibility.
+
+## Failure and publication semantics
+
+- A failed render or compiler invocation does not mutate program state.
+- The final executable is absent on failure.
+- Every build refers to one immutable revision.
+- Build files are created in a temporary sibling directory.
+- The complete directory is published with an atomic rename.
+- Successful identical builds are reused.
+- Compilation and execution are separate operations.
+
+## Implementation status
+
+Completed in the first bridge version:
+
+1. deterministic canonical rendering with per-node spans;
+2. `weave-node-map-v1` serialization and source hash;
+3. exact revision ownership validation and branch-head pinning;
+4. `weavec build` invocation only;
+5. content-derived build IDs and successful-build reuse;
+6. atomic artifact-directory publication;
+7. CLI commands `build` and `get`;
+8. MCP tools `program_build` and `build_get`;
+9. tests for annotation stripping, node lookup, revision pinning, executable
+   production, cache reuse, and failure isolation.
+
+Remaining compiler-side extension:
+
+1. versioned machine-readable source diagnostics from `weavec`;
+2. diagnostic span mapping into node IDs;
+3. optional richer compiler/toolchain identity and target metadata;
+4. separately sandboxed `program_run`.
