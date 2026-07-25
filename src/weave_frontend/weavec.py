@@ -48,6 +48,14 @@ class WeavecValidator:
                 return candidate.resolve()
         return None
 
+    def _active_binary(self) -> Path | None:
+        """Return a currently executable compiler, re-resolving stale paths."""
+
+        if self.binary is not None and self.binary.is_file() and os.access(self.binary, os.X_OK):
+            return self.binary
+        self.binary = self._resolve_binary(None)
+        return self.binary
+
     def validate(self, source: str) -> dict[str, Any]:
         """Validate one source document through the canonical frontend."""
 
@@ -66,14 +74,18 @@ class WeavecValidator:
         ):
             raise ValueError("source documents require non-empty names and string content")
 
-        if self.binary is None:
+        documents = [document for document, _ in sources]
+        binary = self._active_binary()
+        if binary is None:
             return {
                 "available": False,
                 "valid": None,
+                "returncode": None,
                 "diagnostic": (
                     "weavec binary not found. Set WEAVEC_BIN, install weavec on PATH, "
                     "or provide a weavec source root containing build/weavec."
                 ),
+                "documents": documents,
             }
 
         with tempfile.TemporaryDirectory(prefix="weave-validate-") as temporary:
@@ -86,28 +98,44 @@ class WeavecValidator:
                 source_path.write_text(source, encoding="utf-8")
                 source_paths.append(source_path)
 
+            command = [
+                str(binary),
+                "--frontend",
+                str(wir_path),
+                *(str(path) for path in source_paths),
+            ]
             try:
                 completed = subprocess.run(
-                    [
-                        str(self.binary),
-                        "--frontend",
-                        str(wir_path),
-                        *(str(path) for path in source_paths),
-                    ],
+                    command,
                     text=True,
                     capture_output=True,
                     timeout=self.timeout_seconds,
                     check=False,
                 )
             except subprocess.TimeoutExpired as exc:
+                stdout = self._text(exc.stdout)
+                stderr = self._text(exc.stderr)
+                diagnostic = f"weavec validation timed out after {exc.timeout} seconds"
                 return {
                     "available": True,
                     "valid": False,
                     "returncode": None,
-                    "diagnostic": (
-                        f"weavec validation timed out after {exc.timeout} seconds"
-                    ),
-                    "documents": [document for document, _ in sources],
+                    "stdout": stdout,
+                    "stderr": stderr,
+                    "diagnostic": diagnostic,
+                    "timed_out": True,
+                    "documents": documents,
+                }
+            except OSError as exc:
+                return {
+                    "available": False,
+                    "valid": None,
+                    "returncode": None,
+                    "stdout": "",
+                    "stderr": f"weavec validation could not start: {exc}\n",
+                    "diagnostic": f"weavec validation could not start: {exc}",
+                    "timed_out": False,
+                    "documents": documents,
                 }
 
             return {
@@ -117,8 +145,17 @@ class WeavecValidator:
                 "stdout": completed.stdout,
                 "stderr": completed.stderr,
                 "wir": wir_path.read_text(encoding="utf-8") if wir_path.exists() else None,
-                "documents": [document for document, _ in sources],
+                "timed_out": False,
+                "documents": documents,
             }
+
+    @staticmethod
+    def _text(value: str | bytes | None) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, bytes):
+            return value.decode(errors="replace")
+        return value
 
     @staticmethod
     def _safe_basename(document: str) -> str:
