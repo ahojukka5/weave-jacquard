@@ -57,6 +57,12 @@ export WEAVEC_SOURCE_ROOT="../weavec"
 `WEAVEC_BIN` is optional when `weavec` is on `PATH`.
 `WEAVEC_SOURCE_ROOT` is needed only for corpus-backed grammar help.
 
+`program_build` and `build_target_build` require **`weavec >= 0.3.0`**. Earlier
+compiler releases do not provide the public `weavec build`,
+`weavec-build-manifest-v1`, and `weavec-diagnostics-v1` contracts used by the
+native build bridge. Validation-only operations that invoke `weavec --frontend`
+remain separate from this native-build requirement.
+
 Run the stdio MCP server:
 
 ```bash
