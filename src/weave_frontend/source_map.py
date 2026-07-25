@@ -70,10 +70,28 @@ def _render_atom(node: JsonObject) -> str:
     return str(value)
 
 
-def _flat_text(node: JsonObject) -> str:
+def _flat_width_if_fits(node: JsonObject, remaining: int) -> int | None:
+    """Return flat character width, stopping as soon as the line cannot fit."""
+
+    if remaining < 0:
+        return None
     if node["kind"] != "list":
-        return _render_atom(node)
-    return "(" + " ".join(_flat_text(child) for child in node["children"]) + ")"
+        width = len(_render_atom(node))
+        return width if width <= remaining else None
+
+    used = 1  # opening parenthesis
+    for index, child in enumerate(node["children"]):
+        if index:
+            if used + 1 > remaining:
+                return None
+            used += 1
+        child_width = _flat_width_if_fits(child, remaining - used)
+        if child_width is None:
+            return None
+        used += child_width
+    if used + 1 > remaining:
+        return None
+    return used + 1  # closing parenthesis
 
 
 def _render(node: JsonObject, writer: _Writer, *, indent: int) -> None:
@@ -89,8 +107,7 @@ def _render(node: JsonObject, writer: _Writer, *, indent: int) -> None:
         writer.record(node["id"], start)
         return
 
-    flat = _flat_text(node)
-    if indent + len(flat) <= 88:
+    if _flat_width_if_fits(node, max(0, 88 - indent)) is not None:
         writer.append("(")
         for index, child in enumerate(children):
             if index:
