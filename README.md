@@ -12,22 +12,25 @@ The primary executable is **`weave-mcp`**. It provides:
 - parallel branches and structural merge;
 - grammar help derived from the canonical compiler corpus;
 - authoritative validation through `weavec --frontend`;
-- deterministic canonical `.weave` rendering.
+- revision-pinned native builds through `weavec build`;
+- deterministic canonical `.weave` rendering and node source maps.
 
 > The model decides what program to build. The environment owns tree structure,
-> identity, history, and transactional safety.
+> identity, history, build provenance, and transactional safety. `weavec` owns
+> the language and native toolchain.
 
 ## Status
 
 This repository is a runnable prototype, not a replacement compiler. The
 user-facing compiler is [`weavec`](https://github.com/ahojukka5/weavec). This
-project uses that compiler as the language authority while experimenting with a
-more reliable editing interface for coding agents.
+project uses that compiler as the language authority and source-to-executable
+build service while experimenting with a more reliable editing interface for
+coding agents.
 
 The repository contains two related prototypes:
 
 1. **`weave-mcp`** — the primary grammar-neutral MCP server for atomic
-   S-expression construction.
+   S-expression construction and native builds.
 2. **Typed AST prototype** — the earlier frontend used to prove immutable
    revisions, validation, context, and semantic merge.
 
@@ -41,18 +44,20 @@ python -m venv .venv
 python -m pip install -e '.[dev]'
 ```
 
-Install `weavec` on `PATH`, or point the MCP server to a compiler binary and an
-optional source checkout:
+Install a `weavec` package containing the public `weavec build` command, or point
+the server to a development compiler binary:
 
 ```bash
 export WEAVE_DB_PATH="$PWD/weave.db"
+export WEAVE_BUILD_ROOT="$PWD/.weave-build"
 export WEAVEC_SOURCE_ROOT="../weavec"
 export WEAVEC_BIN="../weavec/build/weavec"
 ```
 
 `WEAVEC_BIN` is optional when `weavec` is already available on `PATH`.
-`WEAVEC_SOURCE_ROOT` is used by grammar discovery to scan the compiler's surface
-fixture corpus.
+`WEAVEC_SOURCE_ROOT` is used only by grammar discovery to scan the compiler's
+surface fixture corpus. `WEAVE_BUILD_ROOT` controls where immutable build
+artifacts are stored; the default is `.weave-build` beside the database.
 
 Run the stdio MCP server:
 
@@ -65,11 +70,13 @@ weave-mcp
 | Variable | Purpose | Default |
 |---|---|---|
 | `WEAVE_DB_PATH` | SQLite program database | `weave.db` |
+| `WEAVE_BUILD_ROOT` | Revision build artifact store | `.weave-build` beside DB |
 | `WEAVEC_SOURCE_ROOT` | `weavec` checkout used by grammar help | unset |
-| `WEAVEC_BIN` | `weavec` executable used for validation | `weavec` from `PATH` |
+| `WEAVEC_BIN` | compiler used for validation and native builds | `weavec` from `PATH` |
 
-Tree editing works without the compiler. Grammar examples require the source
-checkout, and authoritative completed-program validation requires the binary.
+Tree editing and stored-build inspection work independently of compiler source.
+Grammar examples require the source checkout. Validation and new native builds
+require the compiler binary.
 
 ## MCP client configuration
 
@@ -82,6 +89,7 @@ A typical stdio client configuration is:
       "command": "/path/to/venv/bin/weave-mcp",
       "env": {
         "WEAVE_DB_PATH": "/path/to/project/weave.db",
+        "WEAVE_BUILD_ROOT": "/path/to/project/.weave-build",
         "WEAVEC_SOURCE_ROOT": "/path/to/weavec",
         "WEAVEC_BIN": "/path/to/weavec/build/weavec"
       }
@@ -104,67 +112,90 @@ weave_help
 → node_inspect
 → program_validate
 → branch_merge
+→ program_build
+→ build_get
 ```
 
 Agents should call `grammar_help` before using an unfamiliar form and should
 prefer atomic writes over bulk `program_import`.
 
-## Atomic construction example
+## Database revision to executable
 
-The following program returns 42:
+`program_build` resolves the selected branch to one immutable revision before it
+does any rendering or compiler work:
+
+```text
+branch head
+    ↓ pin
+immutable revision
+    ↓
+canonical program.weave + program.weave.map.json
+    ↓
+weavec build program.weave -o program
+    ↓
+native executable + manifests + diagnostics
+```
+
+The compiler owns surface lowering, WIR, LLVM IR, object generation, private
+runtime selection, and target linking. `weave_frontend` invokes only the public
+source-to-executable command. It never selects a runtime archive or invokes
+`clang` itself.
+
+A build returns a content-derived build ID and artifact paths. Successful builds
+with the same revision content, document, compiler hash, and target are reused.
+A failed build records diagnostics but does not mutate the database revision or
+publish an executable.
+
+The artifact store contains:
+
+```text
+.weave-build/<build-id>/
+├── program.weave
+├── program.weave.map.json
+├── compiler-manifest.json
+├── diagnostics.json
+├── manifest.json
+└── program
+```
+
+`manifest.json` records the project, branch, pinned revision and root hash,
+source hash, compiler path and hash, target, invoked public command, return code,
+and hashes of all produced artifacts.
+
+The same operation is available outside MCP:
+
+```bash
+weave-build --db weave.db build demo main.weave --branch main
+weave-build --db weave.db get <build-id>
+```
+
+## Agent view and compiler view
+
+Every list and atom has an internal stable ID such as `n_...`. Agent-facing
+rendering may expose wrappers:
 
 ```lisp
-(program
-  (name "answer")
-  (version "0.1")
-  (entry main)
+(@n_function
   (fn main
-    (params)
-    (returns i32)
-    (do
-      (return (const_i32 42)))))
+    (@n_params (params))
+    (@n_returns (returns i32))
+    (@n_body (do (return (const_i32 42))))))
 ```
 
-Construct it one semantic operation at a time:
+Those wrappers are transport metadata, not Weave syntax. The compiler receives:
 
-```text
-project_initialize(project="demo")
-program_create(
-  project="demo",
-  branch="main",
-  document="main",
-  program_name="answer"
-)
+```lisp
+(fn main
+  (params)
+  (returns i32)
+  (do (return (const_i32 42))))
 ```
 
-Use the returned root ID as `program_id`, then create the entry and function
-forms:
-
-```text
-node_create_form(parent_id=program_id, head="entry", ...) → entry_id
-node_add_atom(parent_id=entry_id, kind="symbol", value="main", ...)
-
-node_create_form(parent_id=program_id, head="fn", ...) → fn_id
-node_add_atom(parent_id=fn_id, kind="symbol", value="main", ...)
-node_create_form(parent_id=fn_id, head="params", ...)
-node_create_form(parent_id=fn_id, head="returns", ...) → returns_id
-node_add_atom(parent_id=returns_id, kind="symbol", value="i32", ...)
-node_create_form(parent_id=fn_id, head="do", ...) → do_id
-
-node_create_form(parent_id=do_id, head="return", ...) → return_id
-node_create_form(parent_id=return_id, head="const_i32", ...) → const_id
-node_add_atom(parent_id=const_id, kind="integer", value=42, ...)
-```
-
-Inspect and validate the result:
-
-```text
-node_inspect(node_id=fn_id, depth=6, ...)
-program_validate(project="demo", branch="main", document="main")
-```
-
-Every successful mutation creates a new immutable revision and returns stable
-node IDs for subsequent calls.
+Canonical source and `weave-node-map-v1` are generated in one deterministic
+render operation. The map records UTF-8 byte offsets and line/column spans for
+every node, together with the source hash and revision. Future machine-readable
+compiler diagnostics can therefore be mapped to the smallest containing node
+without teaching `weavec` about database IDs.
 
 ## Grammar discovery and validation
 
@@ -177,28 +208,17 @@ $WEAVEC_SOURCE_ROOT/test/correctness/surface
 It reports observed forms, parent forms, arities, examples, and fixture paths.
 This is construction guidance rather than a duplicate normative grammar.
 
-The final language check is:
+The completed-program language check remains:
 
 ```text
 program_validate → weavec --frontend output.wir input.weave
 ```
 
-A future machine-readable grammar registry in `weavec` can replace corpus
-inference without changing the MCP API.
+Native production uses:
 
-## Stable node IDs
-
-Every list and atom has an internal stable ID such as `n_...`.
-
-- creating a node assigns a new ID;
-- editing an atom preserves its ID;
-- moving a node preserves its ID;
-- wrapping creates a new wrapper ID and preserves the wrapped node ID;
-- deleting removes the node and its subtree;
-- branches preserve IDs inherited from their base revision;
-- merge compares semantic identity instead of source lines.
-
-Canonical rendering omits IDs. Agent-facing annotated rendering exposes them.
+```text
+program_build → weavec build input.weave -o program
+```
 
 ## Parallel agents and merge
 
@@ -221,14 +241,15 @@ The current server exposes:
 - **Projects and branches:** `project_initialize`, `branch_create`,
   `branch_list`, `branch_history`, `branch_merge`
 - **Programs:** `program_create`, `program_import`, `program_list`,
-  `program_render`, `program_validate`
+  `program_render`, `program_validate`, `program_build`
+- **Builds:** `build_get`
 - **Atomic editing:** `node_create_form`, `node_add_atom`, `node_set_atom`,
   `node_move`, `node_wrap`, `node_delete`
 - **Inspection:** `node_inspect`, `node_find`
 - **Context:** `context_add`, `context_get`
 
-See [`docs/mcp.md`](docs/mcp.md) for the tool contract and
-[`docs/architecture.md`](docs/architecture.md) for the broader design.
+See [`docs/mcp.md`](docs/mcp.md), [`docs/compiler-bridge.md`](docs/compiler-bridge.md),
+and [`docs/architecture.md`](docs/architecture.md).
 
 ## Development
 
@@ -244,10 +265,14 @@ Repository invariants and contribution rules are documented in
 ## Current limitations
 
 - grammar help is derived from examples rather than a formal registry;
-- full semantic validation requires `weavec`;
+- exact node-mapped compiler diagnostics wait for `weavec`'s machine-readable
+  source-span output; current build diagnostics retain stdout, stderr, and status;
+- published compiler packages currently determine which native target is
+  available;
+- build execution is local and compilation is separate from future sandboxed
+  `program_run`;
 - immutable database snapshots are intentionally simple rather than compact;
 - merge is conservative;
-- build, run, package, and artifact tools remain future work;
 - the MCP and typed AST prototypes still coexist.
 
 ## License
