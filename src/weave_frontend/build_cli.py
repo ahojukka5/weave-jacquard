@@ -17,9 +17,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--build-root", type=Path)
     subcommands = parser.add_subparsers(dest="command", required=True)
 
-    build = subcommands.add_parser("build", help="build one immutable program revision")
+    build = subcommands.add_parser(
+        "build",
+        help="build an ordered document set from one immutable revision",
+    )
     build.add_argument("project")
-    build.add_argument("document")
+    build.add_argument("document", help="primary source document")
+    build.add_argument(
+        "--source",
+        dest="additional_documents",
+        action="append",
+        default=None,
+        help="additional source document; repeat to preserve compiler input order",
+    )
     build.add_argument("--branch", default="main")
     build.add_argument("--revision")
     build.add_argument("--target")
@@ -41,6 +51,7 @@ def main() -> None:
             result = bridge.build(
                 args.project,
                 args.document,
+                additional_documents=args.additional_documents,
                 branch=args.branch,
                 revision_id=args.revision,
                 target=args.target,
