@@ -17,7 +17,6 @@ PROGRAM_V1 = """(program
     (returns i32)
     (do (return (const_i32 42)))))
 """
-
 PROGRAM_V2 = PROGRAM_V1.replace('(version "0.1")', '(version "0.2")')
 
 
@@ -96,7 +95,7 @@ def main() -> int:
                             "phase": "backend",
                             "message": "requested fake compiler failure",
                             "source": str(source),
-                            "span_origin": "compiler-test",
+                            "span_origin": "inferred-unique-token",
                             "span": {
                                 "start_byte": len(text[:start].encode()),
                                 "end_byte": len(text[:end].encode()),
