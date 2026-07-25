@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 
+from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
 from .mcp_server import _result, mcp, workspace
 
@@ -17,6 +18,11 @@ def compiler_bridge() -> CompilerBridge:
     )
 
 
+@lru_cache(maxsize=1)
+def build_targets() -> BuildTargetRegistry:
+    return BuildTargetRegistry(workspace())
+
+
 @mcp.tool()
 def program_build(
     project: str,
@@ -26,11 +32,7 @@ def program_build(
     target: str | None = None,
     additional_documents: list[str] | None = None,
 ) -> dict[str, object]:
-    """Build an ordered document set from one immutable database revision.
-
-    ``document`` is the primary source. Additional documents are compiled after
-    it in the exact order supplied.
-    """
+    """Build an explicit ordered document set from one immutable revision."""
 
     return _result(
         lambda: compiler_bridge().build(
@@ -40,6 +42,113 @@ def program_build(
             branch=branch,
             revision_id=revision_id,
             target=target,
+        )
+    )
+
+
+@mcp.tool()
+def build_target_set(
+    project: str,
+    name: str,
+    document: str,
+    branch: str = "main",
+    additional_documents: list[str] | None = None,
+    compiler_target: str | None = None,
+) -> dict[str, object]:
+    """Create or update one revisioned named build target."""
+
+    return _result(
+        lambda: build_targets().set(
+            project,
+            branch,
+            name,
+            document,
+            additional_documents=additional_documents,
+            compiler_target=compiler_target,
+        )
+    )
+
+
+@mcp.tool()
+def build_target_list(
+    project: str,
+    branch: str = "main",
+    revision_id: str | None = None,
+) -> dict[str, object]:
+    """List named build targets from a branch head or exact revision."""
+
+    return _result(
+        lambda: build_targets().list(
+            project,
+            branch=branch,
+            revision_id=revision_id,
+        )
+    )
+
+
+@mcp.tool()
+def build_target_get(
+    project: str,
+    name: str,
+    branch: str = "main",
+    revision_id: str | None = None,
+) -> dict[str, object]:
+    """Read one named build target from a branch head or exact revision."""
+
+    return _result(
+        lambda: build_targets().get(
+            project,
+            name,
+            branch=branch,
+            revision_id=revision_id,
+        )
+    )
+
+
+@mcp.tool()
+def build_target_delete(
+    project: str,
+    name: str,
+    branch: str = "main",
+) -> dict[str, object]:
+    """Delete one named target in a new immutable revision."""
+
+    return _result(lambda: build_targets().delete(project, branch, name))
+
+
+@mcp.tool()
+def build_target_build(
+    project: str,
+    name: str,
+    branch: str = "main",
+    revision_id: str | None = None,
+) -> dict[str, object]:
+    """Build one revisioned named target through the public compiler bridge."""
+
+    return _result(
+        lambda: build_targets().build(
+            compiler_bridge(),
+            project,
+            name,
+            branch=branch,
+            revision_id=revision_id,
+        )
+    )
+
+
+@mcp.tool()
+def program_source_list(
+    project: str,
+    branch: str = "main",
+    revision_id: str | None = None,
+) -> dict[str, object]:
+    """List compiler source documents without reserved target metadata."""
+
+    return _result(
+        lambda: build_targets().program_documents(
+            project,
+            branch=branch,
+            revision_id=revision_id,
         )
     )
 
