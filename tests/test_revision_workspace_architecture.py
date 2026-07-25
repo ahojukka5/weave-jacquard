@@ -4,6 +4,7 @@ import inspect
 from pathlib import Path
 
 import weave_frontend
+import weave_frontend.service as service_module
 from weave_frontend.service import MergeResult, RevisionWorkspace
 from weave_frontend.sexpr_service import SExpressionWorkspace
 
@@ -24,7 +25,7 @@ def test_production_workspace_inherits_only_revision_base() -> None:
     assert SExpressionWorkspace.__mro__[1] is RevisionWorkspace
     assert _TYPED_METHODS.isdisjoint(dir(SExpressionWorkspace))
 
-    source = inspect.getsource(RevisionWorkspace)
+    source = inspect.getsource(service_module)
     assert "from .grammar" not in source
     assert "from .renderer" not in source
     assert "from .model" not in source
