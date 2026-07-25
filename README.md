@@ -1,40 +1,39 @@
 # weave_frontend
 
-`weave_frontend` is an experimental **agent-native programming environment**
-for Weave. Coding agents edit a versioned S-expression tree through small MCP
-tool calls instead of repeatedly generating and replacing complete source files.
+`weave_frontend` is the agent-facing programming environment for Weave.
+Coding agents edit a versioned S-expression tree through small MCP operations
+instead of repeatedly replacing complete source files.
 
 The primary executable is **`weave-mcp`**. It provides:
 
 - atomic form and atom edits;
-- stable semantic node IDs;
-- immutable revision history;
-- parallel branches and structural merge;
-- grammar help derived from the canonical compiler corpus;
+- stable node identities;
+- immutable revisions and parallel branches;
+- structural three-way merge;
+- project-, document-, and symbol-scoped context;
+- compiler-corpus-backed grammar help;
 - authoritative validation through `weavec --frontend`;
-- revision-pinned native builds through `weavec build`;
-- ordered multi-document compiler inputs;
-- deterministic canonical `.weave` rendering and per-document node maps;
-- compiler diagnostics mapped back to stable database nodes.
+- revisioned named build targets;
+- ordered multi-document native builds through `weavec build`;
+- deterministic canonical sources and node maps;
+- compiler diagnostics mapped back to database nodes;
+- content-derived build artifacts and cache provenance.
 
-> The model decides what program to build. The environment owns tree structure,
-> identity, history, build provenance, and transactional safety. `weavec` owns
-> the language and native toolchain.
+`weave_frontend` is **not another compiler frontend**. It owns editing,
+identity, history, source materialization, and build provenance. The
+user-facing [`weavec`](https://github.com/ahojukka5/weavec) compiler owns the
+language, surface lowering, WIR, LLVM generation, runtime selection, object
+generation, and linking.
 
 ## Status
 
-This repository is a runnable prototype, not a replacement compiler. The
-user-facing compiler is [`weavec`](https://github.com/ahojukka5/weavec). This
-project uses that compiler as the language authority and source-to-executable
-build service while experimenting with a more reliable editing interface for
-coding agents.
+The grammar-neutral S-expression workspace and `weave-mcp` are the supported
+product direction.
 
-The repository contains two related prototypes:
-
-1. **`weave-mcp`** — the primary grammar-neutral MCP server for atomic
-   S-expression construction and native builds.
-2. **Typed AST prototype** — the earlier frontend used to prove immutable
-   revisions, validation, context, and semantic merge.
+The repository still contains an earlier typed-AST prototype and the legacy
+`weave-front` command. They are not part of the intended production path and
+are scheduled for removal after their shared revision mechanics are extracted;
+see issue #14.
 
 ## Installation
 
@@ -46,20 +45,17 @@ python -m venv .venv
 python -m pip install -e '.[dev]'
 ```
 
-Install a `weavec` build that supports both `--manifest-json` and
-`--diagnostics-json`, or point the server to a development compiler binary:
+Configure the workspace and compiler:
 
 ```bash
 export WEAVE_DB_PATH="$PWD/weave.db"
 export WEAVE_BUILD_ROOT="$PWD/.weave-build"
-export WEAVEC_SOURCE_ROOT="../weavec"
 export WEAVEC_BIN="../weavec/build/weavec"
+export WEAVEC_SOURCE_ROOT="../weavec"
 ```
 
-`WEAVEC_BIN` is optional when `weavec` is already on `PATH`.
-`WEAVEC_SOURCE_ROOT` is used only by grammar discovery to scan compiler
-fixtures. `WEAVE_BUILD_ROOT` controls immutable build artifacts; the default is
-`.weave-build` beside the database.
+`WEAVEC_BIN` is optional when `weavec` is on `PATH`.
+`WEAVEC_SOURCE_ROOT` is needed only for corpus-backed grammar help.
 
 Run the stdio MCP server:
 
@@ -72,13 +68,42 @@ weave-mcp
 | Variable | Purpose | Default |
 |---|---|---|
 | `WEAVE_DB_PATH` | SQLite program database | `weave.db` |
-| `WEAVE_BUILD_ROOT` | Revision build artifact store | `.weave-build` beside DB |
-| `WEAVEC_SOURCE_ROOT` | `weavec` checkout used by grammar help | unset |
-| `WEAVEC_BIN` | compiler used for validation and native builds | `weavec` from `PATH` |
+| `WEAVE_BUILD_ROOT` | Immutable build artifact store | `.weave-build` beside the database |
+| `WEAVEC_BIN` | Compiler used for validation and builds | `weavec` from `PATH` |
+| `WEAVEC_SOURCE_ROOT` | Compiler checkout used by grammar help | unset |
 
-Tree editing and stored-build inspection work independently of compiler source.
-Grammar examples require the source checkout. Validation and new native builds
-require the compiler binary.
+Tree editing, history, merge, and stored-build inspection work without a
+compiler checkout. Validation and new builds require the compiler binary.
+
+## Recommended agent workflow
+
+For a single-document program:
+
+```text
+project_initialize
+→ program_create / program_import
+→ grammar_help
+→ atomic node edits
+→ node_inspect
+→ program_validate
+→ branch_merge
+→ program_build
+→ build_get
+```
+
+For a multi-document program, define the compiler input set once as a named
+target:
+
+```text
+build_target_set
+→ build_target_validate
+→ build_target_build
+→ build_get
+```
+
+A target definition and all of its source documents are resolved from one
+immutable revision. The primary document is first; additional documents retain
+the stored order.
 
 ## MCP client configuration
 
@@ -90,73 +115,65 @@ require the compiler binary.
       "env": {
         "WEAVE_DB_PATH": "/path/to/project/weave.db",
         "WEAVE_BUILD_ROOT": "/path/to/project/.weave-build",
-        "WEAVEC_SOURCE_ROOT": "/path/to/weavec",
-        "WEAVEC_BIN": "/path/to/weavec/build/weavec"
+        "WEAVEC_BIN": "/path/to/weavec/build/weavec",
+        "WEAVEC_SOURCE_ROOT": "/path/to/weavec"
       }
     }
   }
 }
 ```
 
-The exact outer format depends on the MCP client. The command and environment
-variables are the relevant contract.
+The outer configuration format depends on the MCP client. The executable and
+environment variables are the relevant contract.
 
-## Recommended agent workflow
+## Compiler boundary
 
-```text
-weave_help
-→ project_initialize
-→ program_create / program_import
-→ grammar_help
-→ node_create_form / node_add_atom
-→ node_inspect
-→ program_validate
-→ branch_merge
-→ program_build
-→ build_get
-```
-
-Agents should call `grammar_help` before using an unfamiliar form and should
-prefer atomic writes over bulk `program_import`.
-
-## Database revision to executable
-
-`program_build` resolves a branch to one immutable revision before rendering:
+Validation materializes canonical sources and invokes only the public compiler
+frontend:
 
 ```text
-branch head
-    ↓ pin once
 immutable revision
     ↓
-ordered canonical sources + one node map per source
+ordered canonical .weave sources
+    ↓
+weavec --frontend output.wir source0.weave source1.weave ...
+```
+
+A native build follows the same source order:
+
+```text
+immutable revision + compiler hash + target
     ↓
 weavec build source0.weave source1.weave ... -o program
     ↓
-native executable + manifests + mapped diagnostics
+executable + compiler manifest + diagnostics
 ```
 
-The primary `document` is always first. Optional `additional_documents` are
-passed after it in exactly the order supplied:
+The bridge never invokes LLVM or `clang` directly and never selects a runtime
+archive.
 
-```text
-program_build(
-  project="demo",
-  document="main.weave",
-  additional_documents=["library.weave", "platform.weave"],
-  branch="main"
-)
+## Named targets and CLI
+
+Create and validate a revisioned build target:
+
+```bash
+weave-build --db weave.db target-set demo application main.weave \
+  --source library.weave \
+  --source platform.weave
+
+weave-build --db weave.db target-validate demo application
+weave-build --db weave.db target-build demo application
 ```
 
-The bridge does not silently include all project documents and does not sort the
-list. Duplicate names are rejected. Every selected document is read from the
-same pinned revision, and source order is part of the content-derived build ID.
+Use an exact historical revision without moving a branch:
 
-The compiler owns surface lowering, WIR, LLVM IR, object generation, private
-runtime selection, and target linking. `weave_frontend` invokes only the public
-source-to-executable command. It never selects a runtime archive or invokes
-`clang` itself.
+```bash
+weave-build --db weave.db target-validate demo application \
+  --branch main \
+  --revision <revision-id>
+```
 
-The same operation is available outside MCP:
+An ad hoc ordered build remains available:
 
 ```bash
 weave-build --db weave.db build demo main.weave \
@@ -166,46 +183,17 @@ weave-build --db weave.db build demo main.weave \
 weave-build --db weave.db get <build-id>
 ```
 
-Each repeated `--source` preserves command-line order.
+Each repeated `--source` preserves command-line order. Duplicate documents are
+rejected, and no command silently includes every project document.
 
-## Build artifacts
+## Stable IDs and compiler source
 
-A multi-document build uses deterministic indexed filenames so duplicate
-basenames cannot collide:
+Every list and atom receives a stable ID such as `n_3a12cce48fe14f99`.
+Editing or moving an existing node preserves its ID. Branches inherit IDs from
+their base revision, and merge compares stable identities rather than line
+numbers.
 
-```text
-.weave-build/<build-id>/
-├── sources/
-│   ├── 000-main.weave
-│   ├── 001-library.weave
-│   └── 002-platform.weave
-├── source-maps/
-│   ├── 000-main.weave.map.json
-│   ├── 001-library.weave.map.json
-│   └── 002-platform.weave.map.json
-├── compiler-manifest.json
-├── compiler-diagnostics.json
-├── diagnostics.json
-├── manifest.json
-└── program
-```
-
-`weave-frontend-build-manifest-v2` records the ordered database document names,
-canonical source hashes, relative source/map paths, compiler hash, target,
-command, diagnostics validity, return code, and all artifact hashes.
-
-For existing single-document consumers, `artifacts.source` and
-`artifacts.node_map` remain aliases for the primary document. New consumers can
-use `artifacts.sources` and `artifacts.node_maps` for the complete ordered set.
-
-Successful builds with the same revision content, ordered document set,
-compiler hash, and target are reused through `weave-build-key-v3`. Failed or
-incomplete builds are never cache hits.
-
-## Agent view and compiler view
-
-Every list and atom has an internal stable ID such as `n_...`. Agent-facing
-rendering may expose wrappers:
+Agent rendering may expose ID wrappers:
 
 ```lisp
 (@n_function
@@ -215,55 +203,50 @@ rendering may expose wrappers:
     (@n_body (do (return (const_i32 42))))))
 ```
 
-Those wrappers are transport metadata, not Weave syntax. Each compiler source is
-rendered without wrappers. Canonical source and `weave-node-map-v1` are produced
-in one deterministic operation for each selected database document.
+Those wrappers are transport metadata, not Weave syntax. Compiler input is
+canonical `.weave` text without annotations. A separate `weave-node-map-v1`
+records UTF-8 byte and line/column spans for every node.
 
-## Mapped diagnostics
+## Builds and diagnostics
+
+A successful multi-document build contains:
+
+```text
+.weave-build/<build-id>/
+├── sources/
+├── source-maps/
+├── compiler-manifest.json
+├── compiler-diagnostics.json
+├── diagnostics.json
+├── manifest.json
+└── program
+```
+
+`weave-frontend-build-manifest-v2` records the pinned revision, ordered source
+documents, source hashes, compiler hash, target, command, return code, artifact
+paths, and artifact hashes.
 
 `compiler-diagnostics.json` is the raw `weavec-diagnostics-v1` document.
-`diagnostics.json` is the validated `weave-build-diagnostics-v1` view.
+`diagnostics.json` is the validated and node-mapped
+`weave-build-diagnostics-v1` view. A diagnostic is mapped only when its source
+and span unambiguously match one canonical source map; otherwise it remains
+unmapped rather than being guessed.
 
-For a canonical source span, the bridge:
+Build IDs are derived from revision content, ordered source hashes, compiler
+hash, and target. Failed or incomplete builds are not cache hits. Additional
+cache-integrity and concurrent-publication hardening is tracked in issue #17.
 
-1. identifies the exact materialized source named by the compiler;
-2. selects that source's node map;
-3. chooses the smallest containing stable node;
-4. adds the original database `document` and `node_id`.
+## Revision storage
 
-A secondary-file diagnostic therefore maps to the secondary document rather
-than the primary one. Spanless, ambiguous, generated-WIR, and non-canonical
-locations remain unmapped instead of being guessed. Invalid compiler protocol
-output is retained for investigation but prevents executable publication.
+Each mutation creates an immutable revision. Snapshot JSON is stored in an
+adaptive versioned BLOB representation:
 
-## Grammar discovery and validation
+- `WJZ1` for zlib-compressed canonical JSON;
+- `WJR1` when raw canonical JSON is smaller.
 
-`grammar_help` searches:
-
-```text
-$WEAVEC_SOURCE_ROOT/test/correctness/surface
-```
-
-It reports observed forms, parent forms, arities, examples, and fixture paths.
-This is construction guidance rather than a duplicate normative grammar.
-Completed-program validation remains:
-
-```text
-program_validate → weavec --frontend output.wir input.weave
-```
-
-Native production uses:
-
-```text
-program_build → weavec build <ordered sources> -o program
-```
-
-## Parallel agents and merge
-
-Each agent should work on a database branch. Merge uses stable node identities
-and a three-way tree comparison. Independent changes are retained; incompatible
-edits are reported as conflicts. A merged state must still pass structural and
-compiler validation.
+Legacy databases migrate transactionally on first open and are vacuumed once
+after migration. Keep a consistent backup and avoid concurrent writers during
+that first migration startup. See [snapshot storage](docs/snapshot-storage.md).
 
 ## MCP tools
 
@@ -271,43 +254,20 @@ compiler validation.
 - **Projects and branches:** `project_initialize`, `branch_create`,
   `branch_list`, `branch_history`, `branch_merge`
 - **Programs:** `program_create`, `program_import`, `program_list`,
-  `program_render`, `program_validate`, `program_build`
-- **Builds:** `build_get`
+  `program_source_list`, `program_render`, `program_validate`, `program_build`
+- **Named targets:** `build_target_set`, `build_target_list`,
+  `build_target_get`, `build_target_delete`, `build_target_validate`,
+  `build_target_build`
+- **Build inspection:** `build_get`
 - **Atomic editing:** `node_create_form`, `node_add_atom`, `node_set_atom`,
   `node_move`, `node_wrap`, `node_delete`
 - **Inspection:** `node_inspect`, `node_find`
 - **Context:** `context_add`, `context_get`
 
-See [`docs/mcp.md`](docs/mcp.md),
-[`docs/compiler-bridge.md`](docs/compiler-bridge.md), and
-[`docs/architecture.md`](docs/architecture.md).
+## Further documentation
 
-## Development
-
-```bash
-python -m compileall -q src tests
-ruff check .
-pytest --cov=weave_frontend --cov-report=term-missing
-```
-
-When GitHub Actions capacity is unavailable, run these commands and focused
-compiler-bridge integration harnesses locally before merging.
-
-## Current limitations
-
-- grammar help is derived from examples rather than a formal registry;
-- exact surface syntax spans are available, while some backend locations still
-  depend on conservative unique-token inference until locations propagate
-  explicitly through WIR;
-- callers repeat ordered document lists because persistent named build targets
-  are not implemented yet;
-- published compiler packages determine which native target is available;
-- build execution is local and compilation is separate from future sandboxed
-  `program_run`;
-- immutable database snapshots are intentionally simple rather than compact;
-- merge is conservative;
-- the MCP and typed AST prototypes still coexist.
-
-## License
-
-Apache-2.0. See [`LICENSE`](LICENSE).
+- [Architecture](docs/architecture.md)
+- [Revisioned build targets](docs/build-targets.md)
+- [Target validation](docs/target-validation.md)
+- [Snapshot storage](docs/snapshot-storage.md)
+- [MCP tool reference](docs/mcp.md)
