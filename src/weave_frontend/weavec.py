@@ -49,6 +49,23 @@ class WeavecValidator:
         return None
 
     def validate(self, source: str) -> dict[str, Any]:
+        """Validate one source document through the canonical frontend."""
+
+        return self.validate_sources([("program.weave", source)])
+
+    def validate_sources(self, sources: list[tuple[str, str]]) -> dict[str, Any]:
+        """Validate an explicit ordered source set through ``weavec --frontend``."""
+
+        if not sources:
+            raise ValueError("at least one source document is required")
+        if any(
+            not isinstance(document, str)
+            or not document
+            or not isinstance(source, str)
+            for document, source in sources
+        ):
+            raise ValueError("source documents require non-empty names and string content")
+
         if self.binary is None:
             return {
                 "available": False,
@@ -61,12 +78,22 @@ class WeavecValidator:
 
         with tempfile.TemporaryDirectory(prefix="weave-validate-") as temporary:
             temp = Path(temporary)
-            source_path = temp / "program.weave"
             wir_path = temp / "program.wir"
-            source_path.write_text(source, encoding="utf-8")
+            source_paths: list[Path] = []
+            for index, (document, source) in enumerate(sources):
+                basename = self._safe_basename(document)
+                source_path = temp / f"{index:03d}-{basename}"
+                source_path.write_text(source, encoding="utf-8")
+                source_paths.append(source_path)
+
             try:
                 completed = subprocess.run(
-                    [str(self.binary), "--frontend", str(wir_path), str(source_path)],
+                    [
+                        str(self.binary),
+                        "--frontend",
+                        str(wir_path),
+                        *(str(path) for path in source_paths),
+                    ],
                     text=True,
                     capture_output=True,
                     timeout=self.timeout_seconds,
@@ -80,6 +107,7 @@ class WeavecValidator:
                     "diagnostic": (
                         f"weavec validation timed out after {exc.timeout} seconds"
                     ),
+                    "documents": [document for document, _ in sources],
                 }
 
             return {
@@ -89,4 +117,20 @@ class WeavecValidator:
                 "stdout": completed.stdout,
                 "stderr": completed.stderr,
                 "wir": wir_path.read_text(encoding="utf-8") if wir_path.exists() else None,
+                "documents": [document for document, _ in sources],
             }
+
+    @staticmethod
+    def _safe_basename(document: str) -> str:
+        basename = document.replace("\\", "/").rsplit("/", 1)[-1]
+        safe = "".join(
+            character
+            if character.isalnum() or character in {".", "_", "-"}
+            else "_"
+            for character in basename
+        )
+        if not safe:
+            safe = "source.weave"
+        if not safe.endswith(".weave"):
+            safe += ".weave"
+        return safe
