@@ -108,18 +108,26 @@ def _validate_document(
         errors.append(
             f"unsupported compiler diagnostics format: {document.get('format')!r}"
         )
-    if document.get("status") not in {"succeeded", "failed"}:
+
+    status = document.get("status")
+    if status not in {"succeeded", "failed"}:
         errors.append("compiler diagnostics status must be 'succeeded' or 'failed'")
     if not isinstance(document.get("phase"), str) or not document["phase"]:
         errors.append("compiler diagnostics phase must be a non-empty string")
-    if not _is_int(document.get("exit_code")):
+
+    exit_code = document.get("exit_code")
+    if not _is_int(exit_code):
         errors.append("compiler diagnostics exit_code must be an integer")
     if not _is_int(document.get("raw_exit_code")):
         errors.append("compiler diagnostics raw_exit_code must be an integer")
-    if returncode is not None and document.get("exit_code") != returncode:
+    if returncode is not None and exit_code != returncode:
         errors.append(
             "compiler diagnostics exit_code does not match process return code"
         )
+    if _is_int(exit_code) and status in {"succeeded", "failed"}:
+        expected_status = "succeeded" if exit_code == 0 else "failed"
+        if status != expected_status:
+            errors.append("compiler diagnostics status does not match its exit_code")
 
     raw_entries = document.get("diagnostics")
     if not isinstance(raw_entries, list):
@@ -187,6 +195,7 @@ def _map_entry(
         return mapped
 
     mapped["source"] = canonical_source_path.name
+    mapped["compiler_source"] = canonical_source_path.name
     span = entry.get("span")
     if span is None:
         return mapped
