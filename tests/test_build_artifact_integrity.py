@@ -235,7 +235,7 @@ def test_success_replaces_preexisting_failed_build(tmp_path: Path) -> None:
     successful = tmp_path / "successful-replacement"
     _write_build(final, succeeded=False, build_id=final.name)
     _write_build(
-        successful, succeeded=True, payload="replacement", build_id=final.name
+        succeeded=True, directory=successful, payload="replacement", build_id=final.name
     )
 
     CompilerBridge._publish_directory(successful, final)
@@ -259,3 +259,40 @@ def test_incomplete_temporary_build_never_replaces_existing_build(tmp_path: Path
     assert invalid.value.code == "CORRUPT_BUILD_ARTIFACT"
     assert json.loads((final / "manifest.json").read_text())["status"] == "failed"
     assert incomplete.exists()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("status", "unknown"),
+        ("build_key_format", ""),
+        ("returncode", True),
+        ("compiler_diagnostics_protocol_valid", "yes"),
+        ("compiler_manifest_protocol_valid", None),
+    ],
+)
+def test_public_get_rejects_malformed_frontend_manifest_fields(
+    tmp_path: Path,
+    field: str,
+    value: object,
+) -> None:
+    build_root = tmp_path / "builds"
+    build_id = "a" * 32
+    build = build_root / build_id
+    build_root.mkdir()
+    _write_build(build, succeeded=True)
+    manifest_path = build / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest[field] = value
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    class _DB:
+        path = tmp_path / "weave.db"
+
+    class _Workspace:
+        db = _DB()
+
+    bridge = CompilerBridge(_Workspace(), build_root=build_root)
+    with pytest.raises(ValidationError) as malformed:
+        bridge.get(build_id)
+    assert malformed.value.code == "INVALID_BUILD_MANIFEST"

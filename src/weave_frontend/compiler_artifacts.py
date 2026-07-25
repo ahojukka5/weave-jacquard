@@ -261,6 +261,38 @@ class CompilerArtifactMixin:
                 "INVALID_BUILD_MANIFEST",
                 "build manifest ID does not match its artifact directory",
             )
+        if manifest.get("status") not in {"succeeded", "failed"}:
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "build manifest status must be 'succeeded' or 'failed'",
+            )
+        build_key_format = manifest.get("build_key_format")
+        if not isinstance(build_key_format, str) or not build_key_format:
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "build manifest build_key_format must be a non-empty string",
+            )
+        returncode = manifest.get("returncode")
+        if returncode is not None and (
+            not isinstance(returncode, int) or isinstance(returncode, bool)
+        ):
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "build manifest returncode must be an integer or null",
+            )
+        if not isinstance(manifest.get("compiler_diagnostics_protocol_valid"), bool):
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "compiler diagnostics protocol validity must be boolean",
+            )
+        compiler_manifest_valid = manifest.get("compiler_manifest_protocol_valid")
+        if build_key_format == BUILD_KEY_FORMAT and not isinstance(
+            compiler_manifest_valid, bool
+        ):
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "compiler manifest protocol validity must be boolean",
+            )
         cls._verify_artifacts(manifest, directory)
         return manifest
 
