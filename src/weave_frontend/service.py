@@ -68,7 +68,13 @@ class RevisionWorkspace:
             raise NotFoundError(f"branch {branch!r} not found")
         return str(row["head_revision_id"])
 
-    def create_branch(self, project: str, name: str, *, from_branch: str = "main") -> str:
+    def create_branch(
+        self,
+        project: str,
+        name: str,
+        *,
+        from_branch: str = "main",
+    ) -> str:
         project_id = self.project_id(project)
         head = self.branch_head(project, from_branch)
         with self.db.transaction() as connection:
@@ -87,12 +93,10 @@ class RevisionWorkspace:
         if row is None:
             raise NotFoundError(f"revision {revision_id!r} not found")
         with self.db.transaction() as connection:
-            cursor = connection.execute(
+            connection.execute(
                 "UPDATE branches SET head_revision_id = ? WHERE project_id = ? AND name = ?",
                 (revision_id, project_id, branch),
             )
-            if cursor.rowcount != 1:
-                raise NotFoundError(f"branch {branch!r} not found")
 
     def list_history(
         self,
@@ -138,10 +142,17 @@ class RevisionWorkspace:
             merged,
             message=f"merge {source_branch} into {target_branch}",
             author=author,
-            operations=[("merge", target_branch, {"source": source_branch, "base": base})],
+            operations=[
+                ("merge", target_branch, {"source": source_branch, "base": base})
+            ],
             parent2=source_head,
         )
-        return MergeResult(revision, target_branch, source_branch, tuple(sorted(changed)))
+        return MergeResult(
+            revision,
+            target_branch,
+            source_branch,
+            tuple(sorted(changed)),
+        )
 
     def _state(self, project: str, branch: str) -> dict[str, JsonObject]:
         return self._state_at_revision(self.branch_head(project, branch))
@@ -183,19 +194,34 @@ class RevisionWorkspace:
                 """INSERT INTO revisions(
                        id, project_id, parent1_id, parent2_id, message, author, root_hash
                    ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (revision_id, project_id, parent1, parent2, message, author, root_hash),
+                (
+                    revision_id,
+                    project_id,
+                    parent1,
+                    parent2,
+                    message,
+                    author,
+                    root_hash,
+                ),
             )
             for module_name, ast in sorted(modules.items()):
                 canonical = self.db.canonical_json(ast)
                 connection.execute(
-                    """INSERT INTO module_snapshots(revision_id, qualified_name, ast_json, ast_hash)
-                       VALUES (?, ?, ?, ?)""",
-                    (revision_id, module_name, canonical, self.db.hash_value(ast)),
+                    """INSERT INTO module_snapshots(
+                           revision_id, qualified_name, ast_json, ast_hash
+                       ) VALUES (?, ?, ?, ?)""",
+                    (
+                        revision_id,
+                        module_name,
+                        canonical,
+                        self.db.hash_value(ast),
+                    ),
                 )
             for sequence, (kind, target, payload) in enumerate(operations):
                 connection.execute(
                     """INSERT INTO operations(
-                           id, revision_id, sequence_number, operation_kind, target, payload_json
+                           id, revision_id, sequence_number, operation_kind,
+                           target, payload_json
                        ) VALUES (?, ?, ?, ?, ?, ?)""",
                     (
                         str(uuid4()),
@@ -208,15 +234,15 @@ class RevisionWorkspace:
                 )
             for document_id in sorted(document_ids):
                 connection.execute(
-                    "INSERT INTO revision_documents(revision_id, document_id) VALUES (?, ?)",
+                    """INSERT INTO revision_documents(revision_id, document_id)
+                       VALUES (?, ?)""",
                     (revision_id, document_id),
                 )
-            cursor = connection.execute(
-                "UPDATE branches SET head_revision_id = ? WHERE project_id = ? AND name = ?",
+            connection.execute(
+                """UPDATE branches SET head_revision_id = ?
+                   WHERE project_id = ? AND name = ?""",
                 (revision_id, project_id, branch),
             )
-            if cursor.rowcount != 1:
-                raise NotFoundError(f"branch {branch!r} not found")
         return revision_id
 
     def _parents(self, revision: str) -> tuple[str | None, str | None]:
