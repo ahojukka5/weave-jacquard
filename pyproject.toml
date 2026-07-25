@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "weave-frontend"
 version = "0.1.0"
-description = "Agent-native, versioned AST workspace for Weave programs"
+description = "Agent-native, versioned S-expression workspace for Weave programs"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Weave contributors" }]
-keywords = ["weave", "compiler", "ast", "agents", "sqlite", "mcp"]
+keywords = ["weave", "compiler", "s-expression", "agents", "sqlite", "mcp"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "License :: OSI Approved :: Apache Software License",
@@ -31,7 +31,6 @@ dev = [
 ]
 
 [project.scripts]
-weave-front = "weave_frontend.cli:main"
 weave-mcp = "weave_frontend.mcp_build:main"
 weave-build = "weave_frontend.build_cli:main"
 
