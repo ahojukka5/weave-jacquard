@@ -11,8 +11,12 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from .compiler_diagnostics import collect_build_diagnostics
 from .errors import NotFoundError, ValidationError
 from .source_map import render_with_node_map
+
+
+BUILD_KEY_FORMAT = "weave-build-key-v2"
 
 
 class CompilerBridge:
@@ -64,7 +68,7 @@ class CompilerBridge:
         compiler = self._compiler_path()
         compiler_hash = self._sha256_file(compiler)
         cache_payload = {
-            "format": "weave-build-key-v1",
+            "format": BUILD_KEY_FORMAT,
             "revision_hash": revision_hash,
             "revision_id": revision,
             "document": document,
@@ -89,6 +93,7 @@ class CompilerBridge:
         map_path = temporary_directory / "program.weave.map.json"
         executable_path = temporary_directory / "program"
         compiler_manifest_path = temporary_directory / "compiler-manifest.json"
+        compiler_diagnostics_path = temporary_directory / "compiler-diagnostics.json"
         diagnostics_path = temporary_directory / "diagnostics.json"
         manifest_path = temporary_directory / "manifest.json"
 
@@ -103,6 +108,8 @@ class CompilerBridge:
             str(executable_path),
             "--manifest-json",
             str(compiler_manifest_path),
+            "--diagnostics-json",
+            str(compiler_diagnostics_path),
         ]
         if target:
             command.extend(["--target", target])
@@ -134,9 +141,19 @@ class CompilerBridge:
             stdout = ""
             stderr = f"weavec build could not start: {exc}\n"
 
+        diagnostics, protocol_valid = collect_build_diagnostics(
+            compiler_diagnostics_path,
+            node_map=node_map,
+            canonical_source_path=source_path,
+            returncode=returncode,
+            timed_out=timed_out,
+            stdout=stdout,
+            stderr=stderr,
+        )
+
         status = (
             "succeeded"
-            if returncode == 0 and executable_path.is_file()
+            if returncode == 0 and executable_path.is_file() and protocol_valid
             else "failed"
         )
         if status == "failed":
@@ -144,15 +161,8 @@ class CompilerBridge:
 
         if compiler_manifest_path.is_file():
             self._relativize_json_file(compiler_manifest_path, temporary_directory)
-
-        diagnostics = {
-            "format": "weave-build-diagnostics-v1",
-            "returncode": returncode,
-            "timed_out": timed_out,
-            "stdout": stdout,
-            "stderr": stderr,
-            "entries": [],
-        }
+        if compiler_diagnostics_path.is_file() and protocol_valid:
+            self._relativize_json_file(compiler_diagnostics_path, temporary_directory)
         self._write_json(diagnostics_path, diagnostics)
 
         artifact_hashes: dict[str, str] = {
@@ -164,11 +174,16 @@ class CompilerBridge:
             artifact_hashes["compiler-manifest.json"] = self._sha256_file(
                 compiler_manifest_path
             )
+        if compiler_diagnostics_path.is_file():
+            artifact_hashes["compiler-diagnostics.json"] = self._sha256_file(
+                compiler_diagnostics_path
+            )
         if executable_path.is_file():
             artifact_hashes["program"] = self._sha256_file(executable_path)
 
         manifest: dict[str, Any] = {
             "format": "weave-frontend-build-manifest-v1",
+            "build_key_format": BUILD_KEY_FORMAT,
             "build_id": build_id,
             "status": status,
             "cached": False,
@@ -180,6 +195,7 @@ class CompilerBridge:
             "source_sha256": node_map["source_sha256"],
             "compiler": str(compiler),
             "compiler_sha256": compiler_hash,
+            "compiler_diagnostics_protocol_valid": protocol_valid,
             "target": target or "native",
             "command": self._relative_command(command, temporary_directory),
             "returncode": returncode,
@@ -189,6 +205,11 @@ class CompilerBridge:
                 "diagnostics": "diagnostics.json",
                 "compiler_manifest": (
                     "compiler-manifest.json" if compiler_manifest_path.is_file() else None
+                ),
+                "compiler_diagnostics": (
+                    "compiler-diagnostics.json"
+                    if compiler_diagnostics_path.is_file()
+                    else None
                 ),
                 "executable": "program" if executable_path.is_file() else None,
             },
@@ -309,10 +330,20 @@ class CompilerBridge:
         if not manifest_path.is_file():
             return None
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        executable = manifest.get("artifacts", {}).get("executable")
+        artifacts = manifest.get("artifacts", {})
+        executable = artifacts.get("executable")
+        compiler_diagnostics = artifacts.get("compiler_diagnostics")
         if manifest.get("status") != "succeeded" or not executable:
             return None
+        if manifest.get("build_key_format") != BUILD_KEY_FORMAT:
+            return None
+        if manifest.get("compiler_diagnostics_protocol_valid") is not True:
+            return None
+        if not compiler_diagnostics:
+            return None
         if not (directory / executable).is_file():
+            return None
+        if not (directory / compiler_diagnostics).is_file():
             return None
         return cls._with_artifact_paths(manifest, directory)
 

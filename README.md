@@ -13,7 +13,8 @@ The primary executable is **`weave-mcp`**. It provides:
 - grammar help derived from the canonical compiler corpus;
 - authoritative validation through `weavec --frontend`;
 - revision-pinned native builds through `weavec build`;
-- deterministic canonical `.weave` rendering and node source maps.
+- deterministic canonical `.weave` rendering and node source maps;
+- compiler diagnostics mapped back to stable database nodes.
 
 > The model decides what program to build. The environment owns tree structure,
 > identity, history, build provenance, and transactional safety. `weavec` owns
@@ -44,8 +45,8 @@ python -m venv .venv
 python -m pip install -e '.[dev]'
 ```
 
-Install a `weavec` package containing the public `weavec build` command, or point
-the server to a development compiler binary:
+Install a `weavec` build that supports both `--manifest-json` and
+`--diagnostics-json`, or point the server to a development compiler binary:
 
 ```bash
 export WEAVE_DB_PATH="$PWD/weave.db"
@@ -133,7 +134,7 @@ canonical program.weave + program.weave.map.json
     ↓
 weavec build program.weave -o program
     ↓
-native executable + manifests + diagnostics
+native executable + manifests + mapped diagnostics
 ```
 
 The compiler owns surface lowering, WIR, LLVM IR, object generation, private
@@ -143,8 +144,8 @@ source-to-executable command. It never selects a runtime archive or invokes
 
 A build returns a content-derived build ID and artifact paths. Successful builds
 with the same revision content, document, compiler hash, and target are reused.
-A failed build records diagnostics but does not mutate the database revision or
-publish an executable.
+A failed compiler or protocol build records diagnostics but does not mutate the
+database revision or publish an executable.
 
 The artifact store contains:
 
@@ -153,14 +154,20 @@ The artifact store contains:
 ├── program.weave
 ├── program.weave.map.json
 ├── compiler-manifest.json
+├── compiler-diagnostics.json
 ├── diagnostics.json
 ├── manifest.json
 └── program
 ```
 
+`compiler-diagnostics.json` is the raw `weavec-diagnostics-v1` document.
+`diagnostics.json` is the validated `weave-build-diagnostics-v1` document with
+`node_id` mappings. Invalid raw compiler output is preserved for investigation,
+but it prevents successful executable publication.
+
 `manifest.json` records the project, branch, pinned revision and root hash,
-source hash, compiler path and hash, target, invoked public command, return code,
-and hashes of all produced artifacts.
+source hash, compiler path and hash, compiler protocol validity, target, invoked
+public command, return code, and hashes of all produced artifacts.
 
 The same operation is available outside MCP:
 
@@ -193,9 +200,13 @@ Those wrappers are transport metadata, not Weave syntax. The compiler receives:
 
 Canonical source and `weave-node-map-v1` are generated in one deterministic
 render operation. The map records UTF-8 byte offsets and line/column spans for
-every node, together with the source hash and revision. Future machine-readable
-compiler diagnostics can therefore be mapped to the smallest containing node
-without teaching `weavec` about database IDs.
+every node, together with the source hash and revision.
+
+When `weavec-diagnostics-v1` identifies the generated canonical source and gives
+a valid span, the bridge selects the smallest containing node and adds its
+`node_id`. Exact compiler-preflight spans and conservative unique-token spans
+retain their original `span_origin`. Spanless, ambiguous, and non-canonical
+locations remain unmapped rather than guessed.
 
 ## Grammar discovery and validation
 
@@ -259,14 +270,18 @@ ruff check .
 pytest --cov=weave_frontend --cov-report=term-missing
 ```
 
+When GitHub Actions capacity is unavailable, run these commands and the compiler
+bridge integration harness locally before merging.
+
 Repository invariants and contribution rules are documented in
 [`AGENTS.md`](AGENTS.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Current limitations
 
 - grammar help is derived from examples rather than a formal registry;
-- exact node-mapped compiler diagnostics wait for `weavec`'s machine-readable
-  source-span output; current build diagnostics retain stdout, stderr, and status;
+- exact surface syntax spans are available, while some backend locations still
+  depend on conservative unique-token inference until locations propagate
+  explicitly through WIR;
 - published compiler packages currently determine which native target is
   available;
 - build execution is local and compilation is separate from future sandboxed
