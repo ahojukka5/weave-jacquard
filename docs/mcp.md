@@ -42,32 +42,19 @@ Every list and atom has an ID such as `n_3a12cce48fe14f99`.
 - branches retain IDs inherited from their base revision;
 - structural merge compares IDs rather than line numbers.
 
-`program_render(annotated=true)` and `node_inspect` can expose these IDs.
-Compiler sources never include the annotations. Each built source receives a
-separate `weave-node-map-v1` sidecar.
+`program_render(annotated=true)` and `node_inspect` expose these IDs. Compiler
+sources never include annotations. Each materialized source receives a separate
+`weave-node-map-v1` sidecar.
 
 ## Projects and branches
 
-### `project_initialize`
+- `project_initialize`: create a project, initial revision, and `main` branch.
+- `branch_create`: create a branch from another branch head.
+- `branch_list`: list branches and immutable head revisions.
+- `branch_history`: follow first-parent history.
+- `branch_merge`: perform stable-ID three-way merge.
 
-Create a project, its initial revision, and the `main` branch.
-
-### `branch_create`
-
-Create a branch from another branch head.
-
-### `branch_list`
-
-List branches and their current immutable revision IDs.
-
-### `branch_history`
-
-Follow a branch's first-parent revision history.
-
-### `branch_merge`
-
-Run a stable-ID three-way merge. Independent changes are retained;
-incompatible edits produce a conflict and do not advance the target branch.
+Incompatible edits produce a conflict and do not advance the target branch.
 
 ## Program documents
 
@@ -77,8 +64,8 @@ Create a `(program ...)` document with name and version forms.
 
 ### `program_import`
 
-Import one complete source document. This is intended for migration and test
-fixtures; agents should prefer atomic writes for normal work.
+Import a complete source document. This is intended for migration and tests;
+agents should prefer atomic writes for normal work.
 
 ### `program_list`
 
@@ -86,8 +73,8 @@ List all database documents, including reserved structural metadata.
 
 ### `program_source_list`
 
-List only compiler source documents. Revisioned build-target metadata is
-excluded.
+List only compiler source documents from a branch head or exact revision.
+Revisioned build-target metadata is excluded.
 
 ### `program_render`
 
@@ -95,14 +82,12 @@ Render canonical compiler source or an annotated agent view.
 
 ### `program_validate`
 
-Validate one document from the current branch head through `weavec --frontend`.
-For multi-document programs, use a named target and `build_target_validate`.
+Validate one document through `weavec --frontend`. For a multi-document program,
+use a named target and `build_target_validate`.
 
 ### `program_build`
 
 Build an explicit ordered document set from one pinned revision.
-
-Inputs:
 
 ```text
 project
@@ -113,54 +98,27 @@ project
  target = optional compiler target triple
 ```
 
-The primary document is always first. Additional documents retain the supplied
-order. Duplicates are rejected and the server never silently includes all
-project documents.
+The primary document is first. Additional documents retain supplied order.
+Duplicates are rejected and no command silently includes all project documents.
 
 ## Revisioned named targets
 
-A named target stores the compiler input order and target triple in the same
+A named target stores compiler input order and a target triple in the same
 immutable revision graph as its source documents.
 
-### `build_target_set`
+- `build_target_set`: create or update a target definition.
+- `build_target_list`: list targets at a branch head or exact revision.
+- `build_target_get`: read one target definition.
+- `build_target_delete`: delete a target in a new revision.
+- `build_target_validate`: validate target metadata and ordered sources from one
+  pinned revision.
+- `build_target_build`: compile the exact same revisioned target.
 
-Create or update a target definition.
-
-```text
-build_target_set(
-  project="demo",
-  name="application",
-  document="main.weave",
-  additional_documents=["library.weave", "platform.weave"],
-  compiler_target="native"
-)
-```
-
-### `build_target_list`
-
-List targets from a branch head or exact revision.
-
-### `build_target_get`
-
-Read one target definition from a branch head or exact revision.
-
-### `build_target_delete`
-
-Delete a target in a new immutable revision.
-
-### `build_target_validate`
-
-Resolve the target definition and all ordered source documents from one pinned
-revision, render canonical sources, and invoke `weavec --frontend`.
-
-### `build_target_build`
-
-Build the exact same revisioned target through the native compiler bridge.
-
-Recommended multi-document flow:
+Recommended flow:
 
 ```text
-build_target_set
+program_source_list
+→ build_target_set
 → atomic source edits
 → build_target_validate
 → branch_merge
@@ -173,13 +131,25 @@ build_target_set
 ### `build_get`
 
 Read a stored frontend build manifest and absolute artifact paths by build ID.
-The compiler does not need to remain installed for inspection.
+The compiler does not need to remain installed.
 
-A successful build contains canonical sources, node maps, compiler manifest,
-raw compiler diagnostics, mapped bridge diagnostics, frontend manifest, and
-the executable.
+Before returning data, `build_get` verifies:
 
-Cache-integrity and concurrent-publication hardening is tracked in issue #17.
+- the frontend manifest format and its 32-character lowercase build ID;
+- that the manifest build ID matches its directory;
+- that every artifact reference is relative and remains below the build root;
+- that artifact references and hash keys match exactly;
+- that every referenced artifact is a regular file;
+- that every SHA-256 hash is lowercase and matches the current file contents.
+
+A successful cache hit additionally requires build-key v4, return code zero,
+both compiler protocol documents to be valid, and all required source, node-map,
+diagnostics, manifest, and executable artifacts to be present.
+
+The raw `weavec-build-manifest-v1` is validated against the requested target,
+ordered materialized sources, requested output, and compiler status. Invalid or
+missing compiler provenance produces `bridge.invalid-compiler-manifest` and
+withholds the executable.
 
 ## Atomic writes
 
@@ -196,50 +166,37 @@ are zero-based and default to append.
 Each successful write creates one immutable revision. A rejected write does not
 advance the branch.
 
-## Inspection
+## Inspection and shared context
 
-### `node_inspect`
-
-Return a bounded annotated subtree, parent information, position, and grammar
-hint.
-
-### `node_find`
-
-Find stable IDs by form head, atom kind, or exact value.
+- `node_inspect`: return a bounded annotated subtree and grammar hint.
+- `node_find`: find stable IDs by form head, atom kind, or exact value.
+- `context_add`: store project-, document-, or symbol-scoped design material.
+- `context_get`: retrieve context visible at the current branch revision.
 
 Reading may return a useful local subtree. Writing remains atomic.
 
-## Shared context
-
-### `context_add`
-
-Store project-, document-, or symbol-scoped design material in revision
-history.
-
-### `context_get`
-
-Retrieve context visible at the current branch revision.
-
-This lets parallel agents share interface contracts and decisions without
-relying on an unversioned prompt.
-
-## Failure semantics
+## Failure and publication semantics
 
 - Validation and build failures do not mutate program revisions.
 - Builds never advance branches.
-- Missing or duplicate selected documents fail before compilation.
-- A final executable exists only after compiler and diagnostics-protocol success.
-- Diagnostics preserve compiler stdout, stderr, timeout state, and return code.
+- Missing or duplicate sources fail before compilation.
+- A final executable exists only after compiler process, compiler manifest, and
+  compiler diagnostics success.
+- Raw malformed compiler evidence is retained for investigation.
 - Source spans map only through the exact canonical source named by the compiler.
 - Spanless, ambiguous, and non-canonical locations remain unmapped.
-- Program execution is intentionally separate from compilation and is not yet a
-  general MCP operation.
+- Build work occurs in a temporary sibling directory.
+- Publication uses a per-build advisory lock and atomic rename.
+- An existing verified successful build wins over concurrent failed, incomplete,
+  or later successful candidates.
+- Temporary and quarantined candidate directories are cleaned.
+- Program execution remains separate from compilation.
 
 ## Configuration
 
 | Variable | Purpose |
 |---|---|
 | `WEAVE_DB_PATH` | SQLite program database |
-| `WEAVE_BUILD_ROOT` | Immutable build artifact root |
+| `WEAVE_BUILD_ROOT` | Immutable verified build artifact root |
 | `WEAVEC_BIN` | Compiler used for validation and builds |
 | `WEAVEC_SOURCE_ROOT` | Compiler checkout used by grammar help |

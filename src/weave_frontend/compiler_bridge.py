@@ -3,40 +3,20 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
-import shutil
 import subprocess
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .compiler_artifacts import BUILD_KEY_FORMAT, CompilerArtifactMixin
 from .compiler_diagnostics import collect_build_diagnostics
+from .compiler_inputs import CompilerInputMixin, RenderedSource
+from .compiler_manifest import validate_compiler_manifest
 from .errors import NotFoundError, ValidationError
-from .source_map import render_with_node_map
 
 
-BUILD_KEY_FORMAT = "weave-build-key-v3"
-
-
-@dataclass(frozen=True)
-class _RenderedSource:
-    document: str
-    source: str
-    node_map: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class _MaterializedSource:
-    document: str
-    source_path: Path
-    map_path: Path
-    source_sha256: str
-    node_map: dict[str, Any]
-
-
-class CompilerBridge:
+class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
     """Build immutable database revisions through the public compiler interface."""
 
     def __init__(
@@ -100,11 +80,14 @@ class CompilerBridge:
             "target": target or "native",
         }
         build_id = hashlib.sha256(
-            json.dumps(cache_payload, sort_keys=True, separators=(",", ":")).encode()
+            self._canonical_cache_payload(cache_payload)
         ).hexdigest()[:32]
         final_directory = self.build_root / build_id
 
-        cached = self._read_successful_manifest(final_directory)
+        cached = self._read_successful_manifest(
+            final_directory,
+            expected_build_id=build_id,
+        )
         if cached is not None:
             cached["cached"] = True
             return cached
@@ -112,6 +95,53 @@ class CompilerBridge:
         temporary_directory = Path(
             tempfile.mkdtemp(prefix=f".{build_id}-", dir=self.build_root)
         )
+        try:
+            return self._execute_build(
+                project=project,
+                document=document,
+                documents=documents,
+                branch=branch,
+                revision=revision,
+                revision_hash=revision_hash,
+                compiler=compiler,
+                compiler_hash=compiler_hash,
+                target=target,
+                build_id=build_id,
+                final_directory=final_directory,
+                rendered_sources=rendered_sources,
+                temporary_directory=temporary_directory,
+            )
+        finally:
+            if os.path.lexists(temporary_directory):
+                self._remove_path(temporary_directory)
+
+    @staticmethod
+    def _canonical_cache_payload(value: dict[str, Any]) -> bytes:
+        import json
+
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+
+    def _execute_build(
+        self,
+        *,
+        project: str,
+        document: str,
+        documents: list[str],
+        branch: str,
+        revision: str,
+        revision_hash: str,
+        compiler: Path,
+        compiler_hash: str,
+        target: str | None,
+        build_id: str,
+        final_directory: Path,
+        rendered_sources: list[RenderedSource],
+        temporary_directory: Path,
+    ) -> dict[str, Any]:
         materialized_sources = self._materialize_sources(
             rendered_sources,
             temporary_directory,
@@ -136,34 +166,8 @@ class CompilerBridge:
         if target:
             command.extend(["--target", target])
 
-        timed_out = False
-        try:
-            completed = subprocess.run(
-                command,
-                text=True,
-                capture_output=True,
-                timeout=self.timeout_seconds,
-                check=False,
-            )
-            returncode: int | None = completed.returncode
-            stdout = completed.stdout
-            stderr = completed.stderr
-        except subprocess.TimeoutExpired as exc:
-            timed_out = True
-            returncode = None
-            stdout = exc.stdout or ""
-            stderr = exc.stderr or ""
-            if isinstance(stdout, bytes):
-                stdout = stdout.decode(errors="replace")
-            if isinstance(stderr, bytes):
-                stderr = stderr.decode(errors="replace")
-            stderr += f"\nweavec build timed out after {exc.timeout} seconds\n"
-        except OSError as exc:
-            returncode = None
-            stdout = ""
-            stderr = f"weavec build could not start: {exc}\n"
-
-        diagnostics, protocol_valid = collect_build_diagnostics(
+        returncode, timed_out, stdout, stderr = self._run_compiler(command)
+        diagnostics, diagnostics_valid = collect_build_diagnostics(
             compiler_diagnostics_path,
             canonical_sources=[
                 (item.source_path, item.node_map) for item in materialized_sources
@@ -173,29 +177,46 @@ class CompilerBridge:
             stdout=stdout,
             stderr=stderr,
         )
+        compiler_summary = diagnostics.get("compiler")
+        diagnostics_status = (
+            compiler_summary.get("status")
+            if isinstance(compiler_summary, dict)
+            else None
+        )
+        compiler_manifest, compiler_manifest_errors = validate_compiler_manifest(
+            compiler_manifest_path,
+            expected_sources=[item.source_path for item in materialized_sources],
+            expected_output=executable_path,
+            requested_target=target,
+            returncode=returncode,
+            diagnostics_status=diagnostics_status,
+        )
+        compiler_manifest_valid = not compiler_manifest_errors
+        self._attach_compiler_manifest_diagnostics(
+            diagnostics,
+            compiler_manifest=compiler_manifest,
+            errors=compiler_manifest_errors,
+        )
 
         status = (
             "succeeded"
-            if returncode == 0 and executable_path.is_file() and protocol_valid
+            if (
+                returncode == 0
+                and executable_path.is_file()
+                and diagnostics_valid
+                and compiler_manifest_valid
+            )
             else "failed"
         )
         if status == "failed":
             executable_path.unlink(missing_ok=True)
 
-        if compiler_manifest_path.is_file():
+        if compiler_manifest_path.is_file() and compiler_manifest_valid:
             self._relativize_json_file(compiler_manifest_path, temporary_directory)
-        if compiler_diagnostics_path.is_file() and protocol_valid:
+        if compiler_diagnostics_path.is_file() and diagnostics_valid:
             self._relativize_json_file(compiler_diagnostics_path, temporary_directory)
         self._write_json(diagnostics_path, diagnostics)
 
-        artifact_hashes = self._artifact_hashes(
-            materialized_sources,
-            diagnostics_path=diagnostics_path,
-            compiler_manifest_path=compiler_manifest_path,
-            compiler_diagnostics_path=compiler_diagnostics_path,
-            executable_path=executable_path,
-            base=temporary_directory,
-        )
         source_artifacts = [
             {
                 "document": item.document,
@@ -206,6 +227,14 @@ class CompilerBridge:
             for item in materialized_sources
         ]
         primary = source_artifacts[0]
+        artifact_hashes = self._artifact_hashes(
+            materialized_sources,
+            diagnostics_path=diagnostics_path,
+            compiler_manifest_path=compiler_manifest_path,
+            compiler_diagnostics_path=compiler_diagnostics_path,
+            executable_path=executable_path,
+            base=temporary_directory,
+        )
         manifest: dict[str, Any] = {
             "format": "weave-frontend-build-manifest-v2",
             "build_key_format": BUILD_KEY_FORMAT,
@@ -222,8 +251,15 @@ class CompilerBridge:
             "source_sha256": primary["source_sha256"],
             "compiler": str(compiler),
             "compiler_sha256": compiler_hash,
-            "compiler_diagnostics_protocol_valid": protocol_valid,
+            "compiler_diagnostics_protocol_valid": diagnostics_valid,
+            "compiler_manifest_protocol_valid": compiler_manifest_valid,
+            "compiler_manifest_errors": list(compiler_manifest_errors),
             "target": target or "native",
+            "compiler_target": (
+                compiler_manifest.get("target")
+                if compiler_manifest_valid and compiler_manifest is not None
+                else None
+            ),
             "command": self._relative_command(command, temporary_directory),
             "returncode": returncode,
             "artifacts": {
@@ -248,280 +284,79 @@ class CompilerBridge:
         self._publish_directory(temporary_directory, final_directory)
         return self.get(build_id)
 
+    def _run_compiler(
+        self,
+        command: list[str],
+    ) -> tuple[int | None, bool, str, str]:
+        timed_out = False
+        try:
+            completed = subprocess.run(
+                command,
+                text=True,
+                capture_output=True,
+                timeout=self.timeout_seconds,
+                check=False,
+            )
+            return completed.returncode, timed_out, completed.stdout, completed.stderr
+        except subprocess.TimeoutExpired as exc:
+            stdout = exc.stdout or ""
+            stderr = exc.stderr or ""
+            if isinstance(stdout, bytes):
+                stdout = stdout.decode(errors="replace")
+            if isinstance(stderr, bytes):
+                stderr = stderr.decode(errors="replace")
+            stderr += f"\nweavec build timed out after {exc.timeout} seconds\n"
+            return None, True, stdout, stderr
+        except OSError as exc:
+            return None, False, "", f"weavec build could not start: {exc}\n"
+
+    @staticmethod
+    def _attach_compiler_manifest_diagnostics(
+        diagnostics: dict[str, Any],
+        *,
+        compiler_manifest: dict[str, Any] | None,
+        errors: list[str],
+    ) -> None:
+        diagnostics["compiler_manifest"] = (
+            {
+                key: compiler_manifest.get(key)
+                for key in ("format", "status", "phase", "target")
+            }
+            if compiler_manifest is not None
+            else None
+        )
+        diagnostics["compiler_manifest_protocol_valid"] = not errors
+        diagnostics["compiler_manifest_errors"] = list(errors)
+        if errors:
+            diagnostics["entries"].append(
+                {
+                    "code": "bridge.invalid-compiler-manifest",
+                    "severity": "error",
+                    "phase": "bridge",
+                    "message": "weavec produced a missing or invalid build manifest",
+                    "source": None,
+                    "compiler_source": None,
+                    "document": None,
+                    "span_origin": "none",
+                    "span": None,
+                    "node_id": None,
+                    "details": list(errors),
+                }
+            )
+
     def get(self, build_id: str) -> dict[str, Any]:
-        """Return a stored build manifest with absolute artifact paths."""
+        """Return a verified stored build manifest with absolute artifact paths."""
 
-        valid = build_id and all(
-            character in "0123456789abcdef" for character in build_id
-        )
-        if not valid:
-            raise ValidationError("INVALID_BUILD_ID", "build ID must be hexadecimal")
+        if not self._valid_build_id(build_id):
+            raise ValidationError(
+                "INVALID_BUILD_ID",
+                "build ID must contain exactly 32 lowercase hexadecimal characters",
+            )
         directory = self.build_root / build_id
-        manifest_path = directory / "manifest.json"
-        if not manifest_path.is_file():
+        if not (directory / "manifest.json").is_file():
             raise NotFoundError(f"build {build_id!r} not found")
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        return self._with_artifact_paths(manifest, directory)
-
-    @staticmethod
-    def _ordered_documents(
-        document: str,
-        additional_documents: list[str] | None,
-    ) -> list[str]:
-        values: list[Any] = [document]
-        if additional_documents is not None:
-            if not isinstance(additional_documents, list):
-                raise ValidationError(
-                    "INVALID_DOCUMENT_SET",
-                    "additional_documents must be a list of document names",
-                )
-            values.extend(additional_documents)
-        if any(not isinstance(value, str) or not value for value in values):
-            raise ValidationError(
-                "INVALID_DOCUMENT_SET",
-                "document names must be non-empty strings",
-            )
-        documents = [str(value) for value in values]
-        if len(set(documents)) != len(documents):
-            raise ValidationError(
-                "DUPLICATE_BUILD_DOCUMENT",
-                "a document may appear only once in one build",
-            )
-        return documents
-
-    @staticmethod
-    def _render_sources(
-        state: dict[str, Any],
-        documents: list[str],
-        *,
-        revision: str,
-    ) -> list[_RenderedSource]:
-        rendered: list[_RenderedSource] = []
-        for document in documents:
-            try:
-                root = state[document]
-            except KeyError as exc:
-                raise NotFoundError(
-                    f"document {document!r} not found in revision {revision!r}"
-                ) from exc
-            source, node_map = render_with_node_map(
-                root,
-                revision_id=revision,
-                document=document,
-            )
-            rendered.append(_RenderedSource(document, source, node_map))
-        return rendered
-
-    @classmethod
-    def _materialize_sources(
-        cls,
-        rendered: list[_RenderedSource],
-        directory: Path,
-    ) -> list[_MaterializedSource]:
-        source_directory = directory / "sources"
-        map_directory = directory / "source-maps"
-        source_directory.mkdir()
-        map_directory.mkdir()
-        materialized: list[_MaterializedSource] = []
-        for index, item in enumerate(rendered):
-            filename = f"{index:03d}-{cls._safe_document_basename(item.document)}"
-            source_path = source_directory / filename
-            map_path = map_directory / f"{filename}.map.json"
-            source_path.write_text(item.source, encoding="utf-8")
-            cls._write_json(map_path, item.node_map)
-            materialized.append(
-                _MaterializedSource(
-                    document=item.document,
-                    source_path=source_path,
-                    map_path=map_path,
-                    source_sha256=str(item.node_map["source_sha256"]),
-                    node_map=item.node_map,
-                )
-            )
-        return materialized
-
-    @staticmethod
-    def _safe_document_basename(document: str) -> str:
-        basename = document.replace("\\", "/").rsplit("/", 1)[-1]
-        safe = "".join(
-            character
-            if character.isalnum() or character in {".", "_", "-"}
-            else "_"
-            for character in basename
-        )
-        if not safe:
-            safe = "source.weave"
-        if not safe.endswith(".weave"):
-            safe += ".weave"
-        return safe
-
-    @classmethod
-    def _artifact_hashes(
-        cls,
-        sources: list[_MaterializedSource],
-        *,
-        diagnostics_path: Path,
-        compiler_manifest_path: Path,
-        compiler_diagnostics_path: Path,
-        executable_path: Path,
-        base: Path,
-    ) -> dict[str, str]:
-        hashes: dict[str, str] = {}
-        for item in sources:
-            hashes[str(item.source_path.relative_to(base))] = cls._sha256_file(
-                item.source_path
-            )
-            hashes[str(item.map_path.relative_to(base))] = cls._sha256_file(
-                item.map_path
-            )
-        hashes["diagnostics.json"] = cls._sha256_file(diagnostics_path)
-        if compiler_manifest_path.is_file():
-            hashes["compiler-manifest.json"] = cls._sha256_file(
-                compiler_manifest_path
-            )
-        if compiler_diagnostics_path.is_file():
-            hashes["compiler-diagnostics.json"] = cls._sha256_file(
-                compiler_diagnostics_path
-            )
-        if executable_path.is_file():
-            hashes["program"] = cls._sha256_file(executable_path)
-        return hashes
-
-    def _compiler_path(self) -> Path:
-        if self._compiler is None:
-            self._compiler = self._resolve_compiler(self._configured_compiler)
-        return self._compiler
-
-    def _resolve_compiler(self, compiler: str | Path | None) -> Path:
-        configured = compiler or os.environ.get("WEAVEC_BIN")
-        if configured is None:
-            validator = getattr(self.workspace, "validator", None)
-            configured = getattr(validator, "binary", None)
-        if configured is None:
-            configured = shutil.which("weavec")
-        if configured is None:
-            raise ValidationError(
-                "WEAVEC_NOT_FOUND",
-                "weavec was not found; set WEAVEC_BIN or install it on PATH",
-            )
-        path = Path(configured).expanduser().resolve()
-        if not path.is_file() or not os.access(path, os.X_OK):
-            raise ValidationError(
-                "WEAVEC_NOT_EXECUTABLE",
-                f"weavec is not executable: {path}",
-            )
-        return path
-
-    def _require_project_revision(self, project: str, revision_id: str) -> str:
-        row = self.workspace.db.connection.execute(
-            """SELECT r.root_hash
-               FROM revisions r
-               JOIN projects p ON p.id = r.project_id
-               WHERE r.id = ? AND p.name = ?""",
-            (revision_id, project),
-        ).fetchone()
-        if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
-        return str(row["root_hash"])
-
-    @staticmethod
-    def _sha256_file(path: Path) -> str:
-        digest = hashlib.sha256()
-        with path.open("rb") as stream:
-            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(chunk)
-        return digest.hexdigest()
-
-    @staticmethod
-    def _write_json(path: Path, value: Any) -> None:
-        path.write_text(
-            json.dumps(value, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-
-    @classmethod
-    def _relativize_json_file(cls, path: Path, base: Path) -> None:
-        value = json.loads(path.read_text(encoding="utf-8"))
-        cls._write_json(path, cls._relativize_value(value, base))
-
-    @classmethod
-    def _relativize_value(cls, value: Any, base: Path) -> Any:
-        if isinstance(value, str):
-            prefix = str(base) + os.sep
-            return value[len(prefix) :] if value.startswith(prefix) else value
-        if isinstance(value, list):
-            return [cls._relativize_value(item, base) for item in value]
-        if isinstance(value, dict):
-            return {
-                key: cls._relativize_value(item, base)
-                for key, item in value.items()
-            }
-        return value
-
-    @classmethod
-    def _relative_command(cls, command: list[str], base: Path) -> list[str]:
-        return [str(cls._relativize_value(argument, base)) for argument in command]
-
-    @classmethod
-    def _with_artifact_paths(
-        cls,
-        manifest: dict[str, Any],
-        directory: Path,
-    ) -> dict[str, Any]:
-        manifest["build_directory"] = str(directory)
-        manifest["artifact_paths"] = cls._resolve_artifact_value(
-            manifest["artifacts"],
+        manifest = self._read_verified_manifest(
             directory,
+            expected_build_id=build_id,
         )
-        return manifest
-
-    @classmethod
-    def _resolve_artifact_value(cls, value: Any, directory: Path) -> Any:
-        if value is None:
-            return None
-        if isinstance(value, str):
-            return str(directory / value)
-        if isinstance(value, list):
-            return [cls._resolve_artifact_value(item, directory) for item in value]
-        if isinstance(value, dict):
-            return {
-                key: cls._resolve_artifact_value(item, directory)
-                for key, item in value.items()
-            }
-        raise TypeError(f"unsupported artifact manifest value: {type(value).__name__}")
-
-    @classmethod
-    def _read_successful_manifest(cls, directory: Path) -> dict[str, Any] | None:
-        manifest_path = directory / "manifest.json"
-        if not manifest_path.is_file():
-            return None
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        artifacts = manifest.get("artifacts", {})
-        executable = artifacts.get("executable")
-        compiler_diagnostics = artifacts.get("compiler_diagnostics")
-        sources = artifacts.get("sources")
-        node_maps = artifacts.get("node_maps")
-        if manifest.get("status") != "succeeded" or not executable:
-            return None
-        if manifest.get("build_key_format") != BUILD_KEY_FORMAT:
-            return None
-        if manifest.get("compiler_diagnostics_protocol_valid") is not True:
-            return None
-        if not compiler_diagnostics:
-            return None
-        if not isinstance(sources, list) or not sources:
-            return None
-        if not isinstance(node_maps, list) or len(node_maps) != len(sources):
-            return None
-        required = [executable, compiler_diagnostics, *sources, *node_maps]
-        if any(not isinstance(path, str) or not (directory / path).is_file() for path in required):
-            return None
-        return cls._with_artifact_paths(manifest, directory)
-
-    @staticmethod
-    def _publish_directory(temporary: Path, final: Path) -> None:
-        if final.exists():
-            shutil.rmtree(final)
-        os.replace(temporary, final)
+        return self._with_artifact_paths(manifest, directory)
