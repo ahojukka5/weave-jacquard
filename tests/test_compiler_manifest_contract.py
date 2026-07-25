@@ -108,3 +108,26 @@ def test_manifest_rejects_malformed_or_inconsistent_success(tmp_path: Path) -> N
     )
     assert any("process return code" in error for error in errors)
     assert any("compiler diagnostics" in error for error in errors)
+
+
+def test_manifest_rejects_relative_path_escape(tmp_path: Path) -> None:
+    source = tmp_path / "source.weave"
+    output = tmp_path / "program"
+    source.write_text("(program)\n", encoding="utf-8")
+    path = tmp_path / "compiler-manifest.json"
+    value = _manifest(source, output)
+    value["output"] = "../program"
+    value["sources"] = ["../source.weave"]
+    path.write_text(json.dumps(value), encoding="utf-8")
+
+    _, errors = validate_compiler_manifest(
+        path,
+        expected_sources=[source],
+        expected_output=output,
+        requested_target=None,
+        returncode=0,
+        diagnostics_status="succeeded",
+    )
+
+    assert any("output must be a non-empty path" in error for error in errors)
+    assert any("source 0 must be a non-empty path" in error for error in errors)
