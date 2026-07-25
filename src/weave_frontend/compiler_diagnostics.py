@@ -8,9 +8,9 @@ from typing import Any
 
 from .source_map import smallest_node_for_span
 
-
 COMPILER_DIAGNOSTICS_FORMAT = "weavec-diagnostics-v1"
 BUILD_DIAGNOSTICS_FORMAT = "weave-build-diagnostics-v1"
+SPAN_ORIGINS = {"compiler-preflight", "inferred-unique-token", "none"}
 
 
 def collect_build_diagnostics(
@@ -133,13 +133,15 @@ def _validate_document(
     status = document.get("status")
     if status not in {"succeeded", "failed"}:
         errors.append("compiler diagnostics status must be 'succeeded' or 'failed'")
-    if not isinstance(document.get("phase"), str) or not document["phase"]:
+    phase = document.get("phase")
+    if not isinstance(phase, str) or not phase:
         errors.append("compiler diagnostics phase must be a non-empty string")
 
     exit_code = document.get("exit_code")
     if not _is_int(exit_code):
         errors.append("compiler diagnostics exit_code must be an integer")
-    if not _is_int(document.get("raw_exit_code")):
+    raw_exit_code = document.get("raw_exit_code")
+    if not _is_int(raw_exit_code):
         errors.append("compiler diagnostics raw_exit_code must be an integer")
     if returncode is not None and exit_code != returncode:
         errors.append(
@@ -155,6 +157,19 @@ def _validate_document(
         errors.append("compiler diagnostics diagnostics must be an array")
         return errors
 
+    if status == "succeeded":
+        if phase != "complete":
+            errors.append("successful compiler diagnostics phase must be 'complete'")
+        if raw_entries:
+            errors.append("successful compiler diagnostics must have no entries")
+        if _is_int(raw_exit_code) and raw_exit_code != 0:
+            errors.append("successful compiler diagnostics raw_exit_code must be zero")
+    elif status == "failed":
+        if not raw_entries:
+            errors.append("failed compiler diagnostics must contain an entry")
+        if _is_int(raw_exit_code) and raw_exit_code == 0:
+            errors.append("failed compiler diagnostics raw_exit_code must be non-zero")
+
     for index, entry in enumerate(raw_entries):
         errors.extend(_validate_entry(entry, index=index))
     return errors
@@ -166,14 +181,30 @@ def _validate_entry(value: Any, *, index: int) -> list[str]:
         return [f"{prefix} must be an object"]
 
     errors: list[str] = []
-    for key in ("code", "severity", "phase", "message", "span_origin"):
+    for key in ("code", "phase", "message"):
         if not isinstance(value.get(key), str) or not value[key]:
             errors.append(f"{prefix} {key} must be a non-empty string")
+
+    severity = value.get("severity")
+    if severity != "error":
+        errors.append(f"{prefix} severity must be 'error'")
+
     source = value.get("source")
     if source is not None and not isinstance(source, str):
         errors.append(f"{prefix} source must be a string or null")
 
+    span_origin = value.get("span_origin")
+    if span_origin not in SPAN_ORIGINS:
+        errors.append(
+            f"{prefix} span_origin must be one of {sorted(SPAN_ORIGINS)}"
+        )
+
     span = value.get("span")
+    if span_origin == "none" and span is not None:
+        errors.append(f"{prefix} span must be null when span_origin is 'none'")
+    if span_origin in {"compiler-preflight", "inferred-unique-token"} and span is None:
+        errors.append(f"{prefix} span is required for span_origin {span_origin!r}")
+
     if span is not None:
         if not isinstance(span, dict):
             errors.append(f"{prefix} span must be an object or null")
