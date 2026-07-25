@@ -111,15 +111,21 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     with SExpressionWorkspace(args.db, weavec_binary=args.weavec) as workspace:
-        bridge = CompilerBridge(
-            workspace,
-            compiler=args.weavec,
-            build_root=args.build_root,
-        )
         targets = BuildTargetRegistry(workspace)
-        target_validator = BuildTargetValidator(targets)
+        bridge_instance: CompilerBridge | None = None
+
+        def bridge() -> CompilerBridge:
+            nonlocal bridge_instance
+            if bridge_instance is None:
+                bridge_instance = CompilerBridge(
+                    workspace,
+                    compiler=args.weavec,
+                    build_root=args.build_root,
+                )
+            return bridge_instance
+
         if args.command == "build":
-            result = bridge.build(
+            result = bridge().build(
                 args.project,
                 args.document,
                 additional_documents=args.additional_documents,
@@ -156,7 +162,7 @@ def main() -> None:
                 args.name,
             )
         elif args.command == "target-validate":
-            result = target_validator.validate(
+            result = BuildTargetValidator(targets).validate(
                 args.project,
                 args.name,
                 branch=args.branch,
@@ -164,7 +170,7 @@ def main() -> None:
             )
         elif args.command == "target-build":
             result = targets.build(
-                bridge,
+                bridge(),
                 args.project,
                 args.name,
                 branch=args.branch,
@@ -177,7 +183,7 @@ def main() -> None:
                 revision_id=args.revision,
             )
         else:
-            result = bridge.get(args.build_id)
+            result = bridge().get(args.build_id)
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
