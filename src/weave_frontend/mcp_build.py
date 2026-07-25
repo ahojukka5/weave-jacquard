@@ -24,13 +24,19 @@ def program_build(
     branch: str = "main",
     revision_id: str | None = None,
     target: str | None = None,
+    additional_documents: list[str] | None = None,
 ) -> dict[str, object]:
-    """Build one immutable database revision into a native executable."""
+    """Build an ordered document set from one immutable database revision.
+
+    ``document`` is the primary source. Additional documents are compiled after
+    it in the exact order supplied.
+    """
 
     return _result(
         lambda: compiler_bridge().build(
             project,
             document,
+            additional_documents=additional_documents,
             branch=branch,
             revision_id=revision_id,
             target=target,
