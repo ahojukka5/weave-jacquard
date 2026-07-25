@@ -8,6 +8,7 @@ from functools import lru_cache
 from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
 from .mcp_server import _result, mcp, workspace
+from .target_validation import BuildTargetValidator
 
 
 @lru_cache(maxsize=1)
@@ -21,6 +22,11 @@ def compiler_bridge() -> CompilerBridge:
 @lru_cache(maxsize=1)
 def build_targets() -> BuildTargetRegistry:
     return BuildTargetRegistry(workspace())
+
+
+@lru_cache(maxsize=1)
+def build_target_validator() -> BuildTargetValidator:
+    return BuildTargetValidator(build_targets())
 
 
 @mcp.tool()
@@ -114,6 +120,25 @@ def build_target_delete(
     """Delete one named target in a new immutable revision."""
 
     return _result(lambda: build_targets().delete(project, branch, name))
+
+
+@mcp.tool()
+def build_target_validate(
+    project: str,
+    name: str,
+    branch: str = "main",
+    revision_id: str | None = None,
+) -> dict[str, object]:
+    """Validate one target's exact revision and ordered source set."""
+
+    return _result(
+        lambda: build_target_validator().validate(
+            project,
+            name,
+            branch=branch,
+            revision_id=revision_id,
+        )
+    )
 
 
 @mcp.tool()
