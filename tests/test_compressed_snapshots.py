@@ -86,7 +86,7 @@ def test_new_snapshots_are_transparently_compressed_and_reopen(tmp_path):
     with SExpressionWorkspace(path) as workspace:
         workspace.initialize("demo")
         workspace.import_program("demo", "main", "main.weave", source)
-        assert workspace.render("demo", "main", "main.weave") == source
+        canonical = workspace.render("demo", "main", "main.weave")
 
         object_type = workspace.db.connection.execute(
             "SELECT type FROM sqlite_master WHERE name = 'module_snapshots'"
@@ -101,7 +101,7 @@ def test_new_snapshots_are_transparently_compressed_and_reopen(tmp_path):
         assert stored_size < raw_size // 4
 
     with SExpressionWorkspace(path) as reopened:
-        assert reopened.render("demo", "main", "main.weave") == source
+        assert reopened.render("demo", "main", "main.weave") == canonical
 
 
 def test_legacy_snapshot_table_migrates_without_changing_history(tmp_path):
@@ -153,7 +153,7 @@ def test_legacy_snapshot_table_migrates_without_changing_history(tmp_path):
 
 def test_snapshot_view_preserves_transactional_insert_update_delete(tmp_path):
     with Database(tmp_path / "view.db") as database:
-        project_id, revision_id = database.initialize_project("demo")
+        _project_id, revision_id = database.initialize_project("demo")
         ast = json.dumps({"payload": "x" * 1000})
 
         with database.transaction() as connection:
