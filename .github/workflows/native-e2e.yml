@@ -129,6 +129,7 @@ jobs:
             tests/e2e/test_real_mcp_validate_affected.py \
             tests/e2e/test_real_mcp_merge_preflight.py \
             tests/e2e/test_real_mcp_merge_policy.py \
+            tests/e2e/test_real_mcp_build_discovery.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
@@ -405,6 +406,40 @@ jobs:
               "source_policy_ignored"
           ] is True
           assert policy_merges[3]["payload"]["result"]["preflight_enforced"] is True
+
+          discovery_traces = list(base.rglob("build-discovery-trace.json"))
+          assert len(discovery_traces) == 1, discovery_traces
+          discovery_trace = json.loads(
+              discovery_traces[0].read_text(encoding="utf-8")
+          )
+          discovery_pages = [
+              entry for entry in discovery_trace if entry["tool"] == "build_list_page"
+          ]
+          assert len(discovery_pages) == 7
+          catalog_pages = discovery_pages[:5]
+          assert sum(
+              entry["payload"]["result"]["scanned_count"]
+              for entry in catalog_pages
+          ) == 5
+          assert sum(
+              entry["payload"]["result"]["returned_count"]
+              for entry in catalog_pages
+          ) == 3
+          assert sum(
+              entry["payload"]["result"]["filtered_count"]
+              for entry in catalog_pages
+          ) == 1
+          assert sum(
+              entry["payload"]["result"]["rejected_count"]
+              for entry in catalog_pages
+          ) == 1
+          assert discovery_pages[5]["payload"]["result"]["returned_count"] == 1
+          assert discovery_pages[5]["payload"]["result"]["builds"][0][
+              "status"
+          ] == "failed"
+          assert discovery_pages[6]["payload"]["error"]["code"] == (
+              "STALE_BUILD_CATALOG"
+          )
 
           output = Path("qualification/program-matrix-summary.json")
           output.write_text(
