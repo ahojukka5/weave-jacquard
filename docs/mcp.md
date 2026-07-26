@@ -2,18 +2,18 @@
 
 ## Purpose
 
-`weave-mcp` is Jacquard's primary agent interface. It lets coding agents
-construct, inspect, validate, merge, and build Weave programs without replacing
-complete source files or balancing large S-expressions in one call.
+`weave-mcp` is Jacquard's primary agent interface. Agents construct, inspect,
+validate, review, merge, and build Weave programs through stable-ID structural
+operations instead of replacing complete source files.
 
-The database owns node identity, immutable revisions, branches, context, and
-build provenance. `weavec` remains the authoritative language frontend and
-native compiler.
+The database owns node identity, immutable revisions, branches, revisioned
+context and merge policy, and build provenance. `weavec` remains the
+authoritative language frontend and native compiler.
 
 ## Compiler authority
 
-Grammar help is derived from the configured compiler checkout. It is
-construction guidance, not a duplicate language specification.
+Grammar help is construction guidance derived from the configured compiler
+checkout. It is not a duplicate language specification.
 
 Authoritative validation is:
 
@@ -43,161 +43,258 @@ Every list and atom has an ID such as `n_3a12cce48fe14f99`.
 - structural merge compares IDs rather than line numbers;
 - revision diffs compare immutable states through the same IDs.
 
-`program_render(annotated=true)` and `node_inspect` expose these IDs. Compiler
-sources never include annotations. Each materialized source receives a separate
-`weave-node-map-v1` sidecar.
+`program_render(annotated=true)` and `node_inspect` expose IDs. Compiler sources
+never contain annotations. Materialized sources receive separate
+`weave-node-map-v1` sidecars.
 
-## Projects and branches
+## Recommended protected-branch workflow
+
+A project may publish a strict target-branch policy once:
+
+```text
+merge_policy_set(
+  project,
+  branch = "main",
+  require_preflight = true,
+  require_affected_validation = true,
+  allow_uncovered_documents = false,
+  max_affected_targets = project-appropriate bound)
+```
+
+Independent work then follows:
+
+```text
+branch_merge_preflight(project, target_branch, source_branch)
+→ review target_merge_policy and source_merge_policy
+→ review directional impact and uncovered documents
+→ review complete affected-target validation_set
+→ when ready_for_publication is true:
+     call publication_tool with publication_arguments
+```
+
+Publication recomputes policy-aware preflight, compares `preflight_id`, enforces
+the complete validation set, and atomically rechecks both branch heads before
+writing the immutable merge revision.
+
+## Projects, branches, and policy
+
+Core tools:
 
 - `project_initialize`: create a project, initial revision, and `main` branch.
 - `branch_create`: create a branch from another branch head.
 - `branch_list`: list branches and immutable head revisions.
-- `branch_history`: compact first-parent history read retained for compatibility.
-- `branch_history_page`: read bounded first-parent pages with an explicit
-  continuation and ordered operation metadata.
-- `revision_operations_page`: inspect exact immutable operation targets and JSON
-  payloads for one revision in sequence-number pages.
-- `branch_activity_summary`: measure complete first-parent revision, operation,
-  merge, author, and edit-grouping activity.
-- `branch_merge_preview`: preview stable-ID merge conflicts and consequences.
-- `branch_merge_impact`: map prospective source changes to named build targets.
-- `branch_merge_validate`: validate a named target from the exact merge candidate.
-- `branch_merge`: publish a merge, optionally enforcing preview and compiler gates.
+- `branch_history`: compact compatibility history read.
+- `branch_history_page`: bounded first-parent history with continuation.
+- `revision_operations_page`: exact immutable operation audit pages.
+- `branch_activity_summary`: complete first-parent workflow metrics.
+- `merge_policy_get`: read effective first-parent policy.
+- `merge_policy_set`: publish a policy in a new immutable revision.
+- `branch_merge_preflight`: one-call non-mutating admission review.
+- `branch_merge_preview`: low-level structural preview.
+- `branch_merge_impact`: low-level directional target impact.
+- `branch_merge_validate`: low-level one-target validation.
+- `branch_merge_validate_affected`: complete affected-target validation set.
+- `branch_merge`: policy-aware publication.
 
-`branch_history_page` accepts page sizes from 1 to 200. Begin without a start
-revision; when `has_more` is true, pass `next_revision_id` as the next
-`start_revision_id`. A continuation must be reachable from the selected branch
-head. Compare `branch_head_revision_id` between pages when a stable multi-page
-read is required.
-
-`revision_operations_page` is project-scoped and accepts sequence-number pages
-of 1 to 200 rows. When `has_more` is true, pass `next_sequence_number` as the
-next `start_sequence_number`. Revisions and operation rows are immutable, so no
-branch-head stability check is needed while paging one revision. Each row
-preserves its stored ID, kind, target, and parsed JSON payload.
-
-`branch_activity_summary` reports descriptive workflow metrics, including
-single- and multi-operation revisions and the number of revisions avoided by
-operation grouping. These metrics should guide ergonomics work, not encourage
-agents to maximize batch size. See
-[`branch-activity.md`](branch-activity.md) for exact definitions.
-
-### `branch_merge_preview`
-
-Preview the current source branch head into the current target branch head
-without mutating either branch.
+### `merge_policy_set`
 
 ```text
 project
-target_branch
-source_branch
+a branch = "main"
+require_preflight = true
+require_affected_validation = true
+allow_uncovered_documents = false
+max_affected_targets = 64
+author = "policy-agent"
 ```
 
-The response format is `weave-merge-preview-v1`. Its deterministic `preview_id`
-binds the project, branch direction, common ancestor, target head, and source
-head.
+The actual argument is `branch`; the `a` prefixes above are not syntax and are
+omitted in calls:
 
-A clean preview returns:
+```text
+merge_policy_set(
+  project,
+  branch = "main",
+  require_preflight = true,
+  require_affected_validation = true,
+  allow_uncovered_documents = false,
+  max_affected_targets = 64,
+  author = "policy-agent")
+```
 
-- `mergeable: true`;
-- base, target-head, and source-head revision IDs;
-- target, source, and prospective merged root hashes;
-- changed document names;
-- compact per-document node-change summaries.
+The format is `weave-merge-policy-v1`. A successful call:
 
-A conflict preview is still a successful read response. It returns
-`mergeable: false`, exact conflict paths, and no merged root. It does not advance
-the target branch.
+- validates policy values;
+- stores or reuses an immutable project-scoped context document;
+- records a `set_merge_policy` operation;
+- publishes one new revision directly on the selected branch;
+- returns policy, document, revision, and deterministic hash metadata.
 
-Per-document summaries report add/remove/modify status, document hashes, node
-counts, changed stable-node count, and aggregate revision-diff change kinds.
-Complete merged trees are never returned.
+`require_preflight=true` requires `require_affected_validation=true`.
+`max_affected_targets` must be 1–64.
 
-### `branch_merge_impact`
+### `merge_policy_get`
 
-Map the changes introduced by merging the current source head into the current
-target head to revisioned named build targets.
+```text
+project
+branch = "main"
+revision_id = optional exact project revision
+```
+
+The registry walks first-parent history from the selected revision and returns
+the newest policy operation. Historical reads reproduce the effective policy at
+that revision.
+
+When no policy was configured, the returned compatibility policy is:
+
+```text
+configured = false
+require_preflight = false
+require_affected_validation = false
+allow_uncovered_documents = true
+max_affected_targets = 64
+```
+
+It is resolved but not stored, preserving existing merge behavior.
+
+### Target-branch authority
+
+The current target branch's first-parent policy governs publication. The source
+policy is returned for transparency. When hashes differ,
+`source_policy_ignored=true`.
+
+A source branch cannot weaken target admission by setting a permissive policy.
+To loosen a protected branch, publish `merge_policy_set` directly on that target.
+The new policy revision advances its head and invalidates older preview and
+preflight evidence.
+
+See [`merge-policy.md`](merge-policy.md).
+
+## Merge preflight
+
+### `branch_merge_preflight`
 
 ```text
 project
 target_branch
 source_branch
 preview_id = optional reviewed preview
+allow_uncovered_documents = false
+```
+
+The format is `weave-merge-preflight-v1`. Preflight is read-only and composes:
+
+1. target-authoritative and source-visible policy resolution;
+2. stable-ID three-way preview;
+3. directional named-target impact;
+4. candidate coverage analysis;
+5. validation of every affected target surviving in the candidate.
+
+It returns:
+
+- exact ancestor, target-head, source-head, preview, and merged-root identities;
+- `target_merge_policy` and `source_merge_policy`;
+- `source_policy_ignored`;
+- a bounded impact summary;
+- the complete `weave-merge-validation-set-v1`;
+- `ready_for_publication`;
+- `publication_tool = "branch_merge"`;
+- exact `publication_arguments`, including policy-bound `preflight_id`.
+
+The public impact summary contains at most 200 target entries. Truncation is
+reported explicitly and affects presentation only; complete internal impact
+still drives validation.
+
+A forbidden uncovered override returns `MERGE_POLICY_VIOLATION` before impact or
+compiler work. A policy fanout violation returns `TOO_MANY_AFFECTED_TARGETS`
+before compiler startup.
+
+`preflight_id` binds policy hashes and source-policy disposition in addition to
+candidate, impact, validation-set, and uncovered-policy identities.
+
+Preflight creates no revision, branch update, audit row, build manifest,
+executable, retained source, or WIR artifact. See
+[`merge-preflight.md`](merge-preflight.md).
+
+## Lower-level merge review tools
+
+### `branch_merge_preview`
+
+```text
+project
+target_branch
+source_branch
+```
+
+The `weave-merge-preview-v1` `preview_id` binds project, merge direction, common
+ancestor, target head, and source head. A clean preview returns prospective root
+and compact per-document stable-node consequences. A conflict preview returns
+`mergeable=false` and exact conflict paths. Neither mutates a branch.
+
+### `branch_merge_impact`
+
+```text
+project
+target_branch
+source_branch
+preview_id = optional
 start_index = 0
 limit = 50
 ```
 
-A supplied stale preview returns `STALE_MERGE_PREVIEW`. A semantic merge conflict
-returns `MERGE_CONFLICT` before target analysis. The call is read-only and starts
-no compiler process.
+The `weave-merge-target-impact-v1` response reports only consequences introduced
+by merging the source into the current target:
 
-The response format is `weave-merge-target-impact-v1`. It reports:
+- changed program and target-metadata documents;
+- candidate-covered and uncovered changed documents;
+- target counts before and after;
+- affected and unaffected target counts;
+- paged affected-target entries with reasons and before/after definitions.
 
-- preview, ancestor, both head revisions, and prospective merged root;
-- changed program documents;
-- changed `@build-target/*` metadata documents;
-- changed program documents covered by targets surviving in the candidate;
-- changed program documents with no surviving target coverage;
-- target counts before and after the merge;
-- affected and unaffected candidate-target counts;
-- a bounded page of affected target entries.
-
-A target is affected when its definition is added, removed, or modified, or when
-one of its primary/additional source documents changes. Each entry contains a
-status, deterministic reasons, changed source documents, and compact before/after
-target configurations.
-
-The analysis is directional. It compares the current target state with the
-prospective merged state and therefore reports only consequences introduced by
-merging the source into that target. Changes already present on the target branch
-are not reclassified as source merge impact.
-
-Candidate coverage is calculated from targets that exist after the merge. A
-removed target cannot hide a changed source from `uncovered_changed_documents`.
-An uncovered document is not automatically invalid, but no named target can
-validate it automatically.
-
-Affected targets are sorted by name. `start_index` must be non-negative and
-`limit` must be 1–200. When `has_more` is true, pass `next_index` as the next
-`start_index`. The preview binds immutable revisions, so page order is stable.
+Coverage uses only targets surviving in the candidate. A removed target cannot
+hide a changed source. Entries are sorted by target name; page sizes are 1–200.
 See [`merge-impact.md`](merge-impact.md).
 
 ### `branch_merge_validate`
-
-Validate one named target from the exact clean in-memory merge candidate without
-publishing a revision or build artifact.
 
 ```text
 project
 target_branch
 source_branch
 build_target
-preview_id = optional reviewed preview
+preview_id = optional
 ```
 
-The target definition and its ordered source documents are resolved from the
-prospective merged state. Jacquard renders those canonical sources and invokes:
+Validates one target from the exact clean in-memory candidate through
+`weavec --frontend`. `weave-merge-validation-v1` includes ordered source hashes,
+compiler identity, bounded output, diagnostic status, and WIR hash/size. It
+creates no revision or retained artifact. See
+[`merge-validation.md`](merge-validation.md).
+
+### `branch_merge_validate_affected`
 
 ```text
-weavec --frontend program.wir source0.weave source1.weave ...
+project
+target_branch
+source_branch
+preview_id = optional
+allow_uncovered_documents = false
 ```
 
-A supplied stale preview returns `STALE_MERGE_PREVIEW`. A merge conflict returns
-`MERGE_CONFLICT` before compiler startup. The response format
-`weave-merge-validation-v1` includes:
+The `weave-merge-validation-set-v1` response:
 
-- preview, ancestor, target-head, source-head, and merged-root identities;
-- target configuration and ordered document names;
-- stable source-root IDs, source hashes, and source byte counts;
-- compiler path and binary SHA-256;
-- availability, validity, return code, timeout state, and optional diagnostic;
-- stdout and stderr bounded to 8,192 characters with truncation flags;
-- WIR SHA-256 and byte count, but not WIR contents.
+- validates every affected target surviving in the candidate;
+- skips and reports removed targets;
+- uses deterministic target-name order;
+- aggregates all passes, rejections, and unavailable compilers;
+- performs zero compiler work when uncovered documents block coverage;
+- records the effective validation ceiling in result and identity.
 
-The deterministic `validation_id` binds the preview, merged root, target
-configuration, ordered source hashes, and compiler hash. Validation creates no
-revision and retains no temporary source or WIR files. See
-[`merge-validation.md`](merge-validation.md).
+The public tool uses the global bound of 64. Policy-aware preflight and
+publication may impose a smaller target-branch ceiling. See
+[`merge-validation-set.md`](merge-validation-set.md).
+
+## Policy-aware publication
 
 ### `branch_merge`
 
@@ -206,320 +303,166 @@ project
 target_branch
 source_branch
 preview_id = optional
-validation_target = optional named build target
+validation_target = optional named target
+validate_affected_targets = false
+allow_uncovered_documents = false
+preflight_id = optional policy-aware preflight identity
 author = "merge-agent"
 ```
 
-When `validation_target` is present, Jacquard recomputes the current candidate,
-validates that named target through `weavec --frontend`, and rejects unavailable
-or failed validation with `MERGE_VALIDATION_UNAVAILABLE` or
-`MERGE_VALIDATION_FAILED`. The validation's exact preview ID becomes the
-publication token.
+Modes remain compatible when target policy permits them:
 
-When `preview_id` is supplied, a token mismatch returns
-`STALE_MERGE_PREVIEW`; a matching conflict preview returns `MERGE_CONFLICT`.
-Neither publishes a revision.
+- direct structural merge;
+- one explicit `validation_target`;
+- complete `validate_affected_targets=true`;
+- exact policy-aware preflight replay.
 
-For a matching clean candidate, both reviewed branch heads are checked again in
-the same SQLite `BEGIN IMMEDIATE` transaction that writes the merge revision.
-The target update uses compare-and-set semantics. The merge revision records the
-reviewed common ancestor and both parent heads in its operation payload.
+A call cannot combine single-target and all-target validation. A preflight replay
+requires all-target validation and no `validation_target`.
 
-A branch change before validation changes the preview ID. A branch change during
-or after validation fails the transactional head check. The candidate that
-passes the compiler is therefore the only candidate that can be published by the
-validated call.
+Configured target policy may require preflight and all-target validation, forbid
+uncovered overrides, or impose a lower validation ceiling. Policy failures occur
+before publication:
 
-Calls without `preview_id` or `validation_target` remain supported. Direct merges
-still capture and atomically recheck both current heads. Impact-aware
-preview-validation-publication is recommended for independent agent work. See
-[`merge-preview.md`](merge-preview.md), [`merge-impact.md`](merge-impact.md), and
-[`merge-validation.md`](merge-validation.md).
+- `MERGE_POLICY_PREFLIGHT_REQUIRED`;
+- `MERGE_POLICY_AFFECTED_VALIDATION_REQUIRED`;
+- `MERGE_POLICY_VIOLATION`;
+- `STALE_MERGE_PREFLIGHT`;
+- `TOO_MANY_AFFECTED_TARGETS`.
+
+For `preflight_id`, Jacquard recomputes policy-aware preflight once, compares the
+exact identity, enforces its validation set, and publishes with its preview ID.
+It does not launch a redundant second compiler fanout for the same candidate.
+
+Both target and source heads are then rechecked in the same SQLite
+`BEGIN IMMEDIATE` transaction that writes the two-parent merge revision. A branch
+or policy change before replay changes preflight identity; a change after
+validation fails the transactional head check.
+
+The result records:
+
+- `merge_policy_enforced`;
+- target and source policies;
+- `source_policy_ignored`;
+- `preflight_enforced` and `preflight_id`;
+- individual or complete validation evidence;
+- reviewed preview/parent metadata.
+
+Every error leaves target branch and audit tables unchanged.
+
+## History and audit
+
+`branch_history_page` accepts limits 1–200. Begin without `start_revision_id`; use
+`next_revision_id` for continuation. A continuation must remain reachable from
+the selected branch head.
+
+`revision_operations_page` accepts sequence-number pages of 1–200 rows. Immutable
+operation records preserve ID, kind, target, and parsed payload. Policy revisions
+appear as `set_merge_policy` operations.
+
+`branch_activity_summary` reports descriptive revision, operation, merge, author,
+and grouping metrics. Do not maximize batch size only to reduce counts.
 
 ## Program documents
 
-### `program_create`
+- `program_create`: create a basic `(program ...)` document.
+- `program_import`: import complete source for migration and tests.
+- `program_list`: list all structural documents.
+- `program_source_list`: list compiler sources, excluding reserved target metadata.
+- `program_render`: render canonical or annotated source.
+- `program_validate`: validate one source through `weavec --frontend`.
+- `program_build`: build an explicit ordered document set from one revision.
 
-Create a `(program ...)` document with name and version forms.
-
-### `program_import`
-
-Import a complete source document. This is intended for migration and tests;
-agents should prefer structural writes for normal work.
-
-### `program_list`
-
-List all database documents, including reserved structural metadata.
-
-### `program_source_list`
-
-List only compiler source documents from a branch head or exact revision.
-Revisioned build-target metadata is excluded.
-
-### `program_render`
-
-Render canonical compiler source or an annotated agent view.
-
-### `program_validate`
-
-Validate one document through `weavec --frontend`. For a multi-document program,
-use a named target and `build_target_validate`.
-
-### `program_build`
-
-Build an explicit ordered document set from one pinned revision.
-
-```text
-project
- document                         primary source
- additional_documents            optional ordered sources
- branch = "main"
- revision_id = optional exact revision
- target = optional compiler target triple
-```
-
-The primary document is first. Additional documents retain supplied order.
-Duplicates are rejected and no command silently includes all project documents.
+`program_build` never silently includes all project documents. The primary source
+is first; additional sources retain supplied order; duplicates are rejected.
 
 ## Revisioned named targets
 
-A named target stores compiler input order and a target triple in the same
-immutable revision graph as its source documents.
+- `build_target_set`: create/update target metadata.
+- `build_target_list`: list targets at branch head or exact revision.
+- `build_target_get`: read one target.
+- `build_target_delete`: delete one target in a new revision.
+- `build_target_validate`: validate target metadata and ordered sources.
+- `build_target_build`: compile the exact revisioned target.
 
-- `build_target_set`: create or update a target definition.
-- `build_target_list`: list targets at a branch head or exact revision.
-- `build_target_get`: read one target definition.
-- `build_target_delete`: delete a target in a new revision.
-- `build_target_validate`: validate target metadata and ordered sources from one
-  pinned revision.
-- `branch_merge_impact`: identify candidate targets affected by a source merge.
-- `branch_merge_validate`: validate a target from an uncommitted merge candidate.
-- `build_target_build`: compile the exact same revisioned target.
-
-Recommended flow:
+Recommended multi-document flow:
 
 ```text
 program_source_list
 → build_target_set
-→ structural source edits
+→ structural edits
 → build_target_validate
-→ branch_merge_preview
-→ branch_merge_impact
-→ review uncovered changed documents
-→ branch_merge_validate(build_target = each affected surviving target)
-→ branch_merge(preview_id = reviewed preview,
-               validation_target = named target)
+→ branch_merge_preflight
+→ review target policy, impact, coverage, and validation_set
+→ branch_merge using returned publication_arguments
 → build_target_build
 → build_get
-→ build_diagnostics_page when the build failed
-→ node_inspect(revision_id = failed revision) before repair
-→ revision_diff_page(base_revision_id = failed revision) against current head
 ```
-
-## Build inspection
-
-### `build_get`
-
-Read a stored frontend build manifest and absolute artifact paths by build ID.
-The compiler does not need to remain installed.
-
-Before returning data, `build_get` verifies:
-
-- the frontend manifest format and its 32-character lowercase build ID;
-- that the manifest build ID matches its directory;
-- that every artifact reference is relative and remains below the build root;
-- that artifact references and hash keys match exactly;
-- that every referenced artifact is a regular file;
-- that every SHA-256 hash is lowercase and matches the current file contents.
-
-A successful cache hit additionally requires build-key v4, return code zero,
-both compiler protocol documents to be valid, and all required source, node-map,
-diagnostics, manifest, and executable artifacts to be present.
-
-The raw `weavec-build-manifest-v1` is validated against the requested target,
-ordered materialized sources, requested output, and compiler status. Invalid or
-missing compiler provenance produces `bridge.invalid-compiler-manifest` and
-withholds the executable.
-
-### `build_diagnostics_page`
-
-Read mapped retained diagnostic entries by build ID without opening files on the
-server machine.
-
-```text
-build_id
-start_index = 0
-limit = 50
-```
-
-`start_index` must be a non-negative integer and `limit` must be between 1 and
-200. The build first passes the same manifest, path-containment, regular-file,
-and SHA-256 verification used by `build_get`. The retained
-`weave-build-diagnostics-v1` document is then validated before entries are
-returned.
-
-The response includes compact build and compiler summaries, the total diagnostic
-count, page fields, and exact mapped entries. When `has_more` is true, pass
-`next_index` as the next `start_index`. Builds are immutable, so no branch-head
-stability check is needed while paging.
-
-Raw compiler stdout, stderr, malformed protocol documents, and protocol-error
-details remain in the verified build artifacts and are not copied into the
-bounded MCP response. See [`build-diagnostics.md`](build-diagnostics.md) for the
-complete contract and repair workflow.
 
 ## Structural writes
 
-### Single-node tools
+Single-node tools:
 
-- `node_create_form(parent_id, head, position)`
-- `node_add_atom(parent_id, kind, value, position)`
-- `node_set_atom(node_id, value)`
-- `node_move(node_id, new_parent_id, position)`
-- `node_wrap(node_id, head)`
-- `node_delete(node_id)`
+- `node_create_form(parent_id, head, position)`;
+- `node_add_atom(parent_id, kind, value, position)`;
+- `node_set_atom(node_id, value)`;
+- `node_move(node_id, new_parent_id, position)`;
+- `node_wrap(node_id, head)`;
+- `node_delete(node_id)`.
 
-Use these while exploring unfamiliar code, repairing one uncertain location, or
-when an inspection is useful after every decision. Each successful single-node
-write creates one immutable revision.
+Each successful single-node write publishes one immutable revision.
 
-### `node_apply_batch`
+`node_apply_batch` accepts 1–256 flat operations using the same six kinds.
+Temporary aliases created with `as="name"` are referenced as `@name` later in the
+same request. `expected_revision_id` provides optimistic concurrency. The entire
+batch validates and publishes as one revision with ordered audit rows, or rolls
+back completely. See [`edit-transactions.md`](edit-transactions.md).
 
-Use a batch after one coherent local structure is known. It accepts 1–256 flat,
-ordered operations using the same six operation kinds listed above. It never
-accepts a nested replacement tree.
-
-A created form, atom, or wrapper may set `as="alias"`; later operations in the
-same batch refer to it as `@alias`. The response maps surviving aliases to stable
-node IDs for use in later calls.
-
-`expected_revision_id` provides optimistic concurrency. A stale branch head is
-rejected before publication. All operations are applied in memory, the complete
-tree is validated once, and one SQLite transaction writes:
-
-- one immutable revision and snapshot;
-- one ordered audit row per sub-operation;
-- one compare-and-set branch-head update.
-
-Any invalid operation, alias, reference, position, final tree, or stale-head
-check rejects the complete batch. No partial revision or audit rows remain.
-
-The default response reports aggregate counts and aliases. Set
-`include_operation_results=true` only when the caller needs compact results for
-every sub-operation. See [`edit-transactions.md`](edit-transactions.md) for the
-full request and operation contract.
-
-Atom kinds are `symbol`, `string`, `integer`, `float`, and `boolean`. Positions
-are zero-based and default to append.
-
-## Inspection and shared context
+## Inspection and context
 
 ### `node_inspect`
 
-Read a bounded annotated subtree and grammar hint by stable node ID.
-
-```text
-project
-branch
-document
-node_id
-depth = 3
-revision_id = optional exact immutable revision
-```
-
-When `revision_id` is omitted, the tool reads the current branch head, preserving
-its original behavior. When supplied, the revision must belong to `project`, but
-it does not need to remain the selected branch head or be first-parent reachable
-from it.
-
-The response reports both `revision_id`, which identifies the state actually
-inspected, and `branch_head_revision_id`, which identifies the current selected
-branch head. `revision_is_branch_head` states whether they are equal. The node,
-parent, position, subtree, rendering, and grammar hint all come from the exact
-inspected revision.
-
-This is the preferred way to inspect a mapped diagnostic after a branch has
-advanced: pass the failed build's `revision_id` and the diagnostic `node_id`.
-See [`revision-node-inspection.md`](revision-node-inspection.md).
+Reads a bounded annotated subtree from branch head or explicit immutable
+`revision_id`. The response reports both inspected and current branch-head
+revision IDs. Historical inspection is preferred for mapped failed-build
+repair. See [`revision-node-inspection.md`](revision-node-inspection.md).
 
 ### `revision_diff_page`
 
-Compare one document across two immutable project revisions through stable node
-IDs, without rendering and transferring two complete programs.
+Compares one document across two project-owned immutable revisions through stable
+IDs. Change kinds include add/remove, kind/head/value, parent/position, and child
+count. Page sizes are 1–200 and immutable revision selection makes continuation
+stable. See [`revision-diff.md`](revision-diff.md).
 
-```text
-project
-document
-base_revision_id
-branch = "main"
-target_revision_id = optional; defaults to branch head
-start_index = 0
-limit = 50
-```
+Other reads:
 
-The explicit revisions must belong to `project`. They need not be related by
-ancestry or reachable from the selected branch. The branch identifies the current
-head and supplies the target when `target_revision_id` is omitted.
+- `node_find`: locate stable IDs by head, kind, or exact value;
+- `build_diagnostics_page`: bounded mapped diagnostics from verified builds;
+- `context_add`: publish scoped immutable design context;
+- `context_get`: retrieve context visible at current revision.
 
-Each changed node contains compact `before` and `after` descriptors with its
-kind, form head or atom value, parent, sibling position, and child count. Change
-kinds are:
+## Builds and diagnostics
 
-- `added` and `removed`;
-- `kind_changed`, `head_changed`, and `value_changed`;
-- `parent_changed` and `position_changed`;
-- `child_count_changed`.
+`build_get` verifies manifest format, build identity, path containment, regular
+files, expected artifact set, and every SHA-256 hash before returning paths.
+Successful cache admission additionally requires build-key v4, valid compiler
+protocols, zero return code, and complete source/map/diagnostic/executable data.
 
-One stable ID produces one row, which may carry several change kinds. Common and
-added nodes follow target preorder; removed nodes follow afterward in base
-preorder. A document present on only one side produces an all-added or
-all-removed diff. A document absent from both sides is rejected.
-
-`start_index` must be non-negative and `limit` must be 1–200. The response
-includes exact revision identities, whether the target is the branch head,
-document-presence and node-count metadata, total and per-kind change counts, and
-an explicit continuation. When `has_more` is true, pass `next_index` as the next
-`start_index`. Both selected revisions are immutable, so the page order is
-stable.
-
-Use `node_inspect` with the relevant revision to expand any changed node into a
-bounded local subtree. See [`revision-diff.md`](revision-diff.md) for the complete
-contract and compiler-guided repair flow.
-
-Other inspection and context tools:
-
-- `node_find`: find stable IDs by form head, atom kind, or exact value.
-- `build_diagnostics_page`: return bounded mapped diagnostics for a verified
-  immutable build.
-- `context_add`: store project-, document-, or symbol-scoped design material.
-- `context_get`: retrieve context visible at the current branch revision.
-
-Reading may return a useful local subtree, bounded change page, merge preview,
-merge-impact page, or merge-validation record. Writing remains transactional:
-one single edit, one coherent batch, or one merge either publishes completely or
-not at all.
+`build_diagnostics_page(build_id, start_index=0, limit=50)` verifies the immutable
+build and retained diagnostic document before returning mapped entries. Limits
+are 1–200. Raw malformed evidence remains only in verified artifacts.
 
 ## Failure and publication semantics
 
-- Rejected single edits and batches do not advance branches.
-- Validation and build failures do not mutate program revisions.
-- Builds never advance branches.
-- Merge previews, merge impact analysis, merge candidate validation, historical
-  inspection, and revision diffs never check out or rewrite revisions.
-- Conflict previews and stale preview tokens publish no merge revision.
-- Unavailable or failed merge validation publishes no merge revision.
+- Rejected edits and batches do not advance branches.
+- Policy and policy-history reads do not mutate state.
+- Merge preflight, preview, impact, and validation do not publish revisions.
+- Policy, coverage, compiler, conflict, and stale-evidence failures publish no
+  merge revision.
 - Merge publication atomically rechecks both captured branch heads.
-- Missing or duplicate sources fail before compilation.
-- A final executable exists only after compiler process, compiler manifest, and
-  compiler diagnostics success.
-- Raw malformed compiler evidence is retained for investigation.
-- Source spans map only through the exact canonical source named by the compiler.
-- Spanless, ambiguous, and non-canonical locations remain unmapped.
-- Build work occurs in a temporary sibling directory.
-- Publication uses a per-build advisory lock and atomic rename.
-- An existing verified successful build wins over concurrent failed, incomplete,
-  or later successful candidates.
-- Temporary and quarantined candidate directories are cleaned.
+- Builds never advance branches.
+- A final executable exists only after compiler process and protocol success.
+- Build work uses temporary sibling directories and atomic verified publication.
 - Program execution remains separate from compilation.
 
 ## Configuration
