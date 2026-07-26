@@ -41,7 +41,7 @@ def test_runtime_guidance_replaces_legacy_registration() -> None:
     assert server.tools["weave_help"] is weave_help
 
 
-def test_workflow_covers_batch_validation_build_and_inspection() -> None:
+def test_workflow_covers_batch_validation_merge_build_and_inspection() -> None:
     result = weave_help("workflow")
     steps = result["help"]["steps"]
 
@@ -49,6 +49,11 @@ def test_workflow_covers_batch_validation_build_and_inspection() -> None:
     assert "node_apply_batch for one coherent known structure" in steps
     assert "program_validate for a coherent single document" in steps
     assert "build_target_validate before a named-target build" in steps
+    assert "branch_merge_preview after independent agent work" in steps
+    assert "branch_merge with the reviewed preview_id" in steps
+    assert steps.index("branch_merge_preview after independent agent work") < steps.index(
+        "branch_merge with the reviewed preview_id"
+    )
     assert "branch_activity_summary when measuring the workflow" in steps
     assert "program_build or build_target_build" in steps
     assert "build_get to inspect immutable provenance and artifact paths" in steps
@@ -98,6 +103,21 @@ def test_history_help_preserves_pagination_metric_and_audit_contract() -> None:
     assert "branch_activity_summary" in help_value["summary"]
     assert "revisions avoided by grouping" in help_value["summary"]
     assert "Do not maximize batch size" in help_value["interpretation"]
+
+
+def test_merge_help_preserves_preview_and_stale_head_contract() -> None:
+    help_value = weave_help("merge")["help"]
+
+    assert "branch_merge_preview" in help_value["preview"]
+    assert "deterministic preview_id" in help_value["preview"]
+    assert "never advances" in help_value["preview"]
+    assert "mergeable=false" in help_value["consequences"]
+    assert "conflict paths" in help_value["consequences"]
+    assert "preview_id" in help_value["publish"]
+    assert "same SQLite write transaction" in help_value["publish"]
+    assert "STALE_MERGE_PREVIEW" in help_value["publish"]
+    assert "without preview_id" in help_value["compatibility"]
+    assert "branch-head race-safe" in help_value["compatibility"]
 
 
 def test_validation_distinguishes_single_and_multi_document_paths() -> None:
