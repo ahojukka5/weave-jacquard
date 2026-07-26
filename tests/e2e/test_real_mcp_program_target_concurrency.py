@@ -49,12 +49,12 @@ def _payload(response: Any) -> dict[str, Any]:
 async def _call_payload(
     session: ClientSession,
     trace: list[dict[str, Any]],
-    name: str,
+    tool_name: str,
     **arguments: Any,
 ) -> dict[str, Any]:
-    response = await session.call_tool(name, arguments=arguments)
+    response = await session.call_tool(tool_name, arguments=arguments)
     payload = _payload(response)
-    trace.append({"tool": name, "arguments": arguments, "payload": payload})
+    trace.append({"tool": tool_name, "arguments": arguments, "payload": payload})
     assert _attribute(response, "is_error", "isError") is not True, payload
     return payload
 
@@ -62,10 +62,10 @@ async def _call_payload(
 async def _call(
     session: ClientSession,
     trace: list[dict[str, Any]],
-    name: str,
+    tool_name: str,
     **arguments: Any,
 ) -> Any:
-    payload = await _call_payload(session, trace, name, **arguments)
+    payload = await _call_payload(session, trace, tool_name, **arguments)
     assert payload.get("ok") is True, payload
     return payload["result"]
 
@@ -73,10 +73,10 @@ async def _call(
 async def _call_error(
     session: ClientSession,
     trace: list[dict[str, Any]],
-    name: str,
+    tool_name: str,
     **arguments: Any,
 ) -> dict[str, Any]:
-    payload = await _call_payload(session, trace, name, **arguments)
+    payload = await _call_payload(session, trace, tool_name, **arguments)
     assert payload.get("ok") is False, payload
     return payload["error"]
 
@@ -124,10 +124,10 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         tools = await session.list_tools()
         by_name = {tool.name: tool for tool in tools.tools}
         assert set(by_name) >= WRITE_TOOLS
-        for name in WRITE_TOOLS:
-            properties = _schema(by_name[name]).get("properties")
-            assert isinstance(properties, dict), by_name[name]
-            assert "expected_revision_id" in properties, (name, properties)
+        for tool_name in WRITE_TOOLS:
+            properties = _schema(by_name[tool_name]).get("properties")
+            assert isinstance(properties, dict), by_name[tool_name]
+            assert "expected_revision_id" in properties, (tool_name, properties)
 
         await _call(session, trace, "project_initialize", project=PROJECT)
         initial = _main_head(
