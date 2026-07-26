@@ -8,8 +8,8 @@ from .merge_policy import (
     MERGE_POLICY_FORMAT,
     MERGE_POLICY_OPERATION,
     MERGE_POLICY_TITLE,
-    MergePolicyRegistry as _BaseMergePolicyRegistry,
 )
+from .merge_policy import MergePolicyRegistry as _BaseMergePolicyRegistry
 from .merge_validation_set import MAX_AFFECTED_TARGET_VALIDATIONS
 
 
