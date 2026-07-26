@@ -75,6 +75,12 @@ async def _run(tmp_path: Path) -> None:
         assert "revision_scan_limit" in normalized
         assert "branch_checkpoint_compare" in normalized
         assert "does not itself prove completion" in normalized
+        assert "project_agent_status_page" in normalized
+        assert "catalog_id" in normalized
+        assert "next_after_branch" in normalized
+        assert "checkpoint_scan_limit" in normalized
+        assert "do not prove inactivity" in normalized
+        assert "review readiness" in normalized
 
         tools = await session.list_tools()
         names = {tool.name for tool in tools.tools}
@@ -84,6 +90,7 @@ async def _run(tmp_path: Path) -> None:
             "branch_checkpoint_get",
             "branch_checkpoint_history_page",
             "branch_checkpoint_compare",
+            "project_agent_status_page",
             "weave_help",
         } <= names
 
@@ -121,6 +128,30 @@ async def _run(tmp_path: Path) -> None:
         assert "next_revision_id" in timeline["help"]["continuation"]
         assert "branch_checkpoint_compare" in timeline["help"]["compare"]
         assert "does not prove completion" in timeline["help"]["interpretation"]
+
+        status = _payload(
+            await session.call_tool(
+                "weave_help",
+                arguments={"topic": "agent_status"},
+            )
+        )
+        assert status["ok"] is True
+        assert "project_agent_status_page" in status["help"]["page"]
+        assert "catalog_id" in status["help"]["catalog"]
+        assert "checkpoint_scan_limit" in status["help"]["bounds"]
+        assert status["help"]["states"] == [
+            "head",
+            "behind_head",
+            "not_found_within_scan",
+            "none_in_first_parent_history",
+        ]
+        assert "do not prove inactivity" in status["help"]["interpretation"]
+
+        read = _payload(
+            await session.call_tool("weave_help", arguments={"topic": "read"})
+        )
+        assert read["ok"] is True
+        assert "project_agent_status_page" in read["help"]["tools"]
 
         workflow = _payload(
             await session.call_tool("weave_help", arguments={"topic": "workflow"})
