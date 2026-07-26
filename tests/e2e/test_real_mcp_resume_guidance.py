@@ -88,6 +88,14 @@ async def _run(tmp_path: Path) -> None:
         assert "structural preview success only" in normalized
         assert "branch_merge_preflight" in normalized
         assert "does not represent priority" in normalized
+        assert "project_merge_impact_queue_page" in normalized
+        assert "affected_target_limit" in normalized
+        assert "coverage_document_limit" in normalized
+        assert "Conflicted sources stop before impact analysis" in normalized
+        assert "target revision policy as authoritative" in normalized
+        assert "source policy is visible but cannot weaken" in normalized
+        assert "No compiler or build validation runs" in normalized
+        assert "branch_merge_impact" in normalized
 
         tools = await session.list_tools()
         names = {tool.name for tool in tools.tools}
@@ -99,6 +107,7 @@ async def _run(tmp_path: Path) -> None:
             "branch_checkpoint_compare",
             "project_agent_status_page",
             "project_merge_queue_page",
+            "project_merge_impact_queue_page",
             "weave_help",
         } <= names
 
@@ -174,12 +183,35 @@ async def _run(tmp_path: Path) -> None:
         assert "preflight" in queue["help"]["follow_up"]
         assert "does not express priority" in queue["help"]["ordering"]
 
+        impact = _payload(
+            await session.call_tool(
+                "weave_help",
+                arguments={"topic": "merge_impact_queue"},
+            )
+        )
+        assert impact["ok"] is True
+        assert "project_merge_impact_queue_page" in impact["help"]["page"]
+        assert "affected_target_limit" in impact["help"]["bounds"]
+        assert "coverage_document_limit" in impact["help"]["bounds"]
+        assert impact["help"]["classifications"] == [
+            "conflicted",
+            "covered_program_changes",
+            "uncovered_program_changes",
+            "target_definition_changes_only",
+            "no_changes",
+        ]
+        assert "cannot weaken" in impact["help"]["policy"]
+        assert "not compiler validation" in impact["help"]["coverage"]
+        assert "No compiler" in impact["help"]["compiler"]
+        assert "do not prove compiler correctness" in impact["help"]["readiness"]
+
         read = _payload(
             await session.call_tool("weave_help", arguments={"topic": "read"})
         )
         assert read["ok"] is True
         assert "project_agent_status_page" in read["help"]["tools"]
         assert "project_merge_queue_page" in read["help"]["tools"]
+        assert "project_merge_impact_queue_page" in read["help"]["tools"]
 
         workflow = _payload(
             await session.call_tool("weave_help", arguments={"topic": "workflow"})
