@@ -13,6 +13,7 @@ from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
 from .mcp_guidance import install_runtime_guidance
 from .mcp_server import _result, mcp, workspace
+from .merge_impact import MergeTargetImpactService
 from .merge_preview import MergePreviewService
 from .merge_validation import MergeValidationService
 from .revision_diff import RevisionNodeDiffService
@@ -68,6 +69,11 @@ def build_targets() -> BuildTargetRegistry:
 
 
 @lru_cache(maxsize=1)
+def merge_impacts() -> MergeTargetImpactService:
+    return MergeTargetImpactService(merge_previews(), build_targets())
+
+
+@lru_cache(maxsize=1)
 def merge_validations() -> MergeValidationService:
     return MergeValidationService(workspace(), merge_previews(), build_targets())
 
@@ -87,6 +93,29 @@ def branch_merge_preview(
 
     return _result(
         lambda: merge_previews().preview(project, target_branch, source_branch)
+    )
+
+
+@mcp.tool()
+def branch_merge_impact(
+    project: str,
+    target_branch: str,
+    source_branch: str,
+    preview_id: str | None = None,
+    start_index: int = 0,
+    limit: int = 50,
+) -> dict[str, object]:
+    """Read bounded named-target consequences for a prospective merge."""
+
+    return _result(
+        lambda: merge_impacts().page(
+            project,
+            target_branch,
+            source_branch,
+            preview_id=preview_id,
+            start_index=start_index,
+            limit=limit,
+        )
     )
 
 
@@ -384,7 +413,7 @@ def build_target_delete(
     name: str,
     branch: str = "main",
 ) -> dict[str, object]:
-    """Delete one named target in a new immutable revision."""
+    """Delete one named target in a new revision."""
 
     return _result(lambda: build_targets().delete(project, branch, name))
 
