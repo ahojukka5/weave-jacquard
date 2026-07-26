@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -10,13 +12,47 @@ from weave_frontend.build_discovery import (
     BUILD_LIST_FORMAT,
     BuildDiscoveryService,
 )
+from weave_frontend.compiler_artifacts import BUILD_KEY_FORMAT
 from weave_frontend.errors import NotFoundError, ValidationError
 
 
+class _Cursor:
+    def __init__(self, row: dict[str, str] | None) -> None:
+        self.row = row
+
+    def fetchone(self) -> dict[str, str] | None:
+        return self.row
+
+
+class _Connection:
+    def __init__(self, workspace: _Workspace) -> None:
+        self.workspace = workspace
+
+    def execute(self, statement: str, parameters: tuple[str, str]) -> _Cursor:
+        assert "SELECT r.root_hash" in statement
+        revision_id, project = parameters
+        root_hash = self.workspace.revisions.get((project, revision_id))
+        return _Cursor(None if root_hash is None else {"root_hash": root_hash})
+
+
+class _Database:
+    def __init__(self, workspace: _Workspace) -> None:
+        self.connection = _Connection(workspace)
+
+
 class _Workspace:
-    def __init__(self) -> None:
+    def __init__(self, manifests: list[dict[str, Any]]) -> None:
         self.projects = {"demo", "other"}
         self.calls: list[str] = []
+        self.revisions: dict[tuple[str, str], str] = {}
+        for manifest in manifests:
+            project = manifest.get("project")
+            revision_id = manifest.get("revision_id")
+            revision_hash = manifest.get("revision_hash")
+            if all(isinstance(value, str) for value in (project, revision_id, revision_hash)):
+                self.projects.add(str(project))
+                self.revisions[(str(project), str(revision_id))] = str(revision_hash)
+        self.db = _Database(self)
 
     def project_id(self, project: str) -> str:
         self.calls.append(project)
@@ -33,7 +69,7 @@ class _Bridge:
         failures: dict[str, Exception] | None = None,
     ) -> None:
         self.build_root = build_root
-        self.workspace = _Workspace()
+        self.workspace = _Workspace(list(manifests.values()))
         self.manifests = manifests
         self.failures = failures or {}
         self.calls: list[str] = []
@@ -56,21 +92,23 @@ def _manifest(
     project: str = "demo",
     branch: str = "main",
     revision_id: str = "revision-1",
+    revision_hash: str = "a" * 64,
     status: str = "succeeded",
     document: str = "main.weave",
     documents: list[str] | None = None,
     target: str = "native",
+    build_key_format: str = "legacy-test-build-key-v1",
 ) -> dict[str, Any]:
     selected_documents = documents or [document]
     return {
         "format": "weave-frontend-build-manifest-v2",
-        "build_key_format": "weave-build-key-v4",
+        "build_key_format": build_key_format,
         "build_id": build_id,
         "status": status,
         "project": project,
         "branch": branch,
         "revision_id": revision_id,
-        "revision_hash": "a" * 64,
+        "revision_hash": revision_hash,
         "document": document,
         "documents": selected_documents,
         "target": target,
@@ -84,6 +122,67 @@ def _manifest(
             "executable": "program" if status == "succeeded" else None,
         },
     }
+
+
+def _current_manifest(
+    *,
+    project: str = "demo",
+    branch: str = "main",
+    revision_id: str = "revision-current",
+    revision_hash: str = "a" * 64,
+    documents: list[str] | None = None,
+    target: str = "native",
+) -> tuple[str, dict[str, Any]]:
+    selected_documents = documents or ["main.weave"]
+    source_entries: list[dict[str, str]] = []
+    key_documents: list[dict[str, str]] = []
+    artifact_hashes: dict[str, str] = {}
+    for index, document in enumerate(selected_documents):
+        relative = f"sources/{index:04d}-{document}"
+        source_hash = hashlib.sha256(f"{index}:{document}".encode()).hexdigest()
+        source_entries.append(
+            {
+                "document": document,
+                "source": relative,
+                "node_map": f"source-maps/{index:04d}-{document}.json",
+                "source_sha256": source_hash,
+            }
+        )
+        key_documents.append(
+            {"document": document, "source_sha256": source_hash}
+        )
+        artifact_hashes[relative] = source_hash
+
+    payload = {
+        "format": BUILD_KEY_FORMAT,
+        "revision_hash": revision_hash,
+        "revision_id": revision_id,
+        "documents": key_documents,
+        "compiler_sha256": "b" * 64,
+        "target": target,
+    }
+    build_id = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()[:32]
+    manifest = _manifest(
+        build_id,
+        project=project,
+        branch=branch,
+        revision_id=revision_id,
+        revision_hash=revision_hash,
+        document=selected_documents[0],
+        documents=selected_documents,
+        target=target,
+        build_key_format=BUILD_KEY_FORMAT,
+    )
+    manifest.update(
+        {
+            "source_sha256": key_documents[0]["source_sha256"],
+            "sources": source_entries,
+            "artifact_sha256": artifact_hashes,
+        }
+    )
+    return build_id, manifest
 
 
 def _candidate(root: Path, build_id: str) -> None:
@@ -145,6 +244,8 @@ def test_discovery_pages_verified_candidates_and_preserves_catalog(tmp_path: Pat
     assert first["has_more"] is True
     assert first["next_after_build_id"] == build_ids[1]
     assert first["builds"][0]["build_id"] == build_ids[0]
+    assert first["builds"][0]["revision_provenance_verified"] is True
+    assert first["builds"][0]["build_key_verified"] is False
     assert first["builds"][0]["executable_available"] is True
     assert "artifact_paths" not in first["builds"][0]
     assert "build_directory" not in first["builds"][0]
@@ -216,6 +317,78 @@ def test_discovery_filters_verified_summaries(tmp_path: Path) -> None:
     assert result["builds"][0]["documents"] == ["lib.weave", "support.weave"]
 
 
+def test_current_build_key_and_revision_provenance_are_verified(tmp_path: Path) -> None:
+    build_id, manifest = _current_manifest(documents=["main.weave", "lib.weave"])
+    _candidate(tmp_path, build_id)
+    bridge = _Bridge(tmp_path, {build_id: manifest})
+
+    result = BuildDiscoveryService(bridge).page("demo")
+
+    assert result["returned_count"] == 1
+    assert result["builds"][0]["revision_provenance_verified"] is True
+    assert result["builds"][0]["build_key_format"] == BUILD_KEY_FORMAT
+    assert result["builds"][0]["build_key_verified"] is True
+
+
+def test_discovery_rejects_tampered_current_build_key(tmp_path: Path) -> None:
+    build_id, manifest = _current_manifest()
+    manifest["target"] = "wasm32-wasi"
+    _candidate(tmp_path, build_id)
+
+    result = BuildDiscoveryService(_Bridge(tmp_path, {build_id: manifest})).page(
+        "demo"
+    )
+
+    assert result["builds"] == []
+    assert result["rejected_builds"] == [
+        {"build_id": build_id, "code": "BUILD_KEY_MISMATCH"}
+    ]
+
+
+def test_discovery_rejects_tampered_source_metadata(tmp_path: Path) -> None:
+    build_id, manifest = _current_manifest()
+    source_path = manifest["sources"][0]["source"]
+    manifest["artifact_sha256"][source_path] = "c" * 64
+    _candidate(tmp_path, build_id)
+
+    result = BuildDiscoveryService(_Bridge(tmp_path, {build_id: manifest})).page(
+        "demo"
+    )
+
+    assert result["builds"] == []
+    assert result["rejected_builds"] == [
+        {"build_id": build_id, "code": "BUILD_SOURCE_METADATA_MISMATCH"}
+    ]
+
+
+def test_discovery_rejects_missing_revision_provenance(tmp_path: Path) -> None:
+    build_id = _id(1)
+    manifest = _manifest(build_id)
+    _candidate(tmp_path, build_id)
+    bridge = _Bridge(tmp_path, {build_id: manifest})
+    bridge.workspace.revisions.clear()
+
+    result = BuildDiscoveryService(bridge).page("demo")
+
+    assert result["rejected_builds"] == [
+        {"build_id": build_id, "code": "BUILD_REVISION_NOT_FOUND"}
+    ]
+
+
+def test_discovery_rejects_revision_hash_mismatch(tmp_path: Path) -> None:
+    build_id = _id(1)
+    manifest = _manifest(build_id)
+    _candidate(tmp_path, build_id)
+    bridge = _Bridge(tmp_path, {build_id: manifest})
+    bridge.workspace.revisions[("demo", "revision-1")] = "c" * 64
+
+    result = BuildDiscoveryService(bridge).page("demo")
+
+    assert result["rejected_builds"] == [
+        {"build_id": build_id, "code": "BUILD_REVISION_HASH_MISMATCH"}
+    ]
+
+
 def test_discovery_rejects_changed_catalog_membership(tmp_path: Path) -> None:
     first_id = _id(1)
     _candidate(tmp_path, first_id)
@@ -263,6 +436,7 @@ def test_discovery_rejects_invalid_summary_without_returning_it(tmp_path: Path) 
         ({"branch": ""}, "INVALID_BUILD_LIST_FILTER"),
         ({"start_after_build_id": "bad"}, "INVALID_BUILD_LIST_CURSOR"),
         ({"catalog_id": "bad"}, "INVALID_BUILD_CATALOG_ID"),
+        ({"catalog_id": 3}, "INVALID_BUILD_CATALOG_ID"),
     ],
 )
 def test_discovery_validates_requests(
