@@ -230,9 +230,10 @@ def test_checkpoint_reader_rejects_tampered_document(tmp_path: Path) -> None:
         _, revision_id = workspace.initialize("demo")
         registry = AgentCheckpointRegistry(workspace)
         checkpoint = _checkpoint(registry, revision_id)
+        tampered_body = '{"format":"weave-agent-checkpoint-v1","objective":"tampered"}'
         workspace.db.connection.execute(
             "UPDATE documents SET body = ? WHERE id = ?",
-            ('{"format":"weave-agent-checkpoint-v1","objective":"tampered"}', checkpoint["checkpoint_id"]),
+            (tampered_body, checkpoint["checkpoint_id"]),
         )
         workspace.db.connection.commit()
 
