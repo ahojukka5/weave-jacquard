@@ -5,6 +5,8 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any
 
+from .checkpoint_resume_snapshot import CheckpointResumeSnapshotService
+from .mcp_agent_checkpoint import agent_checkpoints
 from .mcp_build import build_targets
 from .mcp_preflight import merge_policies
 from .mcp_resume_guidance import install_resume_guidance
@@ -16,10 +18,11 @@ from .resume_snapshot import ResumeSnapshotService
 def resume_snapshots() -> ResumeSnapshotService:
     """Return the shared bounded resume-snapshot service."""
 
-    return ResumeSnapshotService(
+    return CheckpointResumeSnapshotService(
         workspace(),
         build_targets(),
         merge_policies(),
+        agent_checkpoints(),
     )
 
 
