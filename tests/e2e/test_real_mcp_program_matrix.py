@@ -38,7 +38,7 @@ class ProgramCase:
     name: str
     expected_exit: int
     forms: tuple[Form, ...]
-    source_fragments: tuple[str, ...]
+    source_tokens: tuple[str, ...]
     llvm_fragments: tuple[str, ...]
 
 
@@ -54,7 +54,31 @@ def integer(value: int) -> Atom:
     return Atom("integer", value)
 
 
-def _entry(*body: NodeSpec) -> Form:
+def const_i32(value: int) -> Form:
+    return form("const_i32", integer(value))
+
+
+def const_i64(value: int) -> Form:
+    return form("const_i64", integer(value))
+
+
+def local(name: str) -> Form:
+    return form("local_get", sym(name))
+
+
+def param(name: str) -> Form:
+    return form("param_get", sym(name))
+
+
+def add(left: NodeSpec, right: NodeSpec) -> Form:
+    return form("add_i32", left, right)
+
+
+def increment(name: str) -> Form:
+    return form("set", sym(name), add(local(name), const_i32(1)))
+
+
+def entry(*body: NodeSpec) -> Form:
     return form(
         "entry",
         sym("main"),
@@ -64,55 +88,32 @@ def _entry(*body: NodeSpec) -> Form:
     )
 
 
-def _while_accumulator() -> ProgramCase:
+def while_accumulator() -> ProgramCase:
     return ProgramCase(
         name="while-accumulator",
         expected_exit=42,
         forms=(
-            _entry(
-                form("let", sym("i"), sym("i32"), form("const_i32", integer(0))),
-                form("let", sym("sum"), sym("i32"), form("const_i32", integer(0))),
+            entry(
+                form("let", sym("i"), sym("i32"), const_i32(0)),
+                form("let", sym("sum"), sym("i32"), const_i32(0)),
                 form(
                     "while",
-                    form(
-                        "condition",
-                        form(
-                            "lt_i32",
-                            form("local_get", sym("i")),
-                            form("const_i32", integer(7)),
-                        ),
-                    ),
+                    form("condition", form("lt_i32", local("i"), const_i32(7))),
                     form(
                         "do",
-                        form(
-                            "set",
-                            sym("sum"),
-                            form(
-                                "add_i32",
-                                form("local_get", sym("sum")),
-                                form("const_i32", integer(6)),
-                            ),
-                        ),
-                        form(
-                            "set",
-                            sym("i"),
-                            form(
-                                "add_i32",
-                                form("local_get", sym("i")),
-                                form("const_i32", integer(1)),
-                            ),
-                        ),
+                        form("set", sym("sum"), add(local("sum"), const_i32(6))),
+                        increment("i"),
                     ),
                 ),
-                form("return", form("local_get", sym("sum"))),
+                form("return", local("sum")),
             ),
         ),
-        source_fragments=("(while", "(set sum", "(local_get sum)"),
+        source_tokens=("while", "sum", "local_get"),
         llvm_fragments=("phi i32", "br i1", "add i32"),
     )
 
 
-def _multi_function_chain() -> ProgramCase:
+def multi_function_chain() -> ProgramCase:
     return ProgramCase(
         name="multi-function-chain",
         expected_exit=35,
@@ -127,18 +128,9 @@ def _multi_function_chain() -> ProgramCase:
                     "do",
                     form(
                         "return",
-                        form(
-                            "add_i32",
-                            form(
-                                "call_i32",
-                                sym("helper_double"),
-                                form("param_get", sym("x")),
-                            ),
-                            form(
-                                "call_i32",
-                                sym("helper_square"),
-                                form("param_get", sym("x")),
-                            ),
+                        add(
+                            form("call_i32", sym("helper_double"), param("x")),
+                            form("call_i32", sym("helper_square"), param("x")),
                         ),
                     ),
                 ),
@@ -152,11 +144,7 @@ def _multi_function_chain() -> ProgramCase:
                     "do",
                     form(
                         "return",
-                        form(
-                            "mul_i32",
-                            form("param_get", sym("n")),
-                            form("const_i32", integer(2)),
-                        ),
+                        form("mul_i32", param("n"), const_i32(2)),
                     ),
                 ),
             ),
@@ -169,11 +157,7 @@ def _multi_function_chain() -> ProgramCase:
                     "do",
                     form(
                         "return",
-                        form(
-                            "mul_i32",
-                            form("param_get", sym("n")),
-                            form("param_get", sym("n")),
-                        ),
+                        form("mul_i32", param("n"), param("n")),
                     ),
                 ),
             ),
@@ -186,20 +170,12 @@ def _multi_function_chain() -> ProgramCase:
                     "do",
                     form(
                         "return",
-                        form(
-                            "call_i32",
-                            sym("calculate"),
-                            form("const_i32", integer(5)),
-                        ),
+                        form("call_i32", sym("calculate"), const_i32(5)),
                     ),
                 ),
             ),
         ),
-        source_fragments=(
-            "(fn calculate",
-            "(call_i32 helper_double",
-            "(call_i32 helper_square",
-        ),
+        source_tokens=("calculate", "helper_double", "helper_square"),
         llvm_fragments=(
             "define i32 @calculate(i32 %x)",
             "call i32 @helper_double(i32 %x)",
@@ -208,25 +184,27 @@ def _multi_function_chain() -> ProgramCase:
     )
 
 
-def _memory_flow() -> ProgramCase:
-    increment_i = form(
-        "set",
-        sym("i"),
-        form(
-            "add_i32",
-            form("local_get", sym("i")),
-            form("const_i32", integer(1)),
-        ),
-    )
-    address = form(
+def memory_address() -> Form:
+    return form(
         "ptr_add",
-        form("param_get", sym("buffer")),
+        param("buffer"),
         form(
             "mul_i64",
-            form("cast_i32_to_i64", form("local_get", sym("i"))),
-            form("const_i64", integer(4)),
+            form("cast_i32_to_i64", local("i")),
+            const_i64(4),
         ),
     )
+
+
+def counted_loop(*body: NodeSpec) -> Form:
+    return form(
+        "while",
+        form("condition", form("lt_i32", local("i"), param("count"))),
+        form("do", *body, increment("i")),
+    )
+
+
+def memory_flow() -> ProgramCase:
     return ProgramCase(
         name="memory-flow",
         expected_exit=100,
@@ -243,29 +221,12 @@ def _memory_flow() -> ProgramCase:
                 form("returns", sym("void")),
                 form(
                     "do",
-                    form("let", sym("i"), sym("i32"), form("const_i32", integer(0))),
-                    form(
-                        "while",
+                    form("let", sym("i"), sym("i32"), const_i32(0)),
+                    counted_loop(
                         form(
-                            "condition",
-                            form(
-                                "lt_i32",
-                                form("local_get", sym("i")),
-                                form("param_get", sym("count")),
-                            ),
-                        ),
-                        form(
-                            "do",
-                            form(
-                                "store_i32",
-                                address,
-                                form(
-                                    "mul_i32",
-                                    form("local_get", sym("i")),
-                                    form("const_i32", integer(10)),
-                                ),
-                            ),
-                            increment_i,
+                            "store_i32",
+                            memory_address(),
+                            form("mul_i32", local("i"), const_i32(10)),
                         ),
                     ),
                     form("return_void"),
@@ -282,38 +243,16 @@ def _memory_flow() -> ProgramCase:
                 form("returns", sym("i32")),
                 form(
                     "do",
-                    form(
-                        "let",
-                        sym("sum"),
-                        sym("i32"),
-                        form("const_i32", integer(0)),
-                    ),
-                    form("let", sym("i"), sym("i32"), form("const_i32", integer(0))),
-                    form(
-                        "while",
+                    form("let", sym("sum"), sym("i32"), const_i32(0)),
+                    form("let", sym("i"), sym("i32"), const_i32(0)),
+                    counted_loop(
                         form(
-                            "condition",
-                            form(
-                                "lt_i32",
-                                form("local_get", sym("i")),
-                                form("param_get", sym("count")),
-                            ),
-                        ),
-                        form(
-                            "do",
-                            form(
-                                "set",
-                                sym("sum"),
-                                form(
-                                    "add_i32",
-                                    form("local_get", sym("sum")),
-                                    form("load_i32", address),
-                                ),
-                            ),
-                            increment_i,
+                            "set",
+                            sym("sum"),
+                            add(local("sum"), form("load_i32", memory_address())),
                         ),
                     ),
-                    form("return", form("local_get", sym("sum"))),
+                    form("return", local("sum")),
                 ),
             ),
             form(
@@ -327,13 +266,13 @@ def _memory_flow() -> ProgramCase:
                         "let",
                         sym("buffer"),
                         sym("ptr"),
-                        form("call_ptr", sym("malloc"), form("const_i64", integer(20))),
+                        form("call_ptr", sym("malloc"), const_i64(20)),
                     ),
                     form(
                         "call_void",
                         sym("write_values"),
-                        form("local_get", sym("buffer")),
-                        form("const_i32", integer(5)),
+                        local("buffer"),
+                        const_i32(5),
                     ),
                     form(
                         "let",
@@ -342,16 +281,16 @@ def _memory_flow() -> ProgramCase:
                         form(
                             "call_i32",
                             sym("sum_values"),
-                            form("local_get", sym("buffer")),
-                            form("const_i32", integer(5)),
+                            local("buffer"),
+                            const_i32(5),
                         ),
                     ),
-                    form("call_void", sym("free"), form("local_get", sym("buffer"))),
-                    form("return", form("local_get", sym("result"))),
+                    form("call_void", sym("free"), local("buffer")),
+                    form("return", local("result")),
                 ),
             ),
         ),
-        source_fragments=("(call_ptr malloc", "(store_i32", "(load_i32"),
+        source_tokens=("malloc", "store_i32", "load_i32", "free"),
         llvm_fragments=(
             "declare ptr @malloc(i64)",
             "call void @write_values(ptr",
@@ -361,16 +300,16 @@ def _memory_flow() -> ProgramCase:
     )
 
 
-CASES = (_while_accumulator(), _multi_function_chain(), _memory_flow())
+CASES = (while_accumulator(), multi_function_chain(), memory_flow())
 
 
-def _attribute(value: Any, snake_case: str, camel_case: str) -> Any:
+def attribute(value: Any, snake_case: str, camel_case: str) -> Any:
     result = getattr(value, snake_case, None)
     return result if result is not None else getattr(value, camel_case, None)
 
 
-def _payload(result: Any) -> dict[str, Any]:
-    structured = _attribute(result, "structured_content", "structuredContent")
+def payload(result: Any) -> dict[str, Any]:
+    structured = attribute(result, "structured_content", "structuredContent")
     if isinstance(structured, dict):
         return structured
     for block in getattr(result, "content", []):
@@ -386,7 +325,7 @@ def _payload(result: Any) -> dict[str, Any]:
     raise AssertionError(f"tool result did not contain a JSON object: {result!r}")
 
 
-def _server_environment(tmp_path: Path, compiler: Path) -> dict[str, str]:
+def server_environment(tmp_path: Path, compiler: Path) -> dict[str, str]:
     environment = os.environ.copy()
     python_path = str(ROOT / "src")
     if environment.get("PYTHONPATH"):
@@ -403,21 +342,21 @@ def _server_environment(tmp_path: Path, compiler: Path) -> dict[str, str]:
     return environment
 
 
-async def _call(
+async def call(
     session: ClientSession,
     trace: list[dict[str, Any]],
     name: str,
     arguments: dict[str, Any],
 ) -> Any:
     response = await session.call_tool(name, arguments=arguments)
-    payload = _payload(response)
-    trace.append({"tool": name, "arguments": arguments, "payload": payload})
-    assert _attribute(response, "is_error", "isError") is not True, payload
-    assert payload.get("ok") is True, payload
-    return payload.get("result")
+    result = payload(response)
+    trace.append({"tool": name, "arguments": arguments, "payload": result})
+    assert attribute(response, "is_error", "isError") is not True, result
+    assert result.get("ok") is True, result
+    return result.get("result")
 
 
-async def _append_node(
+async def append_node(
     session: ClientSession,
     trace: list[dict[str, Any]],
     *,
@@ -426,7 +365,7 @@ async def _append_node(
     node: NodeSpec,
 ) -> str:
     if isinstance(node, Atom):
-        created = await _call(
+        created = await call(
             session,
             trace,
             "node_add_atom",
@@ -441,7 +380,7 @@ async def _append_node(
         )
         return str(created["node_id"])
 
-    created = await _call(
+    created = await call(
         session,
         trace,
         "node_create_form",
@@ -455,7 +394,7 @@ async def _append_node(
     )
     node_id = str(created["node_id"])
     for child in node.children:
-        await _append_node(
+        await append_node(
             session,
             trace,
             project=project,
@@ -465,13 +404,13 @@ async def _append_node(
     return node_id
 
 
-def _node_count(node: NodeSpec) -> int:
+def node_count(node: NodeSpec) -> int:
     if isinstance(node, Atom):
         return 1
-    return 1 + sum(_node_count(child) for child in node.children)
+    return 1 + sum(node_count(child) for child in node.children)
 
 
-def _run_checked(command: list[str]) -> subprocess.CompletedProcess[str]:
+def run_checked(command: list[str]) -> subprocess.CompletedProcess[str]:
     completed = subprocess.run(
         command,
         check=False,
@@ -488,13 +427,14 @@ def _run_checked(command: list[str]) -> subprocess.CompletedProcess[str]:
     return completed
 
 
-async def _run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[str, Any]:
+async def run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[str, Any]:
     trace: list[dict[str, Any]] = []
     project = f"stress-{case.name}"
+    structural_nodes = sum(node_count(node) for node in case.forms)
     parameters = StdioServerParameters(
         command=sys.executable,
         args=["-m", "weave_jacquard.mcp_build"],
-        env=_server_environment(tmp_path, compiler),
+        env=server_environment(tmp_path, compiler),
         cwd=str(ROOT),
     )
 
@@ -503,12 +443,12 @@ async def _run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[s
         ClientSession(read_stream, write_stream) as session,
     ):
         initialized = await session.initialize()
-        server_info = _attribute(initialized, "server_info", "serverInfo")
+        server_info = attribute(initialized, "server_info", "serverInfo")
         assert server_info is not None
         assert server_info.name == "weave-mcp"
 
-        await _call(session, trace, "project_initialize", {"project": project})
-        program = await _call(
+        await call(session, trace, "project_initialize", {"project": project})
+        program = await call(
             session,
             trace,
             "program_create",
@@ -521,7 +461,7 @@ async def _run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[s
         )
         root_id = str(program["node_id"])
         for node in case.forms:
-            await _append_node(
+            await append_node(
                 session,
                 trace,
                 project=project,
@@ -529,7 +469,7 @@ async def _run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[s
                 node=node,
             )
 
-        rendered = await _call(
+        rendered = await call(
             session,
             trace,
             "program_render",
@@ -542,10 +482,10 @@ async def _run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[s
         )
         source = str(rendered["source"])
         assert "@n_" not in source
-        for fragment in case.source_fragments:
-            assert fragment in source
+        for token in case.source_tokens:
+            assert token in source
 
-        validated = await _call(
+        validated = await call(
             session,
             trace,
             "program_validate",
@@ -555,7 +495,7 @@ async def _run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[s
         assert validated["valid"] is True
         assert str(validated["wir"]).strip()
 
-        built = await _call(
+        built = await call(
             session,
             trace,
             "program_build",
@@ -565,7 +505,7 @@ async def _run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[s
         assert built["compiler_manifest_protocol_valid"] is True
         assert built["compiler_diagnostics_protocol_valid"] is True
 
-        inspected = await _call(
+        inspected = await call(
             session,
             trace,
             "build_get",
@@ -575,11 +515,15 @@ async def _run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[s
         executable = Path(inspected["artifact_paths"]["executable"])
         assert source_path.read_text(encoding="utf-8") == source + "\n"
 
-        history = await _call(
+        history = await call(
             session,
             trace,
             "branch_history",
-            {"project": project, "branch": "main"},
+            {
+                "project": project,
+                "branch": "main",
+                "limit": structural_nodes + 10,
+            },
         )
 
     executed = subprocess.run(
@@ -603,11 +547,11 @@ async def _run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[s
     wir_path = evidence / "program.wir"
     llvm_path = evidence / "program.ll"
     bitcode_path = evidence / "program.bc"
-    _run_checked([str(compiler), "--frontend", str(wir_path), str(canonical_path)])
-    _run_checked([str(compiler), "--backend", str(wir_path), str(llvm_path)])
+    run_checked([str(compiler), "--frontend", str(wir_path), str(canonical_path)])
+    run_checked([str(compiler), "--backend", str(wir_path), str(llvm_path)])
     llvm_as = shutil.which("llvm-as")
     assert llvm_as is not None
-    _run_checked([llvm_as, str(llvm_path), "-o", str(bitcode_path)])
+    run_checked([llvm_as, str(llvm_path), "-o", str(bitcode_path)])
 
     llvm = llvm_path.read_text(encoding="utf-8")
     assert "define i32 @main" in llvm
@@ -618,7 +562,7 @@ async def _run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[s
         "case": case.name,
         "expected_exit": case.expected_exit,
         "actual_exit": executed.returncode,
-        "node_count": sum(_node_count(node) for node in case.forms),
+        "node_count": structural_nodes,
         "tool_calls": len(trace),
         "reachable_revisions": len(history),
         "source_bytes": canonical_path.stat().st_size,
@@ -638,7 +582,7 @@ async def _run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[s
     return summary
 
 
-def _configured_compiler() -> Path:
+def configured_compiler() -> Path:
     configured = os.environ.get("WEAVEC_BIN")
     if not configured:
         pytest.skip("set WEAVEC_BIN to an executable final weavec")
@@ -657,8 +601,8 @@ def test_real_mcp_complex_program_matrix(
     case: ProgramCase,
     tmp_path: Path,
 ) -> None:
-    summary = asyncio.run(_run_case(case, tmp_path, _configured_compiler()))
+    summary = asyncio.run(run_case(case, tmp_path, configured_compiler()))
     assert summary["actual_exit"] == case.expected_exit
     assert summary["node_count"] >= 20
-    assert summary["tool_calls"] > summary["node_count"]
-    assert summary["reachable_revisions"] >= summary["node_count"] + 1
+    assert summary["tool_calls"] == summary["node_count"] + 7
+    assert summary["reachable_revisions"] == summary["node_count"] + 2
