@@ -80,6 +80,9 @@ jobs:
           mapfile -t project_merge_queue_traces < <(
             find "$base" -name project-merge-queue-trace.json -print
           )
+          mapfile -t project_merge_impact_queue_traces < <(
+            find "$base" -name project-merge-impact-queue-trace.json -print
+          )
           test "${#revision_traces[@]}" -eq 1
           test "${#node_concurrency_traces[@]}" -eq 1
           test "${#program_target_traces[@]}" -eq 1
@@ -90,6 +93,7 @@ jobs:
           test "${#checkpoint_timeline_traces[@]}" -eq 1
           test "${#project_agent_status_traces[@]}" -eq 1
           test "${#project_merge_queue_traces[@]}" -eq 1
+          test "${#project_merge_impact_queue_traces[@]}" -eq 1
           cp "${revision_traces[0]}" qualification/revision-reads-trace.json
           cp "${node_concurrency_traces[0]}" \
             qualification/single-node-concurrency-trace.json
@@ -109,6 +113,8 @@ jobs:
             qualification/project-agent-status-trace.json
           cp "${project_merge_queue_traces[0]}" \
             qualification/project-merge-queue-trace.json
+          cp "${project_merge_impact_queue_traces[0]}" \
+            qualification/project-merge-impact-queue-trace.json
 
       - name: Upload CI qualification evidence
         uses: actions/upload-artifact@v4
