@@ -190,7 +190,7 @@ def test_read_and_write_help_expose_policy_and_build_tools() -> None:
     assert "branch_merge_validate_affected" in read_tools
     assert "aggregate" in read_tools["branch_merge_validate_affected"]
     assert "build_list_page" in read_tools
-    assert "at most 200" in read_tools["build_list_page"]
+    assert "up to 200" in read_tools["build_list_page"]
     assert "build_get" in read_tools["build_list_page"]
     assert "merge_policy_set" in write_tools
     assert "directly on the branch" in write_tools["merge_policy_set"]
