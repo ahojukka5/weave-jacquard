@@ -1,51 +1,51 @@
-# Agent-native Weave frontend architecture
+# Jacquard architecture
 
 ## 1. Thesis
 
 A coding agent should not have to emit and maintain a complete source file.
-Instead, it should operate on a versioned program tree through a compact tool
-surface:
+Instead, it operates on a versioned program tree through a compact tool surface:
 
 ```text
-DISCOVER → INSPECT → MUTATE → VALIDATE → TEST → COMMIT → MERGE
+DISCOVER → INSPECT → MUTATE → VALIDATE → BUILD → TEST → MERGE
 ```
 
-The environment owns syntax, stable identities, scope, revision history, and
-transactional safety. The model concentrates on local algorithmic decisions.
-
-The authoritative editing representation is a versioned abstract syntax tree in
-a database. Surface Weave, WIR, LLVM IR, and native objects are deterministic
-derivatives. The canonical language implementation and completed-program
-validator is [`weavec`](https://github.com/ahojukka5/weavec).
+Jacquard owns syntax-tree identity, immutable revisions, transactional safety,
+canonical source materialization, and build provenance. The agent concentrates
+on local algorithmic decisions. The authoritative language implementation and
+native compiler remains [`weavec`](https://github.com/ahojukka5/weavec).
 
 ## 2. Program structure
 
-An S-expression is an ordered rooted n-ary tree. A first-child/next-sibling
-encoding may implement it in memory, but that encoding is not the semantic
-model. The database stores immutable snapshots and stable node IDs.
+An S-expression is an ordered rooted n-ary tree. The database stores immutable
+snapshots and stable node IDs.
 
 ```text
 workspace
 └── project
     ├── program documents
-    ├── modules and functions
+    ├── named build targets
     ├── contracts and design context
     ├── branches
-    └── immutable revisions
+    ├── immutable revisions
+    └── verified build artifacts
 ```
+
+Surface Weave, WIR, LLVM IR, bitcode, objects, and native executables are
+derivatives of a pinned program revision.
 
 ## 3. Agent API
 
-The intended MCP surface is deliberately small.
-
 ### Discovery and inspection
 
+- `weave_help`
 - `grammar_help`
 - `program_list`
+- `program_source_list`
 - `program_render`
 - `node_find`
 - `node_inspect`
 - `context_get`
+- `build_get`
 
 ### Mutation
 
@@ -57,23 +57,61 @@ The intended MCP surface is deliberately small.
 - `node_move`
 - `node_wrap`
 - `node_delete`
+- `node_apply_batch`
 - `context_add`
 
-### Verification and history
+### Verification, build, and history
 
 - `program_validate`
+- `program_build`
+- `build_target_set`
+- `build_target_list`
+- `build_target_get`
+- `build_target_delete`
+- `build_target_validate`
+- `build_target_build`
 - `branch_create`
 - `branch_list`
 - `branch_history`
 - `branch_merge`
 
-The MCP server is a transport layer over the same workspace services used by the
-Python API.
+The MCP server is a transport layer over the same workspace and compiler-bridge
+services used by the Python implementation.
 
-## 4. Validation and incomplete programs
+## 4. Structural write modes
 
-Every persisted mutation must preserve structural validity. A failed operation
-returns a structured error and does not advance the branch head.
+Jacquard supports two complementary write modes.
+
+### Single-node edits
+
+Use one-node tools while exploring, repairing, or making a decision that should
+be inspected immediately. Each successful call publishes one immutable
+revision.
+
+### Bounded edit transactions
+
+Use `node_apply_batch` after one coherent local structure is known. A batch is a
+flat ordered list of 1–256 ordinary structural operations. It may use temporary
+aliases for nodes created earlier in the same request.
+
+A batch:
+
+- pins one document at one branch head;
+- optionally checks an expected revision;
+- applies every operation in memory;
+- validates the complete resulting tree once;
+- writes one immutable snapshot;
+- records every sub-operation as an ordered audit row;
+- compare-and-set advances the branch;
+- rolls back completely on any failure.
+
+The batch interface must never become an unbounded nested AST replacement. See
+[`edit-transactions.md`](edit-transactions.md).
+
+## 5. Validation and incomplete programs
+
+Every persisted write must preserve structural validity. A failed operation or
+batch returns a structured error and does not advance the branch head.
 
 The generic S-expression layer guarantees:
 
@@ -91,26 +129,11 @@ normative completed-program check through:
 weavec --frontend output.wir input.weave
 ```
 
-The MCP environment must not maintain a second handwritten copy of the complete
-surface grammar. Until `weavec` exposes a machine-readable registry, grammar
-help is inferred from its `test/correctness/surface` corpus.
+Jacquard does not maintain a handwritten copy of the full surface grammar.
+Until `weavec` exposes a machine-readable registry, grammar guidance is inferred
+from its correctness corpus.
 
-## 5. Modules, imports, and externs
-
-An import is a semantic dependency, not textual inclusion. A production module
-reference should record:
-
-- module identity;
-- exact or compatible revision;
-- public interface hash;
-- alias and visibility;
-- target and platform constraints.
-
-An `extern` declares an ABI contract whose implementation is outside the Weave
-program. A precompiled Weave module is different: it has a known interface,
-optional semantic representation, and cached compiled artifacts.
-
-## 6. Persistence model
+## 6. Persistence and publication
 
 The prototype uses SQLite because it is embedded, transactional, portable, and
 supports rich queries over revisions and context.
@@ -123,37 +146,49 @@ revisions
 branches
 module snapshots
 operations
-documents
+context documents
 revision documents
 ```
 
-Each mutation currently creates a complete immutable snapshot. This is simple
-and auditable. A production implementation can deduplicate immutable nodes or
-modules by content hash.
+Snapshots are compressed transparently and revisions are immutable. A branch is
+a named pointer to one revision. The operation log explains how the snapshot was
+produced.
 
-### Compilation boundary
+Single-node publication uses one transaction per edit. Batched publication uses
+one transaction for the complete operation list and a compare-and-set branch
+update. Both preserve the same revision DAG and audit model; no schema migration
+is required.
 
-Compilation must not query one AST node at a time or regenerate source only to
-parse it again. The target path is:
+A production implementation may later deduplicate immutable nodes or modules by
+content hash, but measurements—not aesthetics—should drive that change.
+
+## 7. Compiler and artifact boundary
+
+Compilation resolves one explicit ordered source set from one immutable
+revision:
 
 ```text
 SQLite revision
-→ load changed module snapshot
-→ canonical semantic representation
-→ weavec compiler boundary
-→ cached object
-→ link
+→ canonical .weave sources and node maps
+→ final weavec
+→ validated manifest and diagnostics
+→ verified content-derived artifact store
 ```
 
-A future compact snapshot can contain a node array, string table, type table,
-and symbol table. The normalized representation serves agent edits; the compact
-snapshot serves compilation.
+`weavec` owns surface lowering, WIR, LLVM generation, runtime selection, object
+generation, linking, and native output. Jacquard owns revision pinning, source
+order, canonical materialization, node maps, compiler protocol validation,
+artifact hashing, cache identity, and atomic publication.
 
-## 7. History and backup
+Build artifacts are admitted only when their paths, hashes, compiler manifest,
+diagnostics protocol, source order, target, output, and requested build identity
+all agree. Concurrent candidates are serialized per build ID; an existing
+verified success wins.
 
-Revisions are immutable and form a DAG. A branch is a named pointer to a
-revision. User-facing revert normally creates a new revision so the revert is
-itself reversible.
+## 8. History and backup
+
+Revisions are immutable and form a DAG. A user-facing revert normally creates a
+new revision so the revert itself remains reversible.
 
 ```text
 R0 ── R1 ── R2
@@ -161,46 +196,38 @@ R0 ── R1 ── R2
       └── agent/bar: R4
 ```
 
-The operation log explains how each revision was produced. Snapshot plus log
-enables semantic diff, audit, merge, and reconstruction. Internal history is not
-a physical backup; production operation also requires consistent database
-backups and integrity checks.
+Internal history is not a physical backup. Production operation also requires
+consistent database backups, integrity checks, artifact retention, and orphan
+cleanup.
 
-## 8. Parallel agents
+## 9. Parallel agents and merge
 
 Every agent receives:
 
 - a base revision;
 - a private branch;
 - an edit scope;
-- pinned interfaces;
-- relevant contracts and design context;
+- pinned interfaces and context;
 - tests and acceptance criteria.
 
-Agents may read broadly but should write only inside their declared scope.
-Interfaces can exist before implementations, allowing parallel work against
-pinned contracts.
-
-## 9. Semantic three-way merge
-
-Merge compares a base revision with both branch heads.
+Merge compares a common base revision with both branch heads.
 
 - one branch changed a node and the other did not: take the change;
 - both produced identical content: take either;
 - both changed the same identity differently: conflict;
 - independent node changes: merge automatically.
 
-A text-level clean merge is insufficient. The merged program must pass
-structural validation and, when coherent, compiler validation through `weavec`.
-Later stages should also perform symbol resolution, type checking, contract
-checks, compilation, and affected tests.
+A structurally clean merge is not enough. The merged program must subsequently
+pass compiler validation and relevant tests. A future merge-preview API should
+make semantic consequences visible before committing the merge revision.
 
 ## 10. Versioned design context
 
 Contracts and architecture documents are first-class immutable objects. They
 may apply to a project, document, module, symbol, interface, test, or task.
 
-An agent receives the relevant context closure rather than the entire repository:
+An agent should receive the relevant context closure rather than the entire
+repository:
 
 ```text
 project invariants
@@ -210,30 +237,49 @@ project invariants
 + directly relevant tests
 ```
 
-Because context is pinned to revisions, later review can reproduce the rules an
-agent saw while it worked.
+Because context is pinned to revisions, review can reproduce the rules the agent
+saw while it worked.
 
-## 11. Deterministic compiler boundary
+## 11. Determinism
 
-The same validated program, language version, compiler version, target, and
-options must produce byte-identical canonical output. The active compiler chain
-is external to this repository:
+The same validated program, language version, compiler identity, target, and
+options must produce byte-identical canonical inputs and the same build key.
 
-```text
-weavec0 → weavec1 → weavec-bootstrap → weavec
-```
+Only final user-facing `weavec` is part of the public compiler contract. Bootstrap
+stages must not leak into Jacquard's API.
 
-Only the final user-facing `weavec` command is part of the MCP validation
-contract. Bootstrap stages must not leak into this repository's public API.
+## 12. Measured editing results
 
-## 12. Incremental compilation
+Real stdio MCP qualification has constructed, compiled, assembled, and executed:
 
-Artifact cache keys should include:
+- loop-carried arithmetic;
+- multi-function call chains;
+- heap-backed pointer and memory flows;
+- a 354-node binary-search workload using 361 MCP calls and 356 revisions.
+
+Those results established correctness but exposed round-trip and revision
+amplification. The bounded transaction qualification therefore constructs a
+balanced arithmetic program using:
+
+- 246 structural operations;
+- one batch write call;
+- three reachable revisions instead of the 248-revision atomic equivalent;
+- 418 total stored nodes including form-head atoms;
+- authoritative native execution with exit status 80.
+
+The transaction preserves full ordered audit evidence while reducing write calls
+by more than 99% and revision count by more than 98% for that generated case.
+Hardware-dependent elapsed time is recorded as evidence but is not a correctness
+gate.
+
+## 13. Incremental compilation
+
+Future module cache keys should include:
 
 ```text
 module implementation hash
 + dependency interface hashes
-+ compiler version
++ compiler identity
 + target triple
 + optimization settings
 ```
@@ -242,48 +288,46 @@ Changing a private implementation changes its implementation hash but not
 necessarily its public interface hash. Changing a public signature invalidates
 dependent modules.
 
-## 13. Prototype boundaries
+This should wait for real multi-module workloads and explicit interface objects.
 
-The current implementation deliberately omits:
+## 14. Remaining boundaries
 
-- direct AST-to-compiler integration;
-- a formal machine-readable grammar registry;
+Current major omissions include:
+
+- a formal machine-readable grammar and capability registry from `weavec`;
+- semantic diff and two-phase merge preview;
+- revisioned module-interface objects and dependency hashes;
+- affected-test selection;
+- sandboxed program execution tools;
 - content-addressed node deduplication;
-- ownership and borrow checking;
-- fine-grained expression-level merge;
-- executable contract checking;
 - distributed writers;
-- build, run, package, and artifact management.
+- ownership, borrow, and effect modeling beyond compiler support.
 
-These should be added only after the editing and merge experiments demonstrate
-clear value with real coding agents.
+## 15. Next milestones
 
-## 14. Next milestones
+### M1 — measured agent ergonomics
 
-### M1 — editing ergonomics
+- retain tool-order, failure, repair, and validation traces;
+- compare single-edit and coherent-batch workflows on real agents;
+- improve bounded inspection and grammar guidance from observed failures;
+- add batch preview only if trace evidence shows it is needed.
 
-- evaluate atomic tools on representative Weave programs;
-- record tool calls, validation failures, repairs, and correctness;
-- improve bounded inspection and grammar guidance.
+### M2 — compiler capability contract
 
-### M2 — canonical compiler bridge
-
-- consume a machine-readable grammar registry from `weavec` when available;
-- invoke `weavec --frontend` through the stable adapter;
-- add compile, run, and test tools around released compiler binaries;
-- cache artifacts by revision and target.
+- consume a machine-readable capability and grammar registry from `weavec`;
+- replace corpus inference without changing the MCP workflow;
+- report compiler, language, target, manifest, and diagnostics compatibility.
 
 ### M3 — robust parallel development
 
-- explicit interface objects and versions;
-- edit scopes;
 - semantic diffs and merge previews;
-- conflict diagnostics;
-- affected-test selection.
+- stale-preview protection;
+- explicit interface objects and versions;
+- edit scopes and affected-test selection.
 
-### M4 — safe systems model
+### M4 — execution and scale
 
-- arrays, slices, structs, ownership, borrows, and effects;
-- extern and precompiled module support;
-- compact binary snapshots;
-- auditable sandboxed execution.
+- sandboxed `build_run` assertions;
+- module-level incremental compilation;
+- database integrity, backup, and artifact-retention operations;
+- compact snapshots only when measurements justify them.
