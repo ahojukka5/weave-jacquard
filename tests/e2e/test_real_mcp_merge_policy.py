@@ -35,7 +35,7 @@ SOURCE = """(program
       (return
         (add_i32
           (call_i32 target_value)
-          (call_i32 source_value))))))
+          (call_i32 source_value)))))
 )
 """
 
