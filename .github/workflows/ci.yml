@@ -50,15 +50,23 @@ jobs:
             --basetemp "$base" 2>&1 | tee pytest.log
 
           mkdir -p qualification
-          mapfile -t traces < <(find "$base" -name revision-reads-trace.json -print)
-          test "${#traces[@]}" -eq 1
-          cp "${traces[0]}" qualification/revision-reads-trace.json
+          mapfile -t revision_traces < <(
+            find "$base" -name revision-reads-trace.json -print
+          )
+          mapfile -t concurrency_traces < <(
+            find "$base" -name single-node-concurrency-trace.json -print
+          )
+          test "${#revision_traces[@]}" -eq 1
+          test "${#concurrency_traces[@]}" -eq 1
+          cp "${revision_traces[0]}" qualification/revision-reads-trace.json
+          cp "${concurrency_traces[0]}" \
+            qualification/single-node-concurrency-trace.json
 
       - name: Upload CI qualification evidence
         uses: actions/upload-artifact@v4
         with:
           name: jacquard-ci-qualification
-          path: qualification/revision-reads-trace.json
+          path: qualification
           if-no-files-found: error
           retention-days: 7
 
