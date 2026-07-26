@@ -57,9 +57,9 @@ def test_clean_preview_is_deterministic_and_does_not_advance_target(
             "status": "modified",
             "before_hash": first["document_changes"][0]["before_hash"],
             "after_hash": first["document_changes"][0]["after_hash"],
-            "before_node_count": 7,
-            "after_node_count": 9,
-            "changed_node_count": 2,
+            "before_node_count": 10,
+            "after_node_count": 12,
+            "changed_node_count": 3,
             "change_kind_counts": {
                 "added": 2,
                 "child_count_changed": 1,
