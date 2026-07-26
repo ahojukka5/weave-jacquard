@@ -116,7 +116,8 @@ jobs:
           python -m pytest \
             -m real_e2e \
             tests/e2e/test_real_mcp.py \
-            --basetemp "$base"
+            --basetemp "$base" \
+            --junitxml qualification-pytest.xml
 
           source_path="$(find "$base" -type f -path '*/builds/*/sources/000-main.weave' -print -quit)"
           trace_path="$(find "$base" -type f -name qualification-trace.json -print -quit)"
@@ -127,6 +128,7 @@ jobs:
           cp "$source_path" qualification/main.weave
           cp "$trace_path" qualification/qualification-trace.json
           cp release-metadata.json qualification/weavec-release.json
+          cp qualification-pytest.xml qualification/
 
           "$WEAVEC_BIN" --frontend \
             qualification/program.wir \
@@ -141,6 +143,18 @@ jobs:
           test -s qualification/program.wir
           test -s qualification/program.ll
           test -s qualification/program.bc
+
+      - name: Upload native failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacquard-packaged-weavec-failure
+          path: |
+            qualification-pytest.xml
+            release-metadata.json
+            ${{ runner.temp }}/jacquard-native-e2e
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload qualification evidence
         uses: actions/upload-artifact@v4
