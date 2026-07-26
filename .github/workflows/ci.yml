@@ -68,12 +68,16 @@ jobs:
           mapfile -t resume_snapshot_traces < <(
             find "$base" -name resume-snapshot-trace.json -print
           )
+          mapfile -t agent_checkpoint_traces < <(
+            find "$base" -name agent-checkpoint-trace.json -print
+          )
           test "${#revision_traces[@]}" -eq 1
           test "${#node_concurrency_traces[@]}" -eq 1
           test "${#program_target_traces[@]}" -eq 1
           test "${#context_policy_traces[@]}" -eq 1
           test "${#branch_create_traces[@]}" -eq 1
           test "${#resume_snapshot_traces[@]}" -eq 1
+          test "${#agent_checkpoint_traces[@]}" -eq 1
           cp "${revision_traces[0]}" qualification/revision-reads-trace.json
           cp "${node_concurrency_traces[0]}" \
             qualification/single-node-concurrency-trace.json
@@ -85,6 +89,8 @@ jobs:
             qualification/reproducible-branch-create-trace.json
           cp "${resume_snapshot_traces[0]}" \
             qualification/resume-snapshot-trace.json
+          cp "${agent_checkpoint_traces[0]}" \
+            qualification/agent-checkpoint-trace.json
 
       - name: Upload CI qualification evidence
         uses: actions/upload-artifact@v4
