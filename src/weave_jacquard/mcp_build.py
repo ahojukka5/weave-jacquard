@@ -13,6 +13,9 @@ from weave_frontend import mcp_merge_queue_guidance as _mcp_merge_queue_guidance
 from weave_frontend import mcp_policy as _mcp_policy
 from weave_frontend import mcp_preflight as _mcp_preflight
 from weave_frontend import mcp_project_agent_status as _mcp_project_agent_status
+from weave_frontend import (
+    mcp_project_merge_impact_queue as _mcp_project_merge_impact_queue,
+)
 from weave_frontend import mcp_project_merge_queue as _mcp_project_merge_queue
 from weave_frontend import mcp_resume_snapshot as _mcp_resume_snapshot
 from weave_frontend import mcp_revision_reads as _mcp_revision_reads
@@ -30,6 +33,7 @@ _ = (
     _mcp_agent_checkpoint_timeline,
     _mcp_project_agent_status,
     _mcp_project_merge_queue,
+    _mcp_project_merge_impact_queue,
     _mcp_resume_snapshot,
     _mcp_merge_queue_guidance,
     _mcp_revision_reads,
