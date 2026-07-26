@@ -295,7 +295,10 @@ def _verify_database(tmp_path: Path) -> None:
             ("Jacquard agent checkpoint",),
         ).fetchall()
         assert len(checkpoint_documents) == 2
-        assert all("Stale checkpoint" not in str(row["body"]) for row in checkpoint_documents)
+        assert all(
+            "Stale checkpoint" not in str(row["body"])
+            for row in checkpoint_documents
+        )
 
         operations = connection.execute(
             """SELECT revision_id, payload_json
@@ -321,14 +324,26 @@ def _verify_database(tmp_path: Path) -> None:
         ).fetchone()["count"]
         assert orphan_count == 0
 
-        roots = connection.execute(
-            """SELECT r.root_hash
-               FROM revisions r
-               JOIN operations o ON o.revision_id = r.id
-               WHERE o.operation_kind IN ('create_program', 'create_agent_checkpoint')
-               ORDER BY r.created_at, r.id"""
+        state_operations = connection.execute(
+            """SELECT o.operation_kind, r.root_hash
+               FROM operations o
+               JOIN revisions r ON r.id = o.revision_id
+               WHERE o.operation_kind IN (
+                   'create_program',
+                   'create_form',
+                   'create_agent_checkpoint'
+               )
+               ORDER BY o.rowid"""
         ).fetchall()
-        assert str(roots[0]["root_hash"]) == str(roots[1]["root_hash"])
+        assert [row["operation_kind"] for row in state_operations] == [
+            "create_program",
+            "create_agent_checkpoint",
+            "create_form",
+            "create_agent_checkpoint",
+        ]
+        assert state_operations[0]["root_hash"] == state_operations[1]["root_hash"]
+        assert state_operations[2]["root_hash"] == state_operations[3]["root_hash"]
+        assert state_operations[1]["root_hash"] != state_operations[2]["root_hash"]
     finally:
         connection.close()
 
