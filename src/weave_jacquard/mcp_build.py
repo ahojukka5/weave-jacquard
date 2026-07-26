@@ -26,6 +26,9 @@ from weave_frontend import (
     mcp_selected_merge_preflight_batch as _mcp_selected_merge_preflight_batch,
 )
 from weave_frontend import (
+    mcp_selected_merge_train_preview as _mcp_selected_merge_train_preview,
+)
+from weave_frontend import (
     mcp_selected_preflight_guidance as _mcp_selected_preflight_guidance,
 )
 from weave_frontend.mcp_build import main
@@ -44,6 +47,7 @@ _ = (
     _mcp_project_merge_queue,
     _mcp_project_merge_impact_queue,
     _mcp_selected_merge_preflight_batch,
+    _mcp_selected_merge_train_preview,
     _mcp_resume_snapshot,
     _mcp_merge_queue_guidance,
     _mcp_merge_impact_queue_guidance,
