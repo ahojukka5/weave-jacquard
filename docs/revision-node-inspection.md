@@ -88,3 +88,11 @@ Historical inspection is read-only:
 A stable ID may identify different values or locations across revisions because
 editing and moving preserve identity. The explicit revision therefore remains
 part of the meaning of every historical inspection result.
+
+## Related historical reads
+
+Use [`revision-reads.md`](revision-reads.md) when the investigation needs the
+complete canonical or annotated document through `program_render`, or when an
+agent must locate stable IDs in the exact old state through `node_find`.
+`revision_diff_page` then compares the historical state with another immutable
+revision without silently switching any read to the current branch head.
