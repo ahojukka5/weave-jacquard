@@ -41,12 +41,4 @@ jobs:
         run: ruff check .
 
       - name: Test
-        id: test
-        run: pytest --cov=weave_frontend --cov-report=term-missing --junitxml=pytest-report.xml
-
-      - name: Upload pytest report
-        if: failure() && steps.test.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-report
-          path: pytest-report.xml
+        run: pytest --cov=weave_frontend --cov-report=term-missing
