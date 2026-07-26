@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from .errors import ValidationError
 from .merge_impact import MergeTargetImpactService
-from .merge_validation_set import MergeValidationSetService
+from .merge_validation_set import (
+    MAX_AFFECTED_TARGET_VALIDATIONS,
+    MergeValidationSetService,
+)
 
 MERGE_PREFLIGHT_FORMAT = "weave-merge-preflight-v1"
 MAX_PREFLIGHT_IMPACT_TARGETS = 200
@@ -18,9 +22,11 @@ class MergePreflightService:
         self,
         impacts: MergeTargetImpactService,
         validation_sets: MergeValidationSetService,
+        policies: Any | None = None,
     ) -> None:
         self.impacts = impacts
         self.validation_sets = validation_sets
+        self.policies = policies
 
     def run(
         self,
@@ -32,6 +38,27 @@ class MergePreflightService:
         allow_uncovered_documents: bool = False,
     ) -> dict[str, Any]:
         """Return a bounded exact-candidate review artifact without mutation."""
+
+        policy_context = (
+            self.policies.compare(project, target_branch, source_branch)
+            if self.policies is not None
+            else None
+        )
+        target_policy = policy_context["target"] if policy_context is not None else None
+        if (
+            allow_uncovered_documents
+            and target_policy is not None
+            and target_policy["allow_uncovered_documents"] is not True
+        ):
+            raise ValidationError(
+                "MERGE_POLICY_VIOLATION",
+                "target merge policy forbids uncovered-document overrides",
+            )
+        max_target_validations = (
+            int(target_policy["max_affected_targets"])
+            if target_policy is not None
+            else MAX_AFFECTED_TARGET_VALIDATIONS
+        )
 
         impact = self.impacts.page(
             project,
@@ -47,6 +74,7 @@ class MergePreflightService:
             source_branch,
             preview_id=str(impact["preview_id"]),
             allow_uncovered_documents=allow_uncovered_documents,
+            max_target_validations=max_target_validations,
         )
         impact_summary = {
             key: impact[key]
@@ -66,14 +94,6 @@ class MergePreflightService:
                 "affected_targets",
             )
         }
-        publication_arguments = {
-            "project": project,
-            "target_branch": target_branch,
-            "source_branch": source_branch,
-            "preview_id": impact["preview_id"],
-            "validate_affected_targets": True,
-            "allow_uncovered_documents": allow_uncovered_documents,
-        }
         identity_payload = {
             "format": MERGE_PREFLIGHT_FORMAT,
             "project": project,
@@ -88,11 +108,35 @@ class MergePreflightService:
             "impact_truncated": impact["has_more"],
             "validation_set_id": validation_set["validation_set_id"],
             "allow_uncovered_documents": allow_uncovered_documents,
+            "target_policy_hash": (
+                target_policy["policy_hash"] if target_policy is not None else None
+            ),
+            "source_policy_hash": (
+                policy_context["source"]["policy_hash"]
+                if policy_context is not None
+                else None
+            ),
+            "source_policy_ignored": (
+                policy_context["source_policy_ignored"]
+                if policy_context is not None
+                else False
+            ),
         }
         preflight_id = self.validation_sets.validations.workspace.db.hash_value(
             identity_payload
         )
-        return {
+        publication_arguments = {
+            "project": project,
+            "target_branch": target_branch,
+            "source_branch": source_branch,
+            "preview_id": impact["preview_id"],
+            "validate_affected_targets": True,
+            "allow_uncovered_documents": allow_uncovered_documents,
+        }
+        if policy_context is not None:
+            publication_arguments["preflight_id"] = preflight_id
+
+        result = {
             "format": MERGE_PREFLIGHT_FORMAT,
             "preflight_id": preflight_id,
             "project": project,
@@ -111,3 +155,14 @@ class MergePreflightService:
             "publication_tool": "branch_merge",
             "publication_arguments": publication_arguments,
         }
+        if policy_context is not None:
+            result.update(
+                {
+                    "target_merge_policy": policy_context["target"],
+                    "source_merge_policy": policy_context["source"],
+                    "source_policy_ignored": policy_context[
+                        "source_policy_ignored"
+                    ],
+                }
+            )
+        return result
