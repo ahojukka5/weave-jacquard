@@ -188,13 +188,12 @@ def test_snapshot_view_preserves_transactional_insert_update_delete(tmp_path):
             "SELECT ast_json FROM module_snapshots"
         ).fetchone()[0]
 
-        with pytest.raises(RuntimeError):
-            with database.transaction() as connection:
-                connection.execute(
-                    "DELETE FROM module_snapshots WHERE revision_id = ?",
-                    (revision_id,),
-                )
-                raise RuntimeError("rollback")
+        with pytest.raises(RuntimeError), database.transaction() as connection:
+            connection.execute(
+                "DELETE FROM module_snapshots WHERE revision_id = ?",
+                (revision_id,),
+            )
+            raise RuntimeError("rollback")
         assert database.connection.execute(
             "SELECT count(*) FROM module_snapshots"
         ).fetchone()[0] == 1

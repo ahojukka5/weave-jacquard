@@ -6,7 +6,6 @@ from pathlib import Path
 from weave_frontend.compiler_bridge import CompilerBridge
 from weave_frontend.sexpr_service import SExpressionWorkspace
 
-
 PROGRAM = """(program
   (name \"demo\")
   (version \"0.1\")

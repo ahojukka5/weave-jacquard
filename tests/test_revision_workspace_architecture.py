@@ -8,7 +8,6 @@ import weave_frontend.service as service_module
 from weave_frontend.service import MergeResult, RevisionWorkspace
 from weave_frontend.sexpr_service import SExpressionWorkspace
 
-
 _TYPED_METHODS = {
     "add_import",
     "create_function",

@@ -15,7 +15,6 @@ from uuid import uuid4
 
 from .errors import ValidationError
 
-
 BUILD_KEY_FORMAT = "weave-build-key-v4"
 
 

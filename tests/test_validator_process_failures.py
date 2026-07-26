@@ -4,7 +4,6 @@ from pathlib import Path
 
 from weave_frontend.weavec import WeavecValidator
 
-
 PROGRAM = '(program (name "demo") (version "0.1"))\n'
 
 

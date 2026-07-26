@@ -12,7 +12,6 @@ import pytest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED_TOOLS = {
     "project_initialize",
@@ -276,7 +275,7 @@ async def _run_stdio_qualification(
 
         listed = await session.list_tools()
         names = {tool.name for tool in listed.tools}
-        assert EXPECTED_TOOLS <= names
+        assert names >= EXPECTED_TOOLS
 
         source = await _construct_constant_program(
             session,

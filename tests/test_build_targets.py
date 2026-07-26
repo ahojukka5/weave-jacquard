@@ -9,7 +9,6 @@ from weave_frontend.build_targets import BuildTargetRegistry
 from weave_frontend.errors import ConflictError, NotFoundError, ValidationError
 from weave_frontend.sexpr_service import SExpressionWorkspace
 
-
 MAIN = """(program
   (name "main")
   (version "0.1")

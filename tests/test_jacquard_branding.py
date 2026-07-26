@@ -6,7 +6,6 @@ from pathlib import Path
 import weave_jacquard
 from weave_frontend import SExpressionWorkspace
 
-
 ROOT = Path(__file__).parents[1]
 
 

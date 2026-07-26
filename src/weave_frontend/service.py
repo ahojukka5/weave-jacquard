@@ -18,7 +18,6 @@ from uuid import uuid4
 from .database import Database
 from .errors import ConflictError, NotFoundError
 
-
 JsonObject = dict[str, Any]
 
 
