@@ -22,6 +22,9 @@ from weave_frontend import (
 from weave_frontend import mcp_project_merge_queue as _mcp_project_merge_queue
 from weave_frontend import mcp_resume_snapshot as _mcp_resume_snapshot
 from weave_frontend import mcp_revision_reads as _mcp_revision_reads
+from weave_frontend import (
+    mcp_selected_merge_preflight_batch as _mcp_selected_merge_preflight_batch,
+)
 from weave_frontend.mcp_build import main
 
 _ = (
@@ -37,6 +40,7 @@ _ = (
     _mcp_project_agent_status,
     _mcp_project_merge_queue,
     _mcp_project_merge_impact_queue,
+    _mcp_selected_merge_preflight_batch,
     _mcp_resume_snapshot,
     _mcp_merge_queue_guidance,
     _mcp_merge_impact_queue_guidance,
