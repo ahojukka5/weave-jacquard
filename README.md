@@ -1,8 +1,8 @@
 # Jacquard
 
 **Jacquard is the agent-native programming environment for Weave.** Coding
-agents edit a versioned S-expression tree through small MCP operations instead
-of repeatedly replacing complete source files.
+agents edit a versioned S-expression tree through structural MCP operations
+instead of repeatedly replacing complete source files.
 
 The name refers to the Jacquard loom: a programmable mechanism that turns a
 stored pattern into coordinated weaving operations. Here, agents modify the
@@ -17,7 +17,7 @@ Primary executables: **`weave-mcp`** and **`weave-build`**
 
 Jacquard owns:
 
-- atomic form and atom edits with stable node identities;
+- single-node and bounded transactional edits with stable node identities;
 - immutable revisions, parallel branches, and structural three-way merge;
 - project-, document-, and symbol-scoped context;
 - compiler-corpus-backed grammar help;
@@ -89,7 +89,8 @@ Single-document program:
 project_initialize
 → program_create / program_import
 → grammar_help
-→ atomic node edits
+→ single-node edits while exploring
+→ node_apply_batch for a coherent known structure
 → node_inspect
 → program_validate
 → branch_merge
@@ -102,7 +103,7 @@ Multi-document program:
 ```text
 program_source_list
 → build_target_set
-→ atomic source edits
+→ structural source edits
 → build_target_validate
 → branch_merge
 → build_target_build
@@ -112,6 +113,11 @@ program_source_list
 A target definition and every selected source are resolved from one immutable
 revision. The primary document is first and additional documents retain their
 stored order.
+
+`node_apply_batch` accepts a flat list of up to 256 existing structural
+operations. Temporary `@aliases` refer to nodes created earlier in the same
+request. The complete batch publishes as one revision or rolls back; existing
+single-node tools remain available for uncertain edits and repairs.
 
 ## Compiler boundary
 
@@ -180,8 +186,10 @@ current product.
 
 ## Revision storage
 
-Each mutation creates an immutable revision. Snapshot JSON uses an adaptive,
-versioned BLOB representation:
+Each successful single-node write creates one immutable revision. A bounded
+transaction records every ordered sub-operation while publishing one immutable
+revision for the complete batch. Snapshot JSON uses an adaptive, versioned BLOB
+representation:
 
 - `WJZ1` for zlib-compressed canonical JSON;
 - `WJR1` when raw canonical JSON is smaller.
@@ -212,16 +220,18 @@ Failures are emitted as structured JSON on stderr with exit status 2.
   `build_target_get`, `build_target_delete`, `build_target_validate`,
   `build_target_build`
 - **Build inspection:** `build_get`
-- **Atomic editing:** `node_create_form`, `node_add_atom`, `node_set_atom`,
+- **Single-node editing:** `node_create_form`, `node_add_atom`, `node_set_atom`,
   `node_move`, `node_wrap`, `node_delete`
+- **Transactional editing:** `node_apply_batch`
 - **Inspection:** `node_inspect`, `node_find`
 - **Context:** `context_add`, `context_get`
 
 ## Further documentation
 
 - [Architecture](docs/architecture.md)
+- [MCP tool reference](docs/mcp.md)
+- [Transactional structural edits](docs/edit-transactions.md)
 - [Compiler bridge](docs/compiler-bridge.md)
 - [Revisioned build targets](docs/build-targets.md)
 - [Target validation](docs/target-validation.md)
 - [Snapshot storage](docs/snapshot-storage.md)
-- [MCP tool reference](docs/mcp.md)
