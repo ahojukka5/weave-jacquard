@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -11,12 +12,16 @@ from weave_frontend.errors import ValidationError
 
 
 class _Bridge:
-    def __init__(self, diagnostics: Path) -> None:
+    def __init__(self, diagnostics: Path, expected_sha256: str | None = None) -> None:
         self.diagnostics = diagnostics
+        self.expected_sha256 = expected_sha256
         self.calls: list[str] = []
 
     def get(self, build_id: str) -> dict[str, Any]:
         self.calls.append(build_id)
+        expected = self.expected_sha256 or hashlib.sha256(
+            self.diagnostics.read_bytes()
+        ).hexdigest()
         return {
             "build_id": build_id,
             "status": "failed",
@@ -26,6 +31,8 @@ class _Bridge:
             "document": "main.weave",
             "documents": ["main.weave"],
             "returncode": 11,
+            "artifacts": {"diagnostics": "diagnostics.json"},
+            "artifact_sha256": {"diagnostics.json": expected},
             "artifact_paths": {"diagnostics": str(self.diagnostics)},
         }
 
@@ -157,12 +164,10 @@ def test_diagnostics_page_rejects_invalid_limit(tmp_path: Path, value: Any) -> N
 
 def test_diagnostics_page_rejects_invalid_format_and_entries(tmp_path: Path) -> None:
     diagnostics = tmp_path / "diagnostics.json"
-    bridge = _Bridge(diagnostics)
-    service = BuildInspectionService(bridge)
 
     diagnostics.write_text('{"format":"other","entries":[]}\n', encoding="utf-8")
     with pytest.raises(ValidationError) as format_error:
-        service.diagnostics_page("e" * 32)
+        BuildInspectionService(_Bridge(diagnostics)).diagnostics_page("e" * 32)
     assert format_error.value.code == "INVALID_BUILD_DIAGNOSTICS"
 
     diagnostics.write_text(
@@ -170,5 +175,23 @@ def test_diagnostics_page_rejects_invalid_format_and_entries(tmp_path: Path) -> 
         encoding="utf-8",
     )
     with pytest.raises(ValidationError) as entries_error:
-        service.diagnostics_page("e" * 32)
+        BuildInspectionService(_Bridge(diagnostics)).diagnostics_page("e" * 32)
     assert entries_error.value.code == "INVALID_BUILD_DIAGNOSTICS"
+
+
+def test_diagnostics_page_rejects_bytes_changed_after_verification(
+    tmp_path: Path,
+) -> None:
+    diagnostics = tmp_path / "diagnostics.json"
+    _write_diagnostics(diagnostics, _entries(1))
+    original_sha256 = hashlib.sha256(diagnostics.read_bytes()).hexdigest()
+    diagnostics.write_text(
+        '{"format":"weave-build-diagnostics-v1","entries":[]}\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError) as captured:
+        BuildInspectionService(
+            _Bridge(diagnostics, expected_sha256=original_sha256)
+        ).diagnostics_page("f" * 32)
+    assert captured.value.code == "CORRUPT_BUILD_ARTIFACT"
