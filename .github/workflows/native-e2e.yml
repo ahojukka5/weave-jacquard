@@ -123,6 +123,7 @@ jobs:
             tests/e2e/test_real_mcp_compiler_repair.py \
             tests/e2e/test_real_mcp_revision_inspection.py \
             tests/e2e/test_real_mcp_revision_diff.py \
+            tests/e2e/test_real_mcp_merge_preview.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
@@ -199,6 +200,26 @@ jobs:
           assert diff_pages[0]["payload"]["result"]["total_change_count"] == 5
           assert diff_pages[0]["payload"]["result"]["target_revision_is_branch_head"] is True
           assert diff_pages[3]["payload"]["result"]["target_revision_is_branch_head"] is False
+
+          preview_traces = list(base.rglob("merge-preview-trace.json"))
+          assert len(preview_traces) == 1, preview_traces
+          preview_trace = json.loads(preview_traces[0].read_text(encoding="utf-8"))
+          previews = [
+              entry for entry in preview_trace if entry["tool"] == "branch_merge_preview"
+          ]
+          merges = [
+              entry for entry in preview_trace if entry["tool"] == "branch_merge"
+          ]
+          assert len(previews) == 3
+          assert len(merges) == 3
+          assert previews[0]["payload"]["result"]["mergeable"] is True
+          assert previews[0]["payload"]["result"]["document_changes"][0][
+              "changed_node_count"
+          ] == 3
+          assert merges[0]["payload"]["result"]["preview_enforced"] is True
+          assert merges[1]["payload"]["error"]["code"] == "STALE_MERGE_PREVIEW"
+          assert previews[2]["payload"]["result"]["mergeable"] is False
+          assert merges[2]["payload"]["error"]["code"] == "MERGE_CONFLICT"
 
           output = Path("qualification/program-matrix-summary.json")
           output.write_text(
