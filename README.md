@@ -98,6 +98,7 @@ project_initialize
 → program_build
 → build_get
 → build_diagnostics_page when the build failed
+→ node_inspect(revision_id = failed revision) before repair
 ```
 
 Multi-document program:
@@ -111,6 +112,7 @@ program_source_list
 → build_target_build
 → build_get
 → build_diagnostics_page when the build failed
+→ node_inspect(revision_id = failed revision) before repair
 ```
 
 A target definition and every selected source are resolved from one immutable
@@ -131,7 +133,9 @@ and edit-grouping metrics without changing history.
 For failed builds, `build_diagnostics_page` returns exact mapped diagnostics in
 bounded pages after verifying the immutable build and the bytes being read. An
 agent can follow a returned stable `node_id` without opening files on the MCP
-server machine.
+server machine. Passing the returned build `revision_id` to `node_inspect`
+reproduces the exact failing subtree even after the branch has advanced. Without
+`revision_id`, the same tool continues to inspect the current branch head.
 
 ## Compiler boundary
 
@@ -250,6 +254,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - [Transactional structural edits](docs/edit-transactions.md)
 - [Branch activity observability](docs/branch-activity.md)
 - [Build diagnostic inspection](docs/build-diagnostics.md)
+- [Revision-pinned node inspection](docs/revision-node-inspection.md)
 - [Compiler bridge](docs/compiler-bridge.md)
 - [Revisioned build targets](docs/build-targets.md)
 - [Target validation](docs/target-validation.md)
