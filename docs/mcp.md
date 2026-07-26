@@ -51,10 +51,26 @@ sources never include annotations. Each materialized source receives a separate
 - `project_initialize`: create a project, initial revision, and `main` branch.
 - `branch_create`: create a branch from another branch head.
 - `branch_list`: list branches and immutable head revisions.
-- `branch_history`: follow first-parent history.
+- `branch_history`: compact first-parent history read retained for compatibility.
+- `branch_history_page`: read bounded first-parent pages with an explicit
+  continuation and ordered operation metadata.
+- `branch_activity_summary`: measure complete first-parent revision, operation,
+  merge, author, and edit-grouping activity.
 - `branch_merge`: perform stable-ID three-way merge.
 
 Incompatible edits produce a conflict and do not advance the target branch.
+
+`branch_history_page` accepts page sizes from 1 to 200. Begin without a start
+revision; when `has_more` is true, pass `next_revision_id` as the next
+`start_revision_id`. A continuation must be reachable from the selected branch
+head. Compare `branch_head_revision_id` between pages when a stable multi-page
+read is required.
+
+`branch_activity_summary` reports descriptive workflow metrics, including
+single- and multi-operation revisions and the number of revisions avoided by
+operation grouping. These metrics should guide ergonomics work, not encourage
+agents to maximize batch size. See
+[`branch-activity.md`](branch-activity.md) for exact definitions.
 
 ## Program documents
 
