@@ -262,7 +262,7 @@ async def _run_stdio_qualification(
         command=sys.executable,
         args=["-m", "weave_jacquard.mcp_build"],
         env=_server_environment(tmp_path, compiler),
-        cwd=ROOT,
+        cwd=str(ROOT),
     )
 
     async with stdio_client(parameters) as (read_stream, write_stream):
