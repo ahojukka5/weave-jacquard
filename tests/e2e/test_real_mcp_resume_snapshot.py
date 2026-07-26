@@ -18,6 +18,7 @@ LIBRARY = """(program
   (name \"resume-library\")
   (version \"0.1\"))
 """
+SUPPORT = LIBRARY.replace('name "resume-library"', 'name "resume-support"')
 
 
 def _attribute(value: Any, snake: str, camel: str) -> Any:
@@ -117,6 +118,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             "revision_id",
             "document_limit",
             "target_limit",
+            "target_source_limit",
             "context_limit",
             "branch_limit",
             "history_limit",
@@ -143,6 +145,16 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             source=LIBRARY,
             expected_revision_id=program["revision_id"],
         )
+        support = await _call(
+            session,
+            trace,
+            "program_import",
+            project=PROJECT,
+            branch="main",
+            document="support.weave",
+            source=SUPPORT,
+            expected_revision_id=library["revision_id"],
+        )
         target = await _call(
             session,
             trace,
@@ -151,8 +163,8 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             branch="main",
             name="application",
             document=DOCUMENT,
-            additional_documents=["library.weave"],
-            expected_revision_id=library["revision_id"],
+            additional_documents=["library.weave", "support.weave"],
+            expected_revision_id=support["revision_id"],
         )
         context = await _call(
             session,
@@ -197,8 +209,10 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         )
         assert reviewed["revision_id"] == reviewed_revision
         assert reviewed["revision_is_branch_head"] is True
-        assert reviewed["program_document_count"] == 2
+        assert reviewed["program_document_count"] == 3
         assert reviewed["build_target_count"] == 1
+        assert reviewed["build_targets"][0]["additional_document_count"] == 2
+        assert reviewed["build_targets"][0]["additional_documents_truncated"] is False
         assert reviewed["merge_policy"]["max_affected_targets"] == 5
         assert reviewed["context_count"] == 2
         assert reviewed["branch_count"] == 2
@@ -270,12 +284,14 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             revision_id=reviewed_revision,
             document_limit=1,
             target_limit=1,
+            target_source_limit=1,
             context_limit=1,
             branch_limit=1,
             history_limit=1,
             operation_limit=1,
         )
         assert bounded["program_documents_truncated"] is True
+        assert bounded["build_targets"][0]["additional_documents_truncated"] is True
         assert bounded["contexts_truncated"] is True
         assert bounded["branches_truncated"] is True
         assert bounded["history"]["has_more"] is True
