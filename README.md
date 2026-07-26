@@ -28,7 +28,7 @@ Jacquard owns:
 - revisioned named build targets and ordered multi-document builds;
 - deterministic canonical sources and per-document node maps;
 - compiler diagnostics mapped back to database nodes and exposed in bounded pages;
-- verified, content-derived native build artifacts.
+- verified, content-derived native build artifacts and bounded build-ID recovery.
 
 Jacquard is not another compiler. The user-facing
 [`weavec`](https://github.com/ahojukka5/weavec) compiler owns the Weave language,
@@ -111,6 +111,7 @@ project_initialize
 → branch_merge using returned publication_arguments
 → branch_activity_summary when measuring the workflow
 → program_build
+→ build_list_page when the build ID is no longer in context
 → build_get
 → build_diagnostics_page when the build failed
 → node_inspect(revision_id = failed revision) before repair
@@ -128,6 +129,7 @@ program_source_list
 → review target policy, every affected surviving target, and uncovered document
 → branch_merge using returned publication_arguments
 → build_target_build
+→ build_list_page when the build ID is no longer in context
 → build_get
 → build_diagnostics_page when the build failed
 → node_inspect(revision_id = failed revision) before repair
@@ -291,6 +293,17 @@ ID, path containment, regular-file status, and every SHA-256 hash.
 `build_diagnostics_page` performs the same verified admission and hashes the
 exact diagnostic bytes it decodes before returning mapped entries.
 
+When an agent no longer knows the build ID, `build_list_page` scans at most 200
+lexically ordered catalog members and applies the same stored-build verification
+before returning compact summaries. Valid builds from other projects and
+nonmatching filters are omitted. Malformed or corrupt members are returned only
+as rejected IDs and error codes.
+
+The response carries `catalog_id` and `next_after_build_id`. Replaying the catalog
+identity across pages rejects membership changes with `STALE_BUILD_CATALOG`.
+List responses never expose build directories or artifact paths; select a
+verified ID and call `build_get` for detailed provenance and paths.
+
 `weave-build-key-v4` derives the build ID from the immutable revision, ordered
 source hashes, compiler binary hash, and requested target. Concurrent builds use
 a per-build advisory lock. An existing verified successful build wins; failed
@@ -340,7 +353,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - **Named targets:** `build_target_set`, `build_target_list`,
   `build_target_get`, `build_target_delete`, `build_target_validate`,
   `build_target_build`
-- **Build inspection:** `build_get`, `build_diagnostics_page`
+- **Build inspection:** `build_list_page`, `build_get`, `build_diagnostics_page`
 - **Single-node editing:** `node_create_form`, `node_add_atom`, `node_set_atom`,
   `node_move`, `node_wrap`, `node_delete`
 - **Transactional editing:** `node_apply_batch`
@@ -359,6 +372,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - [Merge target impact analysis](docs/merge-impact.md)
 - [Affected-target validation sets](docs/merge-validation-set.md)
 - [Merge candidate validation](docs/merge-validation.md)
+- [Verified stored-build discovery](docs/build-discovery.md)
 - [Build diagnostic inspection](docs/build-diagnostics.md)
 - [Revision-pinned node inspection](docs/revision-node-inspection.md)
 - [Stable-node revision diffs](docs/revision-diff.md)
