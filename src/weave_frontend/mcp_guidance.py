@@ -13,16 +13,17 @@ grammar_help before using an unfamiliar Weave form. Use expected_revision_id for
 optimistic concurrency. Use program_validate for a coherent single document. For
 a multi-document program, define a named target and use build_target_validate so
 the target metadata and ordered sources are validated from one pinned revision.
-Before combining independent branches, call branch_merge_preview, review its
-conflicts and document consequences, then call branch_merge_validate for the
-named target. Publish with branch_merge using both preview_id and
-validation_target so the exact compiler-validated candidate is rechecked before
-the target branch advances. Build through program_build or build_target_build and
-inspect the immutable result with build_get. When a build fails, read mapped
-errors through build_diagnostics_page instead of assuming access to server-local
-artifact paths. Pass the failed build revision_id to node_inspect when the branch
-may have advanced, then use revision_diff_page to compare that failing state with
-the current branch head before repairing. Use branch_history_page for complete
+Before combining independent branches, call branch_merge_preview, then
+branch_merge_impact to identify affected named targets and changed documents with
+no target coverage. Review those consequences, validate the relevant named
+targets, and publish with branch_merge using preview_id and validation_target so
+the exact compiler-validated candidate is rechecked before the target branch
+advances. Build through program_build or build_target_build and inspect the
+immutable result with build_get. When a build fails, read mapped errors through
+build_diagnostics_page instead of assuming access to server-local artifact paths.
+Pass the failed build revision_id to node_inspect when the branch may have
+advanced, then use revision_diff_page to compare that failing state with the
+current branch head before repairing. Use branch_history_page for complete
 bounded history reads, revision_operations_page for exact grouped-edit audit rows,
 and branch_activity_summary to measure revision and operation grouping.
 """.strip()
@@ -41,7 +42,8 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "build_target_set for a reusable multi-document program",
             "build_target_validate before a named-target build",
             "branch_merge_preview after independent agent work",
-            "branch_merge_validate for the reviewed named target",
+            "branch_merge_impact to find affected targets and uncovered documents",
+            "branch_merge_validate for each relevant reviewed target",
             "branch_merge with preview_id and validation_target",
             "branch_activity_summary when measuring the workflow",
             "program_build or build_target_build",
@@ -112,6 +114,10 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "branch_merge_preview": (
                 "Preview conflicts and compact document consequences for two current "
                 "branch heads without mutating either branch."
+            ),
+            "branch_merge_impact": (
+                "Map prospective document changes to named build targets in bounded pages "
+                "and expose changed program documents with no candidate target coverage."
             ),
             "branch_merge_validate": (
                 "Validate a named build target from the exact in-memory merge candidate "
@@ -187,6 +193,11 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "stable-node change counts. A conflicting preview returns mergeable=false and "
             "the exact conflict paths."
         ),
+        "impact": (
+            "branch_merge_impact explains which named targets are added, removed, modified, "
+            "or affected by changed source documents. It separately reports changed program "
+            "documents that no target in the candidate covers."
+        ),
         "validation": (
             "branch_merge_validate resolves one named target and its ordered sources from "
             "the clean in-memory candidate, invokes weavec --frontend, and returns compiler, "
@@ -203,7 +214,7 @@ _TOPICS: dict[str, dict[str, Any]] = {
         ),
         "compatibility": (
             "branch_merge still accepts calls without preview_id or validation_target, but "
-            "reviewed parallel work should use the compiler-gated flow."
+            "reviewed parallel work should use the impact-aware compiler-gated flow."
         ),
     },
     "ids": {
@@ -235,7 +246,8 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "program_source_list to choose source documents",
             "build_target_set to store primary source, ordered additional sources, and target",
             "build_target_validate to validate the exact pinned target",
-            "branch_merge_validate to validate the target from a prospective merge",
+            "branch_merge_impact to identify affected targets and uncovered documents",
+            "branch_merge_validate to validate a target from a prospective merge",
             "build_target_build to compile the same target through weavec build",
             "build_get to inspect provenance, diagnostics, and artifacts",
         ],
@@ -249,6 +261,7 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "build_target_get",
             "build_target_delete",
             "build_target_validate",
+            "branch_merge_impact",
             "branch_merge_validate",
             "build_target_build",
         ],
