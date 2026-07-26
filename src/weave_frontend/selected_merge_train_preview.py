@@ -226,10 +226,11 @@ class SelectedMergeTrainPreviewService:
 
         changed_documents = sorted(changed)
         merged_root_hash = self.workspace.db.hash_value(merged_state)
-        if original["mergeable"]:
-            relation = "consistent_clean"
-        else:
-            relation = "order_removed_conflict"
+        relation = (
+            "consistent_clean"
+            if original["mergeable"]
+            else "order_removed_conflict"
+        )
         return {
             "public": {
                 "step_index": index,
