@@ -45,14 +45,19 @@ The basic native test validates through `weavec --frontend`, builds through
 `weavec build`, verifies stored artifacts through `build_get`, executes the
 returned binary, and requires exit status 42.
 
-The complex program matrix additionally constructs every form and atom through
-MCP for three progressively harder programs:
+The native stress matrix constructs every form and atom through MCP:
 
 | Case | Language/runtime coverage | Nodes | MCP calls | Revisions | Exit |
 |---|---|---:|---:|---:|---:|
 | `while-accumulator` | locals, loop-carried values, comparison, mutation | 41 | 48 | 43 | 42 |
 | `multi-function-chain` | parameters, three helper calls, arithmetic | 59 | 66 | 61 | 35 |
 | `memory-flow` | allocation, pointer arithmetic, stores, loads, two loops, free | 136 | 143 | 138 | 100 |
+| `binary-search-batch16` | 16-element array, nested search loop and ifs, null guard, twelve queries | 354 | 361 | 356 | 26 |
+
+The binary-search workload is the first algorithmic stress case. It initializes a
+sorted 16-element array, runs twelve searches through a helper function with
+loop-carried low/high/found state, accumulates the four found indices and eight
+`-1` misses, frees the array, and returns 26.
 
 For each case the test:
 
@@ -65,6 +70,9 @@ For each case the test:
 7. checks case-specific LLVM instructions and calls;
 8. records artifact sizes, build ID, node count, MCP call count, and complete
    reachable revision count.
+
+The binary-search evidence contains 3,502 bytes of canonical source, 2,877 bytes
+of WIR, 4,552 bytes of LLVM IR, and 2,864 bytes of bitcode.
 
 The compiler-backed tests skip when `WEAVEC_BIN` is unset or not executable.
 Native execution is currently POSIX-only.
