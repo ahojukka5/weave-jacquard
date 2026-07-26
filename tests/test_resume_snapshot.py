@@ -8,8 +8,8 @@ from weave_frontend import NotFoundError, SExpressionWorkspace, ValidationError
 from weave_frontend.concurrent_build_targets import BuildTargetRegistry
 from weave_frontend.concurrent_merge_policy import MergePolicyRegistry
 from weave_frontend.resume_snapshot import (
-    RESUME_SNAPSHOT_FORMAT,
     MAX_CONTEXT_PREVIEW_CHARS,
+    RESUME_SNAPSHOT_FORMAT,
     ResumeSnapshotService,
 )
 
