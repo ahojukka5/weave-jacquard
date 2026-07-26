@@ -1,9 +1,9 @@
 # Contributing
 
-Thank you for contributing to `weave_frontend`.
+Thank you for contributing to `weave-jacquard`.
 
-This project explores an agent-native programming frontend. Changes should keep
-the core invariants explicit, deterministic, and covered by tests.
+This project explores an agent-native programming environment. Changes should
+keep the core invariants explicit, deterministic, and covered by tests.
 
 ## Development setup
 
@@ -82,12 +82,16 @@ Every pull request should include:
 
 Read `AGENTS.md` and `docs/architecture.md` before changing the data model,
 revision semantics, grammar, validation rules, merge behavior, or public API.
+Read `docs/single-node-concurrency.md` before changing structural node writes.
 
 In particular:
 
 - invalid AST mutations must be rejected atomically;
 - committed revisions must remain immutable;
 - branch heads must advance only after successful validation;
+- a structural write must publish from one captured base revision through a
+  transactional compare-and-set branch update;
+- prepared node and batch writes must reject stale `expected_revision_id` state;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
