@@ -4,8 +4,9 @@
 
 A restarted or disconnected coding agent often knows the project and branch but
 no longer holds the exact revision, document set, target definitions, policy,
-context, or recent history in working memory. Recovering those pieces through
-separate calls risks mixing an older inspected revision with a newer branch head.
+context, structured handoff, or recent history in working memory. Recovering those
+pieces through separate calls risks mixing an older inspected revision with a
+newer branch head.
 
 `branch_resume_snapshot` provides one bounded orientation read from one immutable
 project revision.
@@ -50,10 +51,11 @@ revision:
 - effective first-parent merge policy;
 - linked context documents;
 - operation audit rows;
+- the newest verified first-parent agent checkpoint reachable from that revision;
 - first-parent history beginning at that revision.
 
 The newer branch head is comparison metadata only. It must not influence the
-selected programs, targets, policy, context, operations, or history.
+selected programs, targets, policy, context, operations, checkpoint, or history.
 
 The project branch list is intentionally current project-level orientation data.
 Each entry includes its exact head revision, so it is never presented as part of
@@ -69,13 +71,13 @@ weave-agent-resume-snapshot-v1
 
 `snapshot_id` is SHA-256 over the complete returned response before the ID field
 is added. Repeating a call with the same immutable database evidence and the same
-bounds produces the same ID. Changing the selected revision, a current branch
-head, branch list, or output bounds may change the ID because the returned
-orientation evidence changed.
+bounds produces the same ID. Changing the selected revision, resolved checkpoint,
+a current branch head, branch list, or output bounds may change the ID because the
+returned orientation evidence changed.
 
 The response includes the effective limit values used for the call. The snapshot
-is read-only. It creates no branch, revision, operation, context, build, compiler
-artifact, or filesystem output.
+is read-only. It creates no branch, revision, operation, context, checkpoint,
+build, compiler artifact, or filesystem output.
 
 ## Program summaries
 
@@ -117,6 +119,32 @@ revision. A target cannot borrow a source from the current branch head.
 merge preflight and publication. An unconfigured historical state returns the
 normal explicit default-policy result rather than borrowing a later policy.
 
+## Agent checkpoint
+
+`agent_checkpoint` is resolved through the revisioned checkpoint registry using
+the same exact selected revision as the rest of the snapshot.
+
+The checkpoint view reports:
+
+- whether a checkpoint is configured;
+- the checkpoint document and verified hash;
+- `checkpoint_revision_id`;
+- whether the checkpoint was published on the selected revision itself;
+- structured objective, summary, status, completed work, next steps, open
+  questions, and validation evidence;
+- focused `branch_resume_snapshot` arguments pinned to the checkpoint revision.
+
+A later program revision may inherit an older first-parent checkpoint. In that
+case the snapshot still summarizes the later program state, but the checkpoint's
+own resume arguments identify the revision where the handoff was published.
+
+A historical snapshot never searches descendants or borrows a later checkpoint.
+Publishing a new checkpoint changes `snapshot_id` even when program source is
+unchanged because the orientation evidence changed.
+
+See `docs/agent-checkpoints.md` for publication, bounds, atomicity, and integrity
+verification.
+
 ## Context previews
 
 Linked context rows are sorted deterministically and contain:
@@ -129,8 +157,9 @@ Linked context rows are sorted deterministically and contain:
 - up to 512 characters of body preview;
 - an explicit truncation flag.
 
-Policy documents are context documents and therefore may appear in the context
-summary in addition to the parsed effective `merge_policy`.
+Policy and checkpoint documents are context documents and therefore may appear in
+the context summary in addition to their parsed `merge_policy` and
+`agent_checkpoint` views.
 
 ## Operations and history
 
@@ -165,8 +194,9 @@ enumeration. Program source rendering is performed only for returned documents.
 
 Each bounded collection reports total count, returned count, and a truncation
 flag. Each target reports the same evidence for its nested additional-source
-list. History reports its own continuation. Invalid limits return
-`INVALID_RESUME_SNAPSHOT_LIMIT` before project state is summarized.
+list. History reports its own continuation. The checkpoint itself has fixed
+publication bounds defined by the checkpoint protocol. Invalid snapshot limits
+return `INVALID_RESUME_SNAPSHOT_LIMIT` before project state is summarized.
 
 ## Reproducible follow-up actions
 
@@ -189,6 +219,11 @@ build_recovery.arguments = {project, revision_id}
 The response explicitly states that build discovery is lexical by content-derived
 build ID, not chronological. The snapshot never invents a “latest build.”
 
+When `agent_checkpoint` is configured, its own `resume` call is additionally
+pinned to `checkpoint_revision_id`. This is useful when the current selected
+revision has advanced beyond the last explicit handoff and the receiving agent
+wants to reconstruct exactly what the publishing agent reviewed.
+
 ## Errors
 
 - missing branch or project uses the normal not-found contract;
@@ -196,7 +231,9 @@ build ID, not chronological. The snapshot never invents a “latest build.”
   selected project;
 - invalid bounds return `INVALID_RESUME_SNAPSHOT_LIMIT`;
 - malformed historical target metadata or missing target sources use the normal
-  target/document validation contract.
+  target/document validation contract;
+- malformed, tampered, or incorrectly scoped checkpoint state returns
+  `INVALID_AGENT_CHECKPOINT`.
 
 No partial snapshot is returned on request-level failure.
 
@@ -211,13 +248,21 @@ Direct tests prove:
 - historical isolation after later source and policy changes;
 - top-level and nested target-source truncation evidence;
 - validation of every bound;
-- foreign-revision rejection.
+- foreign-revision rejection;
+- unconfigured, exact, inherited, and historical checkpoint composition;
+- snapshot identity changes when checkpoint evidence changes;
+- historical snapshots never borrow later checkpoints.
 
-The production stdio lifecycle creates a reviewed three-document state with a
-multi-source build target, context, merge policy, and historical branch. It then
-advances main and proves reviewed, historical, current, and deliberately
-truncated snapshots remain internally consistent.
+The production stdio resume lifecycle creates a reviewed three-document state with
+a multi-source build target, context, merge policy, and historical branch. It then
+advances main and proves reviewed, historical, current, and deliberately truncated
+snapshots remain internally consistent.
 
-Standard CI retains `resume-snapshot-trace.json`. The packaged `weavec` workflow
-verifies that the final MCP registration does not regress native builds, merge
-admission, policies, preflight, or artifact discovery.
+The checkpoint lifecycle separately publishes two handoffs around a real
+structural edit and proves current, inherited, and historical checkpoint views are
+composed into snapshots from the correct revision.
+
+Standard CI retains `resume-snapshot-trace.json` and
+`agent-checkpoint-trace.json`. The packaged `weavec` workflow verifies that final
+MCP registration does not regress native builds, merge admission, policies,
+preflight, or artifact discovery.
