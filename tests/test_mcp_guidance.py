@@ -33,29 +33,29 @@ class _FakeFastMCP:
 
 def test_runtime_guidance_replaces_legacy_registration() -> None:
     server = _FakeFastMCP()
-
     install_runtime_guidance(server)
-
     assert server._mcp_server.instructions == INSTRUCTIONS
     assert server.removed == ["weave_help"]
     assert server.tools["weave_help"] is weave_help
 
 
-def test_workflow_covers_batch_validation_merge_build_and_inspection() -> None:
-    result = weave_help("workflow")
-    steps = result["help"]["steps"]
+def test_workflow_covers_impact_aware_compiler_gated_merge() -> None:
+    steps = weave_help("workflow")["help"]["steps"]
+    preview = "branch_merge_preview after independent agent work"
+    impact = "branch_merge_impact to find affected targets and uncovered documents"
+    validation = "branch_merge_validate for each relevant reviewed target"
+    publication = "branch_merge with preview_id and validation_target"
 
     assert "single-node tools while exploring or repairing" in steps
     assert "node_apply_batch for one coherent known structure" in steps
     assert "program_validate for a coherent single document" in steps
     assert "build_target_validate before a named-target build" in steps
-    preview = "branch_merge_preview after independent agent work"
-    validation = "branch_merge_validate for the reviewed named target"
-    publication = "branch_merge with preview_id and validation_target"
     assert preview in steps
+    assert impact in steps
     assert validation in steps
     assert publication in steps
-    assert steps.index(preview) < steps.index(validation) < steps.index(publication)
+    assert steps.index(preview) < steps.index(impact) < steps.index(validation)
+    assert steps.index(validation) < steps.index(publication)
     assert "branch_activity_summary when measuring the workflow" in steps
     assert "program_build or build_target_build" in steps
     assert "build_get to inspect immutable provenance and artifact paths" in steps
@@ -67,7 +67,6 @@ def test_workflow_covers_batch_validation_merge_build_and_inspection() -> None:
 
 def test_batch_help_preserves_transaction_contract() -> None:
     help_value = weave_help("batch")["help"]
-
     assert "single-node tools" in help_value["when"]
     assert help_value["operations"] == [
         "create_form",
@@ -86,7 +85,6 @@ def test_batch_help_preserves_transaction_contract() -> None:
 
 def test_history_help_preserves_pagination_metric_and_audit_contract() -> None:
     help_value = weave_help("history")["help"]
-
     assert "next_revision_id" in help_value["page"]
     assert "1..200" in help_value["bounds"]
     assert "reachable" in help_value["bounds"]
@@ -107,14 +105,16 @@ def test_history_help_preserves_pagination_metric_and_audit_contract() -> None:
     assert "Do not maximize batch size" in help_value["interpretation"]
 
 
-def test_merge_help_preserves_validation_and_stale_head_contract() -> None:
+def test_merge_help_preserves_impact_validation_and_stale_head_contract() -> None:
     help_value = weave_help("merge")["help"]
-
     assert "branch_merge_preview" in help_value["preview"]
     assert "deterministic preview_id" in help_value["preview"]
     assert "never advances" in help_value["preview"]
     assert "mergeable=false" in help_value["consequences"]
     assert "conflict paths" in help_value["consequences"]
+    assert "branch_merge_impact" in help_value["impact"]
+    assert "added, removed, modified" in help_value["impact"]
+    assert "no target" in help_value["impact"]
     assert "branch_merge_validate" in help_value["validation"]
     assert "weavec --frontend" in help_value["validation"]
     assert "without retaining artifacts" in help_value["validation"]
@@ -123,12 +123,11 @@ def test_merge_help_preserves_validation_and_stale_head_contract() -> None:
     assert "MERGE_VALIDATION_UNAVAILABLE" in help_value["failures"]
     assert "MERGE_VALIDATION_FAILED" in help_value["failures"]
     assert "STALE_MERGE_PREVIEW" in help_value["failures"]
-    assert "without preview_id or validation_target" in help_value["compatibility"]
+    assert "impact-aware" in help_value["compatibility"]
 
 
 def test_validation_distinguishes_stored_and_merge_candidate_paths() -> None:
     help_value = weave_help("validation")["help"]
-
     assert "program_validate" in help_value["single_document"]
     assert "build_target_validate" in help_value["multi_document"]
     assert "one immutable revision" in help_value["multi_document"]
@@ -136,25 +135,25 @@ def test_validation_distinguishes_stored_and_merge_candidate_paths() -> None:
     assert "uncommitted clean merge candidate" in help_value["merge_candidate"]
 
 
-def test_target_help_preserves_source_order_and_candidate_contract() -> None:
+def test_target_help_preserves_source_order_and_impact_contract() -> None:
     help_value = weave_help("targets")["help"]
-
     assert help_value["workflow"] == [
         "program_source_list to choose source documents",
         "build_target_set to store primary source, ordered additional sources, and target",
         "build_target_validate to validate the exact pinned target",
-        "branch_merge_validate to validate the target from a prospective merge",
+        "branch_merge_impact to identify affected targets and uncovered documents",
+        "branch_merge_validate to validate a target from a prospective merge",
         "build_target_build to compile the same target through weavec build",
         "build_get to inspect provenance, diagnostics, and artifacts",
     ]
     assert "exact in-memory merge candidate" in help_value["revision_rule"]
     assert "Source order is authoritative" in help_value["revision_rule"]
+    assert "branch_merge_impact" in help_value["tools"]
     assert "branch_merge_validate" in help_value["tools"]
 
 
 def test_build_help_preserves_bounded_diagnostic_repair_contract() -> None:
     help_value = weave_help("builds")["help"]
-
     assert "build_get" in help_value["inspect"]
     assert "build_diagnostics_page" in help_value["inspect"]
     assert "1..200" in help_value["inspect"]
