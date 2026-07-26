@@ -106,6 +106,70 @@ def test_batch_commits_one_revision_with_ordered_audit_rows(sexpr_workspace):
     )
 
 
+def test_batch_supports_set_wrap_move_and_delete(sexpr_workspace):
+    created = _program(sexpr_workspace)
+    executor = EditBatchExecutor(sexpr_workspace)
+    initial = executor.apply(
+        "sexpr-demo",
+        "main",
+        "main.weave",
+        _constant_operations(created["node_id"]),
+    )
+    aliases = initial["aliases"]
+    before = sexpr_workspace.branch_head("sexpr-demo", "main")
+
+    result = executor.apply(
+        "sexpr-demo",
+        "main",
+        "main.weave",
+        [
+            {"op": "set_atom", "node": aliases["entry_name"], "value": "start"},
+            {
+                "op": "wrap_node",
+                "node": aliases["constant"],
+                "head": "identity",
+                "as": "wrapper",
+            },
+            {
+                "op": "create_form",
+                "parent": created["node_id"],
+                "head": "scratch",
+                "as": "scratch",
+            },
+            {
+                "op": "move_node",
+                "node": "@wrapper",
+                "new_parent": "@scratch",
+            },
+            {"op": "delete_node", "node": "@scratch"},
+        ],
+        expected_revision_id=before,
+        include_operation_results=True,
+    )
+
+    assert result["operation_count"] == 5
+    assert result["created_node_count"] == 2
+    assert result["deleted_node_count"] == 7
+    assert result["aliases"] == {}
+    assert [item["op"] for item in result["operation_results"]] == [
+        "set_atom",
+        "wrap_node",
+        "create_form",
+        "move_node",
+        "delete_node",
+    ]
+    assert result["operation_results"][-1]["invalidated_aliases"] == [
+        "scratch",
+        "wrapper",
+    ]
+    source = sexpr_workspace.render("sexpr-demo", "main", "main.weave")
+    assert "start" in source
+    assert "identity" not in source
+    assert "scratch" not in source
+    assert "const_i32" not in source
+    assert len(sexpr_workspace.list_history("sexpr-demo", limit=10)) == 4
+
+
 def test_batch_failure_rolls_back_all_prior_operations(sexpr_workspace):
     created = _program(sexpr_workspace)
     executor = EditBatchExecutor(sexpr_workspace)
@@ -171,3 +235,19 @@ def test_batch_rejects_stale_expected_revision(sexpr_workspace):
 
     assert captured.value.code == "STALE_REVISION"
     assert sexpr_workspace.branch_head("sexpr-demo", "main") == current
+
+
+def test_batch_rejects_more_than_256_operations(sexpr_workspace):
+    _program(sexpr_workspace)
+    before = sexpr_workspace.branch_head("sexpr-demo", "main")
+
+    with pytest.raises(ValidationError) as captured:
+        EditBatchExecutor(sexpr_workspace).apply(
+            "sexpr-demo",
+            "main",
+            "main.weave",
+            [{"op": "delete_node", "node": "n_unused"}] * 257,
+        )
+
+    assert captured.value.code == "EDIT_BATCH_TOO_LARGE"
+    assert sexpr_workspace.branch_head("sexpr-demo", "main") == before
