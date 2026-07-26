@@ -8,6 +8,7 @@ from typing import Any
 
 from .batch_edit import EditBatchExecutor
 from .branch_activity import BranchActivityService
+from .build_inspection import BuildInspectionService
 from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
 from .mcp_guidance import install_runtime_guidance
@@ -33,6 +34,11 @@ def compiler_bridge() -> CompilerBridge:
         workspace(),
         build_root=os.environ.get("WEAVE_BUILD_ROOT"),
     )
+
+
+@lru_cache(maxsize=1)
+def build_inspection() -> BuildInspectionService:
+    return BuildInspectionService(compiler_bridge())
 
 
 @lru_cache(maxsize=1)
@@ -274,6 +280,23 @@ def build_get(build_id: str) -> dict[str, object]:
     """Return a stored build manifest and its artifact paths."""
 
     return _result(lambda: compiler_bridge().get(build_id))
+
+
+@mcp.tool()
+def build_diagnostics_page(
+    build_id: str,
+    start_index: int = 0,
+    limit: int = 50,
+) -> dict[str, object]:
+    """Read mapped retained diagnostics in bounded immutable build pages."""
+
+    return _result(
+        lambda: build_inspection().diagnostics_page(
+            build_id,
+            start_index=start_index,
+            limit=limit,
+        )
+    )
 
 
 def main() -> None:
