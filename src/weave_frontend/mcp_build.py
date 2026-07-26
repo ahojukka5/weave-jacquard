@@ -13,6 +13,7 @@ from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
 from .mcp_guidance import install_runtime_guidance
 from .mcp_server import _result, mcp, workspace
+from .revision_diff import RevisionNodeDiffService
 from .revision_inspection import RevisionNodeInspectionService
 from .target_validation import BuildTargetValidator
 
@@ -33,6 +34,11 @@ def branch_activity() -> BranchActivityService:
 @lru_cache(maxsize=1)
 def revision_inspection() -> RevisionNodeInspectionService:
     return RevisionNodeInspectionService(workspace())
+
+
+@lru_cache(maxsize=1)
+def revision_diffs() -> RevisionNodeDiffService:
+    return RevisionNodeDiffService(workspace())
 
 
 @lru_cache(maxsize=1)
@@ -77,6 +83,31 @@ def node_inspect(
             node_id,
             depth=depth,
             revision_id=revision_id,
+        )
+    )
+
+
+@mcp.tool()
+def revision_diff_page(
+    project: str,
+    document: str,
+    base_revision_id: str,
+    branch: str = "main",
+    target_revision_id: str | None = None,
+    start_index: int = 0,
+    limit: int = 50,
+) -> dict[str, object]:
+    """Read bounded stable-node changes between two immutable revisions."""
+
+    return _result(
+        lambda: revision_diffs().page(
+            project,
+            document,
+            base_revision_id,
+            branch=branch,
+            target_revision_id=target_revision_id,
+            start_index=start_index,
+            limit=limit,
         )
     )
 
