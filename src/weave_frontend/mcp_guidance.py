@@ -16,9 +16,11 @@ the target metadata and ordered sources are validated from one pinned revision.
 Build through program_build or build_target_build and inspect the immutable result
 with build_get. When a build fails, read mapped errors through
 build_diagnostics_page instead of assuming access to server-local artifact paths.
-Use branch_history_page for complete bounded history reads,
-revision_operations_page for exact grouped-edit audit rows, and
-branch_activity_summary to measure revision and operation grouping.
+Pass the failed build revision_id to node_inspect when the branch may have advanced,
+so the inspected stable node is reproduced from the exact failing state. Use
+branch_history_page for complete bounded history reads, revision_operations_page
+for exact grouped-edit audit rows, and branch_activity_summary to measure revision
+and operation grouping.
 """.strip()
 
 
@@ -39,6 +41,7 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "program_build or build_target_build",
             "build_get to inspect immutable provenance and artifact paths",
             "build_diagnostics_page to read mapped errors after a failed build",
+            "node_inspect with the failed revision_id before repairing a mapped node",
         ],
         "rule": (
             "Keep writes structural and ID-based. Batch only coherent operations; "
@@ -88,7 +91,10 @@ _TOPICS: dict[str, dict[str, Any]] = {
     },
     "read": {
         "tools": {
-            "node_inspect": "Return an ID-bearing local subtree and grammar hint.",
+            "node_inspect": (
+                "Return an ID-bearing local subtree and grammar hint from the branch head "
+                "or an explicit immutable revision_id."
+            ),
             "node_find": "Find stable IDs by form head, atom kind, or value.",
             "program_render": "Render canonical source or an annotated agent view.",
             "program_source_list": (
@@ -127,6 +133,11 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "Call revision_operations_page with a revision ID. When has_more is true, "
             "pass next_sequence_number as the next start_sequence_number. Revision "
             "operations are immutable and project-scoped."
+        ),
+        "inspection": (
+            "node_inspect defaults to the selected branch head. Pass revision_id to read "
+            "the exact immutable project revision even when it is no longer the branch head; "
+            "the response reports both revision_id and branch_head_revision_id."
         ),
         "summary": (
             "branch_activity_summary traverses complete first-parent history and "
@@ -188,8 +199,9 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "pages of 1..200 without exposing compiler stdout or stderr."
         ),
         "repair": (
-            "On failure, page diagnostics by build ID, inspect the returned stable node_id, "
-            "repair that node with a structural tool, then validate and build the new revision."
+            "On failure, page diagnostics by build ID, pass the returned revision_id to "
+            "node_inspect for the mapped stable node_id, repair that node with a structural "
+            "tool, then validate and build the new revision."
         ),
         "ownership": (
             "Jacquard owns revision pinning, canonical sources, node maps, and provenance; "
