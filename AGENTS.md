@@ -21,24 +21,27 @@ server for Weave. The central object is a versioned program tree. Textual
    rolls back.
 6. **Use optimistic concurrency for prepared edits.** Pass the expected base
    revision when a batch was planned from a specific branch head.
-7. **Larger reads are acceptable.** Inspection may return a local subtree when it
-   helps an agent understand context.
-8. **Do not duplicate the Weave grammar.** `weavec` is authoritative. Grammar
+7. **Keep historical reads revision-consistent.** Once an exact immutable
+   revision is selected, render, search, inspect, source-list, target, build,
+   and diff reads must not silently mix in branch-head program state.
+8. **Larger reads are acceptable.** Inspection may return a local subtree or
+   complete source rendering when it helps an agent understand context.
+9. **Do not duplicate the Weave grammar.** `weavec` is authoritative. Grammar
    help is derived from its source corpus and completed programs are validated
    by its frontend.
-9. **Target policy governs admission.** The current target branch's first-parent
-   policy is authoritative. A source branch policy is visible review evidence
-   but must never weaken the target through merge.
-10. **Preflight independent work before publication.** Reviewed parallel-agent
+10. **Target policy governs admission.** The current target branch's first-parent
+    policy is authoritative. A source branch policy is visible review evidence
+    but must never weaken the target through merge.
+11. **Preflight independent work before publication.** Reviewed parallel-agent
     merges should use `branch_merge_preflight`, inspect policy, directional
     impact, uncovered documents, and every affected surviving target, then
     publish with the returned arguments.
-11. **Context is versioned.** Interfaces, contracts, invariants, policies, and
+12. **Context is versioned.** Interfaces, contracts, invariants, policies, and
     design documents used by an agent must be reproducible from its base
     revision.
-12. **Rendering is deterministic.** Identical database state and renderer version
+13. **Rendering is deterministic.** Identical database state and renderer version
     must produce byte-identical canonical source.
-13. **SQLite is the prototype truth store.** Avoid adding a distributed database
+14. **SQLite is the prototype truth store.** Avoid adding a distributed database
     until measurements require it.
 
 ## Node identity
@@ -51,6 +54,27 @@ server for Weave. The central object is a versioned program tree. Textual
   on them.
 - Merge, diff, preview, impact, preflight, policy, and MCP mutations target IDs or
   immutable revision identities, never line numbers.
+
+## Historical read consistency
+
+`node_inspect`, `program_render`, and `node_find` default to the selected branch
+head. When `revision_id` is supplied, every returned program value, parent,
+position, rendering, and match must come from that exact project-owned immutable
+revision.
+
+Historical read responses must report both:
+
+- `revision_id`, the state actually read;
+- `branch_head_revision_id`, the selected branch head at read time.
+
+`revision_is_branch_head` must state whether they are equal. An explicit revision
+does not need to remain reachable from the selected branch, but it must belong to
+the project. The selected branch must exist so its current head can be reported.
+
+`program_render` may extend its existing result object with this metadata.
+`node_find` must preserve its compatibility `result` list and expose revision
+metadata beside that list in the MCP response envelope, including when no nodes
+match. Historical reads are non-mutating and must never check out a revision.
 
 ## Structural writes
 
@@ -200,6 +224,7 @@ inference without changing the public MCP API.
 - `src/weave_frontend/sexpr.py`: generic S-expression nodes and rendering.
 - `src/weave_frontend/sexpr_service.py`: single-node structural operations.
 - `src/weave_frontend/batch_edit.py`: bounded transactional structural edits.
+- `src/weave_frontend/revision_reads.py`: exact-revision render and node search.
 - `src/weave_frontend/revision_diff.py`: bounded stable-node revision diffs.
 - `src/weave_frontend/merge_preview.py`: deterministic two-phase merge previews.
 - `src/weave_frontend/merge_impact.py`: named-target and coverage impact analysis.
@@ -209,6 +234,7 @@ inference without changing the public MCP API.
 - `src/weave_frontend/merge_preflight.py`: policy-aware one-call review composition.
 - `src/weave_frontend/mcp_preflight.py`: production preflight MCP registration.
 - `src/weave_frontend/mcp_policy.py`: final policy-enforced merge registration.
+- `src/weave_frontend/mcp_revision_reads.py`: final historical read registration.
 - `src/weave_frontend/grammar_help.py`: guidance derived from compiler examples.
 - `src/weave_frontend/weavec.py`: authoritative frontend validation adapter.
 - `src/weave_frontend/compiler_*.py`: native compiler and artifact boundary.
@@ -217,6 +243,7 @@ inference without changing the public MCP API.
 - `docs/architecture.md`: broad design and roadmap.
 - `docs/mcp.md`: MCP workflow and public tool contract.
 - `docs/edit-transactions.md`: bounded batch request and publication contract.
+- `docs/revision-reads.md`: historical rendering and search response contract.
 - `docs/merge-policy.md`: revisioned target-authoritative admission rules.
 - `docs/merge-preflight.md`: one-call review evidence and safe replay.
 - `docs/merge-preview.md`: preview identity and atomic merge publication.
