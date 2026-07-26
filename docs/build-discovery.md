@@ -92,7 +92,28 @@ checks:
 - regular-file status;
 - lowercase SHA-256 values and current artifact checksums;
 - core discovery metadata such as project, branch, revision, ordered documents,
-  target, compiler hash, and build-key format.
+  target, compiler hash, and build-key format;
+- that the recorded revision belongs to the recorded project;
+- that the manifest revision hash equals the immutable revision root hash stored
+  in Jacquard.
+
+For current `weave-build-key-v4` manifests, discovery additionally verifies:
+
+- exactly one ordered source metadata entry per document;
+- source-document order and primary-source identity;
+- each recorded source SHA-256 against the verified source artifact hash;
+- the primary source hash against the first ordered source;
+- recomputation of the 32-character build ID from revision ID and hash, ordered
+  document/source hashes, compiler SHA-256, and requested target.
+
+A current manifest whose inputs do not reproduce its directory ID is rejected as
+`BUILD_KEY_MISMATCH`. Source metadata disagreements are rejected as
+`BUILD_SOURCE_METADATA_MISMATCH`.
+
+Legacy nonempty build-key formats remain discoverable after normal artifact and
+revision-provenance verification. Their summaries report
+`build_key_verified=false`; current v4 summaries report `build_key_verified=true`.
+All returned summaries report `revision_provenance_verified=true`.
 
 Only verified manifests matching `project` and all requested filters appear in
 `builds`. Valid builds from other projects are counted in `filtered_count` but
@@ -113,9 +134,10 @@ A returned build summary contains enough identity to choose a subsequent read:
 
 - build ID, status, project, and branch;
 - revision ID and revision hash;
+- revision-provenance verification state;
 - primary and ordered source documents;
 - requested and compiler-reported targets;
-- compiler SHA-256 and build-key format;
+- compiler SHA-256, build-key format, and build-key verification state;
 - return code and protocol-validity flags;
 - executable and diagnostics availability.
 
@@ -146,12 +168,22 @@ sparse or empty pages. Continue with the returned cursor until `has_more=false`.
 
 ## Failure codes
 
+Request-level errors:
+
 - `INVALID_BUILD_LIST_LIMIT`;
 - `INVALID_BUILD_LIST_FILTER`;
 - `INVALID_BUILD_LIST_CURSOR`;
 - `INVALID_BUILD_CATALOG_ID`;
 - `STALE_BUILD_CATALOG`;
 - `BUILD_CATALOG_UNAVAILABLE`.
+
+Per-member provenance errors can include:
+
+- `BUILD_REVISION_NOT_FOUND`;
+- `BUILD_REVISION_HASH_MISMATCH`;
+- `BUILD_SOURCE_METADATA_MISMATCH`;
+- `BUILD_KEY_MISMATCH`;
+- the manifest, artifact-path, and checksum errors already used by `build_get`.
 
 Per-member verification failures are returned in `rejected_builds` instead of
 failing the complete page. Request-level errors fail the page before any build is
@@ -170,6 +202,8 @@ It then proves:
 
 - five catalog members are scanned through one-member pages;
 - three verified project builds are recovered;
+- current build IDs reproduce from their immutable revision, source, compiler,
+  and target inputs;
 - one foreign build is filtered;
 - one malformed manifest is rejected;
 - status/revision/document/target filters recover the failed build;
