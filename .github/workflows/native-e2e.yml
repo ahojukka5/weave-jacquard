@@ -122,6 +122,7 @@ jobs:
             tests/e2e/test_real_mcp_workflow_equivalence.py \
             tests/e2e/test_real_mcp_compiler_repair.py \
             tests/e2e/test_real_mcp_revision_inspection.py \
+            tests/e2e/test_real_mcp_revision_diff.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
@@ -183,6 +184,21 @@ jobs:
           assert inspections[1]["payload"]["result"]["revision_is_branch_head"] is False
           assert inspections[0]["payload"]["result"]["subtree"]["value"] == "after"
           assert inspections[1]["payload"]["result"]["subtree"]["value"] == "before"
+
+          diff_traces = list(base.rglob("revision-diff-trace.json"))
+          assert len(diff_traces) == 1, diff_traces
+          diff_trace = json.loads(diff_traces[0].read_text(encoding="utf-8"))
+          diff_pages = [
+              entry for entry in diff_trace if entry["tool"] == "revision_diff_page"
+          ]
+          assert len(diff_pages) == 4
+          assert [
+              entry["payload"]["result"]["returned_count"]
+              for entry in diff_pages[:3]
+          ] == [2, 2, 1]
+          assert diff_pages[0]["payload"]["result"]["total_change_count"] == 5
+          assert diff_pages[0]["payload"]["result"]["target_revision_is_branch_head"] is True
+          assert diff_pages[3]["payload"]["result"]["target_revision_is_branch_head"] is False
 
           output = Path("qualification/program-matrix-summary.json")
           output.write_text(
