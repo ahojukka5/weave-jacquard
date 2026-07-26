@@ -6,9 +6,9 @@ and existing implementation modules retain compatibility.
 """
 
 from .compiler_bridge import CompilerBridge
+from .concurrent_sexpr import SExpressionWorkspace
 from .errors import ConflictError, NotFoundError, ValidationError, WeaveFrontendError
 from .service import MergeResult
-from .sexpr_service import SExpressionWorkspace
 from .source_map import render_with_node_map, smallest_node_for_span
 
 __all__ = [
