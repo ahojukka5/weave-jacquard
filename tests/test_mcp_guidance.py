@@ -44,6 +44,8 @@ def test_workflow_defaults_to_one_call_merge_preflight() -> None:
     preflight = "branch_merge_preflight after independent agent work"
     review = "review impact, coverage, and complete affected-target validation"
     publication = "branch_merge with the returned publication_arguments when ready"
+    discovery = "build_list_page when recovering an unknown stored build ID"
+    inspection = "build_get to inspect immutable provenance and artifact paths"
 
     assert "single-node tools while exploring or repairing" in steps
     assert "node_apply_batch for one coherent known structure" in steps
@@ -55,14 +57,16 @@ def test_workflow_defaults_to_one_call_merge_preflight() -> None:
     assert steps.index(preflight) < steps.index(review) < steps.index(publication)
     assert "branch_activity_summary when measuring the workflow" in steps
     assert "program_build or build_target_build" in steps
-    assert "build_get to inspect immutable provenance and artifact paths" in steps
+    assert discovery in steps
+    assert inspection in steps
+    assert steps.index(discovery) < steps.index(inspection)
     assert "build_diagnostics_page to read mapped errors after a failed build" in steps
     assert any("node_inspect with the failed revision_id" in step for step in steps)
     assert "revision_diff_page" in steps[-1]
     assert "current head" in steps[-1]
 
 
-def test_instructions_explain_preflight_revalidation_and_target_policy() -> None:
+def test_instructions_explain_preflight_policy_and_build_recovery() -> None:
     normalized = " ".join(INSTRUCTIONS.split())
     assert "merge_policy_set" in INSTRUCTIONS
     assert "current target branch policy is authoritative" in normalized
@@ -73,6 +77,11 @@ def test_instructions_explain_preflight_revalidation_and_target_policy() -> None
     assert "publication repeats every gate" in normalized
     assert "atomically rechecks both branch heads" in normalized
     assert "only when investigating an individual layer" in normalized
+    assert "build_list_page" in INSTRUCTIONS
+    assert "exact build ID is no longer in context" in normalized
+    assert "carry catalog_id across pages" in normalized
+    assert "verified project-matching summary" in normalized
+    assert normalized.index("build_list_page") < normalized.index("build_get")
 
 
 def test_batch_help_preserves_transaction_contract() -> None:
@@ -167,7 +176,7 @@ def test_merge_help_preserves_policy_preflight_and_publication_contract() -> Non
     assert "target policy permits" in help_value["compatibility"]
 
 
-def test_read_and_write_help_expose_policy_tools() -> None:
+def test_read_and_write_help_expose_policy_and_build_tools() -> None:
     read_tools = weave_help("read")["help"]["tools"]
     write_tools = weave_help("write")["help"]["tools"]
     assert "merge_policy_get" in read_tools
@@ -180,6 +189,9 @@ def test_read_and_write_help_expose_policy_tools() -> None:
     assert "branch_merge_validate" in read_tools
     assert "branch_merge_validate_affected" in read_tools
     assert "aggregate" in read_tools["branch_merge_validate_affected"]
+    assert "build_list_page" in read_tools
+    assert "at most 200" in read_tools["build_list_page"]
+    assert "build_get" in read_tools["build_list_page"]
     assert "merge_policy_set" in write_tools
     assert "directly on the branch" in write_tools["merge_policy_set"]
     assert "branch_merge" in write_tools
@@ -217,8 +229,19 @@ def test_target_help_preserves_source_order_and_preflight_contract() -> None:
     assert "branch_merge_validate_affected" in help_value["tools"]
 
 
-def test_build_help_preserves_bounded_diagnostic_repair_contract() -> None:
+def test_build_help_preserves_discovery_and_repair_contract() -> None:
     help_value = weave_help("builds")["help"]
+    assert "program_build" in help_value["explicit"]
+    assert "build_target_build" in help_value["named"]
+    assert "build_list_page" in help_value["discover"]
+    assert "at most 200" in help_value["discover"]
+    assert "without artifact paths" in help_value["discover"]
+    assert "lexical order" in help_value["catalog"]
+    assert "catalog_id" in help_value["catalog"]
+    assert "next_after_build_id" in help_value["catalog"]
+    assert "STALE_BUILD_CATALOG" in help_value["catalog"]
+    assert "rejected_builds" in help_value["rejections"]
+    assert "error codes" in help_value["rejections"]
     assert "build_get" in help_value["inspect"]
     assert "build_diagnostics_page" in help_value["inspect"]
     assert "1..200" in help_value["inspect"]
