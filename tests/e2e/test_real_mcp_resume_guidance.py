@@ -105,6 +105,17 @@ async def _run(tmp_path: Path) -> None:
         assert "never publishes a merge" in normalized
         assert "ready_for_publication" in normalized
         assert "publication_arguments" in normalized
+        assert "selected_merge_train_preview" in normalized
+        assert "1–10 unique source branches" in normalized
+        assert "in-memory virtual target" in normalized
+        assert "order_introduced_conflict" in normalized
+        assert "order_removed_conflict" in normalized
+        assert "later no-change redundancy" in normalized
+        assert "stops at the first unresolved train conflict" in normalized
+        assert "No compiler, preflight, build, or merge publication runs" in normalized
+        assert "Only the first clean step" in normalized
+        assert "fresh catalog and preflight" in normalized
+        assert "does not itself express priority" in normalized
 
         tools = await session.list_tools()
         names = {tool.name for tool in tools.tools}
@@ -118,6 +129,7 @@ async def _run(tmp_path: Path) -> None:
             "project_merge_queue_page",
             "project_merge_impact_queue_page",
             "selected_merge_preflight_batch",
+            "selected_merge_train_preview",
             "weave_help",
         } <= names
 
@@ -237,6 +249,27 @@ async def _run(tmp_path: Path) -> None:
         assert "publishes no merge" in selected["help"]["publication"]
         assert "publication_arguments" in selected["help"]["publication"]
 
+        train = _payload(
+            await session.call_tool(
+                "weave_help",
+                arguments={"topic": "merge_train"},
+            )
+        )
+        assert train["ok"] is True
+        assert "selected_merge_train_preview" in train["help"]["selection"]
+        assert "unselected branches" in train["help"]["catalog"]
+        assert train["help"]["relations"] == [
+            "consistent_clean",
+            "consistent_conflict",
+            "order_introduced_conflict",
+            "order_removed_conflict",
+        ]
+        assert "no_changes" in train["help"]["redundancy"]
+        assert "first unresolved train conflict" in train["help"]["stopping"]
+        assert "no compiler" in train["help"]["execution"]
+        assert "refresh the complete catalog" in train["help"]["publication"]
+        assert "can change conflicts and redundancy" in train["help"]["ordering"]
+
         read = _payload(
             await session.call_tool("weave_help", arguments={"topic": "read"})
         )
@@ -245,6 +278,7 @@ async def _run(tmp_path: Path) -> None:
         assert "project_merge_queue_page" in read["help"]["tools"]
         assert "project_merge_impact_queue_page" in read["help"]["tools"]
         assert "selected_merge_preflight_batch" in read["help"]["tools"]
+        assert "selected_merge_train_preview" in read["help"]["tools"]
 
         workflow = _payload(
             await session.call_tool("weave_help", arguments={"topic": "workflow"})
