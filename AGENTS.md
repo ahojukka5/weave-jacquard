@@ -20,7 +20,9 @@ server for Weave. The central object is a versioned program tree. Textual
    ordered audit row, while the complete batch publishes as one revision or
    rolls back.
 6. **Use optimistic concurrency for prepared edits.** Pass the expected base
-   revision when a batch was planned from a specific branch head.
+   revision when a single-node mutation or batch was planned from a specific
+   branch head. Every structural write must still compare-and-set its captured
+   base when the expectation is omitted.
 7. **Keep historical reads revision-consistent.** Once an exact immutable
    revision is selected, render, search, inspect, source-list, target, build,
    and diff reads must not silently mix in branch-head program state.
@@ -85,6 +87,14 @@ match. Historical reads are non-mutating and must never check out a revision.
 Single-node tools are the default for uncertain work. They create or change one
 form, atom, edge, or location and publish one revision per successful call.
 
+Every single-node mutation must capture one branch head, load and mutate that
+exact immutable state, and publish through a conditional branch-head update.
+Prepared calls accept `expected_revision_id`; stale expectations fail before
+mutation. Calls without an expectation remain race-safe and return the captured
+`base_revision_id` after successful publication. A concurrent branch advance at
+any point before commit must return `STALE_BRANCH_HEAD` and roll back the revision,
+snapshot, operation row, and branch update together.
+
 `node_apply_batch` is allowed for one coherent known structure. It must remain:
 
 - a flat ordered list of existing structural operation kinds;
@@ -95,7 +105,8 @@ form, atom, edge, or location and publish one revision per successful call.
 - fully rolled back on any operation or stale-head failure.
 
 Do not turn the batch tool into source replacement, a nested AST upload, an
-unbounded request, or a way to bypass validation.
+unbounded request, or a way to bypass validation. Neither a single-node call nor
+a batch may silently replay stale work on a newer branch head.
 
 ## Revisioned merge policy authority
 
@@ -255,7 +266,9 @@ inference without changing the public MCP API.
 
 - `src/weave_frontend/service.py`: grammar-neutral revision and merge mechanics.
 - `src/weave_frontend/sexpr.py`: generic S-expression nodes and rendering.
-- `src/weave_frontend/sexpr_service.py`: single-node structural operations.
+- `src/weave_frontend/sexpr_service.py`: historical single-node implementation.
+- `src/weave_frontend/concurrent_sexpr.py`: race-safe public node mutations.
+- `src/weave_frontend/mcp_concurrent_nodes.py`: production node-tool registration.
 - `src/weave_frontend/batch_edit.py`: bounded transactional structural edits.
 - `src/weave_frontend/revision_reads.py`: exact-revision render and node search.
 - `src/weave_frontend/revision_diff.py`: bounded stable-node revision diffs.
@@ -277,6 +290,7 @@ inference without changing the public MCP API.
 - `src/weave_frontend/mcp_build.py`: production MCP entry point and extensions.
 - `docs/architecture.md`: broad design and roadmap.
 - `docs/mcp.md`: MCP workflow and public tool contract.
+- `docs/single-node-concurrency.md`: race-safe structural write contract.
 - `docs/edit-transactions.md`: bounded batch request and publication contract.
 - `docs/revision-reads.md`: historical rendering and search response contract.
 - `docs/build-discovery.md`: verified stored-build recovery and pagination.
