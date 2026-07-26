@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Protocol
@@ -33,19 +34,11 @@ class BuildInspectionService:
         self._validate_start_index(start_index)
         self._validate_limit(limit)
         build = self.bridge.get(build_id)
-        artifact_paths = build.get("artifact_paths")
-        diagnostics_value = (
-            artifact_paths.get("diagnostics")
-            if isinstance(artifact_paths, dict)
-            else None
+        diagnostics_path, expected_sha256 = self._diagnostics_artifact(build)
+        diagnostics = self._read_diagnostics(
+            diagnostics_path,
+            expected_sha256=expected_sha256,
         )
-        if not isinstance(diagnostics_value, str) or not diagnostics_value:
-            raise ValidationError(
-                "MISSING_BUILD_DIAGNOSTICS",
-                "verified build manifest does not reference mapped diagnostics",
-            )
-
-        diagnostics = self._read_diagnostics(Path(diagnostics_value))
         entries = diagnostics.get("entries")
         if not isinstance(entries, list) or not all(
             isinstance(entry, dict) for entry in entries
@@ -84,13 +77,51 @@ class BuildInspectionService:
         }
 
     @staticmethod
-    def _read_diagnostics(path: Path) -> dict[str, Any]:
+    def _diagnostics_artifact(build: dict[str, Any]) -> tuple[Path, str]:
+        artifact_paths = build.get("artifact_paths")
+        artifacts = build.get("artifacts")
+        hashes = build.get("artifact_sha256")
+        diagnostics_path = (
+            artifact_paths.get("diagnostics")
+            if isinstance(artifact_paths, dict)
+            else None
+        )
+        relative = artifacts.get("diagnostics") if isinstance(artifacts, dict) else None
+        expected_sha256 = hashes.get(relative) if isinstance(hashes, dict) else None
+        if (
+            not isinstance(diagnostics_path, str)
+            or not diagnostics_path
+            or not isinstance(relative, str)
+            or not relative
+            or not isinstance(expected_sha256, str)
+            or len(expected_sha256) != 64
+        ):
+            raise ValidationError(
+                "MISSING_BUILD_DIAGNOSTICS",
+                "verified build manifest does not reference hashed mapped diagnostics",
+            )
+        return Path(diagnostics_path), expected_sha256
+
+    @staticmethod
+    def _read_diagnostics(path: Path, *, expected_sha256: str) -> dict[str, Any]:
         try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raw = path.read_bytes()
+        except OSError as exc:
             raise ValidationError(
                 "INVALID_BUILD_DIAGNOSTICS",
                 f"cannot read mapped build diagnostics: {exc}",
+            ) from exc
+        if hashlib.sha256(raw).hexdigest() != expected_sha256:
+            raise ValidationError(
+                "CORRUPT_BUILD_ARTIFACT",
+                "mapped build diagnostics checksum changed during inspection",
+            )
+        try:
+            value = json.loads(raw.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise ValidationError(
+                "INVALID_BUILD_DIAGNOSTICS",
+                f"cannot decode mapped build diagnostics: {exc}",
             ) from exc
         if not isinstance(value, dict):
             raise ValidationError(
