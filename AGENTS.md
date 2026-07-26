@@ -26,15 +26,19 @@ server for Weave. The central object is a versioned program tree. Textual
 8. **Do not duplicate the Weave grammar.** `weavec` is authoritative. Grammar
    help is derived from its source corpus and completed programs are validated
    by its frontend.
-9. **Preflight independent work before publication.** Reviewed parallel-agent
-   merges should use `branch_merge_preflight`, inspect directional impact,
-   uncovered documents, and every affected surviving target, then publish with
-   the returned arguments.
-10. **Context is versioned.** Interfaces, contracts, invariants, and design
-    documents used by an agent must be reproducible from its base revision.
-11. **Rendering is deterministic.** Identical database state and renderer version
+9. **Target policy governs admission.** The current target branch's first-parent
+   policy is authoritative. A source branch policy is visible review evidence
+   but must never weaken the target through merge.
+10. **Preflight independent work before publication.** Reviewed parallel-agent
+    merges should use `branch_merge_preflight`, inspect policy, directional
+    impact, uncovered documents, and every affected surviving target, then
+    publish with the returned arguments.
+11. **Context is versioned.** Interfaces, contracts, invariants, policies, and
+    design documents used by an agent must be reproducible from its base
+    revision.
+12. **Rendering is deterministic.** Identical database state and renderer version
     must produce byte-identical canonical source.
-12. **SQLite is the prototype truth store.** Avoid adding a distributed database
+13. **SQLite is the prototype truth store.** Avoid adding a distributed database
     until measurements require it.
 
 ## Node identity
@@ -45,8 +49,8 @@ server for Weave. The central object is a versioned program tree. Textual
 - Batch aliases are temporary names for stable IDs created in that transaction.
 - Annotated source may display IDs, but canonical program meaning does not depend
   on them.
-- Merge, diff, preview, impact, preflight, and MCP mutations target IDs, never
-  line numbers.
+- Merge, diff, preview, impact, preflight, policy, and MCP mutations target IDs or
+  immutable revision identities, never line numbers.
 
 ## Structural writes
 
@@ -65,12 +69,41 @@ form, atom, edge, or location and publish one revision per successful call.
 Do not turn the batch tool into source replacement, a nested AST upload, an
 unbounded request, or a way to bypass validation.
 
+## Revisioned merge policy authority
+
+`merge_policy_set` publishes one immutable policy revision directly on the
+selected branch. Policy state is stored as a project-scoped immutable context
+document referenced by a `set_merge_policy` operation. It must not become a
+mutable global setting, an environment variable, or a compiler-source document.
+
+`merge_policy_get` resolves the latest policy by walking first-parent history
+from the selected branch head or exact project revision. Historical policy must
+remain reproducible.
+
+The current target policy controls:
+
+- whether preflight replay is required;
+- whether all affected surviving targets must validate;
+- whether uncovered-document overrides are allowed;
+- the affected-target compiler fanout ceiling.
+
+The source branch policy is returned for transparency. Different policy hashes
+must set `source_policy_ignored=true`, and the target policy must remain the only
+admission authority. A policy can be loosened only by publishing a new policy
+revision directly on the target branch. That branch-head change must invalidate
+older preview and preflight evidence.
+
+No configured policy must preserve legacy merge compatibility. Configuring a
+policy must not change database schema, compiler protocols, stored build keys, or
+source-language behavior.
+
 ## Merge preflight and publication
 
 `branch_merge_preflight` is the default review boundary. It must compose the
 current exact-candidate merge layers rather than introduce a parallel merge
 implementation:
 
+- target-authoritative and source-visible policy resolution;
 - stable-ID three-way preview;
 - directional named-target impact;
 - candidate coverage analysis;
@@ -78,17 +111,23 @@ implementation:
 
 Preflight is read-only. It must create no revision, branch update, audit row,
 build manifest, executable, retained WIR, or compiler artifact. Its deterministic
-identity must bind the merge direction, exact preview and merged root, impact
-summary state, validation-set identity, and uncovered-document policy.
+identity must bind policy hashes, source-policy disposition, merge direction,
+exact preview and merged root, impact summary state, validation-set identity,
+and uncovered-document policy.
 
 The public impact list must remain bounded and explicitly report truncation. Any
 truncation is presentation-only: the complete internal target graph still drives
 the bounded validation set.
 
 A preflight response is evidence, not authority. It may return
-`publication_tool` and exact `publication_arguments`, but publication must repeat
-impact, coverage, and all affected-target compiler validation before writing.
-Never add a token that allows an old preflight to bypass revalidation.
+`publication_tool` and exact `publication_arguments`, including `preflight_id`,
+but publication must resolve current policies, recompute preflight, compare
+identity, enforce readiness, and then write. Never add a token that allows an old
+preflight to bypass policy or compiler revalidation.
+
+When exact preflight is recomputed successfully, publication may reuse that
+single validation set before the same transactional branch-head check. Do not
+launch a redundant second compiler fanout for the identical candidate.
 
 ## Merge preview, impact, and validation layers
 
@@ -116,7 +155,8 @@ candidate. A removed target cannot hide a changed source document from
 - validate every affected target that survives in the candidate;
 - skip and report removed targets;
 - use deterministic target-name order;
-- keep compiler fanout bounded;
+- keep compiler fanout bounded by both global and effective target policy limits;
+- bind the effective limit into validation-set identity;
 - aggregate every pass, rejection, and unavailable result;
 - perform zero compiler work when uncovered documents block the candidate;
 - record any explicit uncovered-document override.
@@ -124,13 +164,15 @@ candidate. A removed target cannot hide a changed source document from
 A validation or validation-set response is evidence, not a bearer token.
 Publication must repeat the selected gate and use that candidate's preview ID.
 Compiler unavailability, compiler rejection, uncovered-document policy failure,
-merge conflict, or stale preview state must leave the target branch unchanged.
+policy violation, merge conflict, stale preflight, or stale preview state must
+leave the target branch unchanged.
 
 Both reviewed branch heads must be rechecked inside the same SQLite write
 transaction that publishes the merge. Any mismatch must return
 `STALE_MERGE_PREVIEW` and leave the target branch and audit tables unchanged.
-Direct merges without preview or validation remain supported, but they must still
-capture and atomically recheck both current heads.
+Direct merges without preview or validation remain supported only when the
+effective target policy permits them; they must still capture and atomically
+recheck both current heads.
 
 ## Grammar and validation
 
@@ -163,8 +205,10 @@ inference without changing the public MCP API.
 - `src/weave_frontend/merge_impact.py`: named-target and coverage impact analysis.
 - `src/weave_frontend/merge_validation.py`: one exact-candidate compiler validation.
 - `src/weave_frontend/merge_validation_set.py`: complete affected-target gate.
-- `src/weave_frontend/merge_preflight.py`: one-call non-mutating review composition.
+- `src/weave_frontend/merge_policy.py`: revisioned first-parent policy registry.
+- `src/weave_frontend/merge_preflight.py`: policy-aware one-call review composition.
 - `src/weave_frontend/mcp_preflight.py`: production preflight MCP registration.
+- `src/weave_frontend/mcp_policy.py`: final policy-enforced merge registration.
 - `src/weave_frontend/grammar_help.py`: guidance derived from compiler examples.
 - `src/weave_frontend/weavec.py`: authoritative frontend validation adapter.
 - `src/weave_frontend/compiler_*.py`: native compiler and artifact boundary.
@@ -173,6 +217,7 @@ inference without changing the public MCP API.
 - `docs/architecture.md`: broad design and roadmap.
 - `docs/mcp.md`: MCP workflow and public tool contract.
 - `docs/edit-transactions.md`: bounded batch request and publication contract.
+- `docs/merge-policy.md`: revisioned target-authoritative admission rules.
 - `docs/merge-preflight.md`: one-call review evidence and safe replay.
 - `docs/merge-preview.md`: preview identity and atomic merge publication.
 - `docs/merge-impact.md`: affected targets and uncovered candidate documents.
@@ -198,8 +243,9 @@ pytest
 
 ## Merge expectations
 
-A passing structural merge is not enough. Use one preflight to review the exact
-incoming impact, uncovered documents, and complete affected-target compiler
-result. Publish through its returned arguments only when ready. After
-publication, preserve unique node IDs and run any native build or execution
+A passing structural merge is not enough. Resolve and review the target policy,
+then use one preflight to inspect the exact incoming impact, source-policy
+difference, uncovered documents, and complete affected-target compiler result.
+Publish through its returned arguments only when ready and policy-compliant.
+After publication, preserve unique node IDs and run any native build or execution
 checks required by the task.
