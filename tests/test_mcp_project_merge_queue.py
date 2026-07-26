@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from weave_frontend import mcp_project_merge_queue
+from weave_frontend import mcp_agent_checkpoint, mcp_project_merge_queue
 from weave_frontend.project_merge_queue import ProjectMergeQueueService
 
 
@@ -58,7 +58,14 @@ def test_project_merge_queue_page_forwards_target_catalog_cursor_and_bounds(
 
 
 def test_project_merge_queue_factory_uses_shared_preview_and_status_services() -> None:
-    mcp_project_merge_queue.project_merge_queues.cache_clear()
+    caches = (
+        mcp_project_merge_queue.project_merge_queues,
+        mcp_project_merge_queue.merge_previews,
+        mcp_project_merge_queue.project_agent_statuses,
+        mcp_agent_checkpoint.agent_checkpoints,
+    )
+    for cached in caches:
+        cached.cache_clear()
 
     service = mcp_project_merge_queue.project_merge_queues()
 
@@ -67,4 +74,6 @@ def test_project_merge_queue_factory_uses_shared_preview_and_status_services() -
     assert service.statuses is mcp_project_merge_queue.project_agent_statuses()
     assert service.workspace is service.previews.workspace
     assert service.workspace is service.statuses.workspace
-    mcp_project_merge_queue.project_merge_queues.cache_clear()
+
+    for cached in caches:
+        cached.cache_clear()
