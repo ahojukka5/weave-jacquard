@@ -82,8 +82,9 @@ Every pull request should include:
 
 Read `AGENTS.md` and `docs/architecture.md` before changing the data model,
 revision semantics, grammar, validation rules, merge behavior, or public API.
-Read `docs/single-node-concurrency.md` and
-`docs/program-target-concurrency.md` before changing direct branch-state writes.
+Read `docs/single-node-concurrency.md`,
+`docs/program-target-concurrency.md`, and
+`docs/context-policy-concurrency.md` before changing direct branch-state writes.
 Consult `docs/write-concurrency-audit.md` before adding a new mutating tool.
 
 In particular:
@@ -91,11 +92,11 @@ In particular:
 - invalid AST mutations must be rejected atomically;
 - committed revisions must remain immutable;
 - branch heads must advance only after successful validation;
-- program, single-node, batch, and build-target writes must publish from one
-  captured base revision through a transactional compare-and-set branch update;
+- every existing-branch mutation must publish from one captured base through a
+  transactional compare-and-set branch update;
 - prepared direct writes must reject stale `expected_revision_id` state;
-- a content-document row and the revision that references it must not be split
-  across transactions when that could leave orphan state;
+- auxiliary persistent rows, operation payloads, revision links, and the branch
+  update must commit or roll back together;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
