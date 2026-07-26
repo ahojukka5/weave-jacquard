@@ -90,12 +90,13 @@ Read `docs/single-node-concurrency.md`,
 `docs/agent-checkpoints.md`,
 `docs/agent-checkpoint-timeline.md`,
 `docs/project-agent-status.md`,
-`docs/project-merge-queue.md`, and
-`docs/project-merge-impact-queue.md` before changing branch writes, fork
+`docs/project-merge-queue.md`,
+`docs/project-merge-impact-queue.md`, and
+`docs/selected-merge-preflight-batch.md` before changing branch writes, fork
 semantics, one-call orientation reads, handoff protocols, checkpoint
-supervision, project-wide agent status, project merge queues, or non-compiling
-merge-impact review. Consult `docs/write-concurrency-audit.md` before adding a
-new mutating tool.
+supervision, project-wide agent status, project merge queues, non-compiling
+merge-impact review, or compiler-backed selected preflight orchestration.
+Consult `docs/write-concurrency-audit.md` before adding a new mutating tool.
 
 In particular:
 
@@ -154,6 +155,21 @@ In particular:
 - non-compiling merge-impact review must never silently run builds or affected-
   target validation; compiler-backed admission remains an explicit preflight
   stage;
+- selected preflight batches must accept only an explicit bounded unique source
+  list and must preserve caller order without selecting, ranking, or expanding it;
+- uncovered-document overrides in a selected batch must be an explicit subset of
+  selected sources and remain subject to exact target-policy authority;
+- selected preflight batches must verify the complete exact project merge catalog
+  before and after compiler work, including unselected branches, and must reject
+  catalog drift rather than return partial stale evidence;
+- per-source domain errors in a selected batch must remain independent evidence,
+  while catalog-staleness errors must invalidate the whole batch identity;
+- selected compiler-backed batch results must bound target-validation and
+  document evidence while preserving totals, truncation, replayable full
+  preflight, and guarded publication arguments;
+- selected preflight batches must publish no merge and advance no branch;
+  `ready_for_publication` remains exact guarded evidence requiring explicit
+  `branch_merge` publication;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
