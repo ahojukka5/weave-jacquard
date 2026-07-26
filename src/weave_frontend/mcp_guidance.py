@@ -14,7 +14,9 @@ optimistic concurrency. Use program_validate for a coherent single document. For
 a multi-document program, define a named target and use build_target_validate so
 the target metadata and ordered sources are validated from one pinned revision.
 Build through program_build or build_target_build and inspect the immutable result
-with build_get. Use branch_history_page for complete bounded history reads,
+with build_get. When a build fails, read mapped errors through
+build_diagnostics_page instead of assuming access to server-local artifact paths.
+Use branch_history_page for complete bounded history reads,
 revision_operations_page for exact grouped-edit audit rows, and
 branch_activity_summary to measure revision and operation grouping.
 """.strip()
@@ -35,7 +37,8 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "branch_merge after independent agent work",
             "branch_activity_summary when measuring the workflow",
             "program_build or build_target_build",
-            "build_get to inspect immutable artifacts and diagnostics",
+            "build_get to inspect immutable provenance and artifact paths",
+            "build_diagnostics_page to read mapped errors after a failed build",
         ],
         "rule": (
             "Keep writes structural and ID-based. Batch only coherent operations; "
@@ -101,7 +104,10 @@ _TOPICS: dict[str, dict[str, Any]] = {
                 "Measure revisions, operations, merges, authors, and grouping."
             ),
             "grammar_help": "Search the weavec surface corpus for exact examples.",
-            "build_get": "Inspect one stored build and its immutable artifact paths.",
+            "build_get": "Inspect one verified stored build and its artifact paths.",
+            "build_diagnostics_page": (
+                "Read mapped retained errors without opening server-local files."
+            ),
         }
     },
     "history": {
@@ -176,7 +182,15 @@ _TOPICS: dict[str, dict[str, Any]] = {
     "builds": {
         "explicit": "program_build compiles an explicit ordered document set.",
         "named": "build_target_build compiles a stored revisioned target.",
-        "inspect": "build_get returns the stored manifest and artifact paths.",
+        "inspect": (
+            "build_get verifies the stored manifest and returns immutable provenance and "
+            "artifact paths. build_diagnostics_page returns mapped diagnostic entries in "
+            "pages of 1..200 without exposing compiler stdout or stderr."
+        ),
+        "repair": (
+            "On failure, page diagnostics by build ID, inspect the returned stable node_id, "
+            "repair that node with a structural tool, then validate and build the new revision."
+        ),
         "ownership": (
             "Jacquard owns revision pinning, canonical sources, node maps, and provenance; "
             "weavec owns lowering, LLVM generation, runtime selection, linking, and publication."
