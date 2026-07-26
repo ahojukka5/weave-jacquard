@@ -43,12 +43,12 @@ def _payload(response: Any) -> dict[str, Any]:
 async def _call(
     session: ClientSession,
     trace: list[dict[str, Any]],
-    name: str,
+    tool_name: str,
     **arguments: Any,
 ) -> Any:
-    response = await session.call_tool(name, arguments=arguments)
+    response = await session.call_tool(tool_name, arguments=arguments)
     payload = _payload(response)
-    trace.append({"tool": name, "arguments": arguments, "payload": payload})
+    trace.append({"tool": tool_name, "arguments": arguments, "payload": payload})
     assert _attribute(response, "is_error", "isError") is not True, payload
     assert payload.get("ok") is True, payload
     return payload.get("result")
@@ -57,12 +57,12 @@ async def _call(
 async def _call_error(
     session: ClientSession,
     trace: list[dict[str, Any]],
-    name: str,
+    tool_name: str,
     **arguments: Any,
 ) -> dict[str, Any]:
-    response = await session.call_tool(name, arguments=arguments)
+    response = await session.call_tool(tool_name, arguments=arguments)
     payload = _payload(response)
-    trace.append({"tool": name, "arguments": arguments, "payload": payload})
+    trace.append({"tool": tool_name, "arguments": arguments, "payload": payload})
     assert payload.get("ok") is False, payload
     error = payload.get("error")
     assert isinstance(error, dict)
