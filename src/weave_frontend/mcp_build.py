@@ -13,9 +13,11 @@ from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
 from .mcp_guidance import install_runtime_guidance
 from .mcp_server import _result, mcp, workspace
+from .revision_inspection import RevisionNodeInspectionService
 from .target_validation import BuildTargetValidator
 
 install_runtime_guidance(mcp)
+mcp.remove_tool("node_inspect")
 
 
 @lru_cache(maxsize=1)
@@ -26,6 +28,11 @@ def edit_batches() -> EditBatchExecutor:
 @lru_cache(maxsize=1)
 def branch_activity() -> BranchActivityService:
     return BranchActivityService(workspace())
+
+
+@lru_cache(maxsize=1)
+def revision_inspection() -> RevisionNodeInspectionService:
+    return RevisionNodeInspectionService(workspace())
 
 
 @lru_cache(maxsize=1)
@@ -49,6 +56,29 @@ def build_targets() -> BuildTargetRegistry:
 @lru_cache(maxsize=1)
 def build_target_validator() -> BuildTargetValidator:
     return BuildTargetValidator(build_targets())
+
+
+@mcp.tool()
+def node_inspect(
+    project: str,
+    branch: str,
+    document: str,
+    node_id: str,
+    depth: int = 3,
+    revision_id: str | None = None,
+) -> dict[str, object]:
+    """Inspect a stable node at a branch head or exact immutable revision."""
+
+    return _result(
+        lambda: revision_inspection().inspect(
+            project,
+            branch,
+            document,
+            node_id,
+            depth=depth,
+            revision_id=revision_id,
+        )
+    )
 
 
 @mcp.tool()
