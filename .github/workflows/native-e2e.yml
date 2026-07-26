@@ -127,6 +127,7 @@ jobs:
             tests/e2e/test_real_mcp_merge_validation.py \
             tests/e2e/test_real_mcp_merge_impact.py \
             tests/e2e/test_real_mcp_validate_affected.py \
+            tests/e2e/test_real_mcp_merge_preflight.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
@@ -317,6 +318,50 @@ jobs:
               "MERGE_UNCOVERED_DOCUMENTS"
           )
           assert affected_merges[3]["payload"]["result"][
+              "allow_uncovered_documents"
+          ] is True
+
+          preflight_traces = list(base.rglob("merge-preflight-trace.json"))
+          assert len(preflight_traces) == 1, preflight_traces
+          preflight_trace = json.loads(
+              preflight_traces[0].read_text(encoding="utf-8")
+          )
+          preflights = [
+              entry
+              for entry in preflight_trace
+              if entry["tool"] == "branch_merge_preflight"
+          ]
+          preflight_merges = [
+              entry for entry in preflight_trace if entry["tool"] == "branch_merge"
+          ]
+          assert len(preflights) == 4
+          assert preflights[0]["payload"]["result"]["ready_for_publication"] is True
+          assert preflights[0]["payload"]["result"]["validation_set"][
+              "passed_targets"
+          ] == ["application", "mirror"]
+          assert preflights[0]["payload"]["result"]["publication_arguments"][
+              "validate_affected_targets"
+          ] is True
+          assert preflights[1]["payload"]["result"]["validation_set"][
+              "failed_targets"
+          ] == ["application", "mirror"]
+          assert preflights[2]["payload"]["result"]["validation_set"][
+              "coverage_passed"
+          ] is False
+          assert preflights[2]["payload"]["result"]["validation_set"][
+              "validated_target_count"
+          ] == 0
+          assert preflights[3]["payload"]["result"][
+              "allow_uncovered_documents"
+          ] is True
+          assert len(preflight_merges) == 3
+          assert preflight_merges[0]["payload"]["result"][
+              "affected_validation_enforced"
+          ] is True
+          assert preflight_merges[1]["payload"]["error"]["code"] == (
+              "MERGE_VALIDATION_FAILED"
+          )
+          assert preflight_merges[2]["payload"]["result"][
               "allow_uncovered_documents"
           ] is True
 
