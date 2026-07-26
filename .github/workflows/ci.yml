@@ -45,8 +45,22 @@ jobs:
       - name: Test
         run: |
           set -o pipefail
+          base="$RUNNER_TEMP/jacquard-ci"
           pytest -q --tb=short --cov=weave_frontend --cov-report=term-missing \
-            2>&1 | tee pytest.log
+            --basetemp "$base" 2>&1 | tee pytest.log
+
+          mkdir -p qualification
+          mapfile -t traces < <(find "$base" -name revision-reads-trace.json -print)
+          test "${#traces[@]}" -eq 1
+          cp "${traces[0]}" qualification/revision-reads-trace.json
+
+      - name: Upload CI qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacquard-ci-qualification
+          path: qualification/revision-reads-trace.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload CI failure evidence
         if: failure()
