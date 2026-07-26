@@ -2,20 +2,22 @@
 
 ## Purpose
 
-`branch_merge_preflight` is the default review entrypoint for combining independent
-Jacquard branches. It composes the existing non-mutating merge layers into one
-bounded deterministic result:
+`branch_merge_preflight` is the default review entrypoint for combining
+independent Jacquard branches. It composes all non-mutating admission layers into
+one bounded deterministic result:
 
 ```text
-stable-ID merge preview
+target-authoritative merge policy
++ visible source-branch policy
++ stable-ID merge preview
 + directional named-target impact
 + candidate coverage analysis
 + complete affected-target frontend validation
 = merge preflight evidence
 ```
 
-The tool does not create a revision, update a branch, retain compiler output, or
-publish a build artifact.
+The tool creates no revision, branch update, audit row, retained compiler output,
+or build artifact.
 
 ## Request
 
@@ -29,9 +31,30 @@ branch_merge_preflight(
 )
 ```
 
-When `preview_id` is supplied, either branch advancing causes
-`STALE_MERGE_PREVIEW`. A structural conflict causes `MERGE_CONFLICT` before any
-compiler process starts.
+A supplied stale preview returns `STALE_MERGE_PREVIEW`. A structural conflict
+returns `MERGE_CONFLICT` before compiler startup.
+
+## Policy resolution
+
+Preflight first resolves effective first-parent policies for both branches.
+
+- `target_merge_policy` is authoritative;
+- `source_merge_policy` is review evidence;
+- `source_policy_ignored=true` reports different hashes;
+- the incoming source policy cannot weaken target admission.
+
+The target policy may:
+
+- require exact preflight replay;
+- require all affected surviving targets to validate;
+- forbid uncovered-document overrides;
+- set an affected-target validation ceiling below the global maximum.
+
+A forbidden override returns `MERGE_POLICY_VIOLATION` before impact or compiler
+work. A target ceiling violation returns `TOO_MANY_AFFECTED_TARGETS` before
+compiler startup.
+
+See [`merge-policy.md`](merge-policy.md).
 
 ## Response format
 
@@ -44,52 +67,52 @@ weave-merge-preflight-v1
 It contains:
 
 - project and merge direction;
-- common ancestor and exact target/source branch heads;
+- common ancestor and exact target/source heads;
+- `target_merge_policy` and `source_merge_policy`;
+- `source_policy_ignored`;
 - exact `preview_id` and prospective merged-root hash;
-- a bounded directional impact summary;
-- the complete `weave-merge-validation-set-v1` result;
+- bounded directional impact summary;
+- complete `weave-merge-validation-set-v1`;
 - `ready_for_publication`;
 - `publication_tool` and exact `publication_arguments`.
 
 ## Directional impact
 
 Preflight reports only consequences introduced by merging the source into the
-current target. Work already present on the target branch is not reclassified as
-incoming impact.
+current target. Existing target-side work is not reclassified as incoming
+impact.
 
-The embedded impact summary includes:
+The embedded summary includes:
 
 - changed program and target-metadata documents;
 - candidate-covered and uncovered changed documents;
-- target counts before and after the candidate;
-- total affected and unaffected target counts;
+- target counts before and after;
+- affected and unaffected target counts;
 - compact affected-target entries.
 
-At most 200 affected target entries are returned. When more exist,
-`impact_targets_truncated=true`, `impact.has_more=true`, and `impact.next_index`
-identifies the continuation for `branch_merge_impact`.
+At most 200 entries are returned. More entries set
+`impact_targets_truncated=true`, `impact.has_more=true`, and an explicit
+`impact.next_index` for `branch_merge_impact` continuation.
 
-Truncation affects only the human-facing impact list. The validation set still
-uses the complete internal impact analysis and retains its separate compiler
-fanout bound.
+Truncation is presentation-only. Complete internal impact still drives the
+validation set.
 
 ## Complete validation set
 
-The embedded validation set checks every affected target that survives in the
-candidate, in deterministic target-name order.
+The embedded set validates every affected target surviving in the candidate, in
+deterministic target-name order. It reports:
 
-It reports:
-
-- coverage result and uncovered-document policy;
-- surviving affected targets and removed targets skipped;
+- effective target validation ceiling;
+- coverage and uncovered-document policy;
+- surviving affected and skipped removed targets;
 - passed, failed, and unavailable targets;
-- compact per-target compiler, source, diagnostic, and WIR evidence;
+- compact compiler/source/diagnostic/WIR evidence;
 - deterministic `validation_set_id`;
 - `ready_for_publication`.
 
-Uncovered changed documents block by default before compiler startup. Setting
-`allow_uncovered_documents=true` records an explicit review decision; it does not
-claim those documents were validated.
+Uncovered documents block before compiler startup unless both target policy and
+request allow the explicit override. The override records acceptance of the gap;
+it does not claim validation.
 
 ## Preflight identity
 
@@ -98,19 +121,25 @@ The deterministic `preflight_id` binds:
 ```text
 format
 + project and merge direction
-+ preview ID and prospective merged-root hash
-+ total and returned affected-target counts
++ preview and merged-root identity
++ total and returned impact counts
 + impact truncation state
-+ validation-set ID
++ validation-set identity
 + uncovered-document policy
++ target policy hash
++ source policy hash
++ source-policy-ignored disposition
 ```
 
-The same exact candidate, compiler identities, named-target graph, and policy
-produce the same preflight identity.
+The same exact branches, policies, compiler identities, target graph, source
+hashes, and request policy produce the same preflight ID.
+
+A target policy revision or a source policy revision changes preflight identity,
+even when program trees are otherwise unchanged.
 
 ## Publication
 
-A ready response includes:
+A policy-aware ready response includes:
 
 ```json
 {
@@ -121,62 +150,78 @@ A ready response includes:
     "source_branch": "agent/feature",
     "preview_id": "...",
     "validate_affected_targets": true,
-    "allow_uncovered_documents": false
+    "allow_uncovered_documents": false,
+    "preflight_id": "..."
   }
 }
 ```
 
-The normal agent workflow is:
+Normal workflow:
 
 ```text
 preflight = branch_merge_preflight(...)
-review preflight
+review policy, impact, coverage, and validation evidence
 if preflight.ready_for_publication:
     call preflight.publication_tool with preflight.publication_arguments
 ```
 
-The preflight result is evidence, not a bearer token. `branch_merge` repeats
-impact analysis, coverage enforcement, and every affected-target frontend
-validation. It then rechecks both branch heads inside the same SQLite write
-transaction that publishes the immutable two-parent merge revision.
+Preflight is evidence, not a bearer token. Publication:
 
-This closes both stale windows:
+1. resolves current target and source policies;
+2. recomputes policy-aware preflight against current heads;
+3. compares exact `preflight_id`;
+4. enforces complete validation-set readiness;
+5. publishes using the validated preview ID;
+6. rechecks both heads inside the SQLite write transaction.
 
-- a change before publication changes the preview ID and fails the replay;
-- a change during or after validation fails the transactional head check.
+The recomputed validation set is reused. Jacquard does not launch a redundant
+second compiler fanout before the same transactional head check.
+
+Stale windows are closed because:
+
+- any branch or policy change before publication changes preflight identity;
+- any change during or after validation fails the transactional head check.
 
 ## Failure visibility
 
-Preflight returns an inspectable non-ready result for candidate coverage or
-compiler failures rather than hiding the validation set.
+Preflight returns inspectable non-ready evidence for coverage or compiler
+failures. Common states:
 
-Common states include:
+- `ready_for_publication=true`: policy, coverage, and every selected target pass;
+- `coverage_passed=false`: uncovered documents blocked compiler startup;
+- `failed_targets` non-empty: frontend rejected those targets;
+- `unavailable_targets` non-empty: compiler validation was unavailable.
 
-- `ready_for_publication=true`: coverage and every affected target passed;
-- `coverage_passed=false`: uncovered documents blocked validation before compiler
-  startup;
-- `failed_targets` non-empty: frontend validation rejected those targets;
-- `unavailable_targets` non-empty: configured compiler validation was unavailable.
+Policy/preflight calls may also return:
 
-Publication converts those states to structured errors:
-
-- `MERGE_UNCOVERED_DOCUMENTS`;
-- `MERGE_VALIDATION_FAILED`;
-- `MERGE_VALIDATION_UNAVAILABLE`;
+- `MERGE_POLICY_VIOLATION`;
+- `TOO_MANY_AFFECTED_TARGETS`;
 - `STALE_MERGE_PREVIEW`;
 - `MERGE_CONFLICT`.
 
-Every failure leaves the target branch and audit tables unchanged.
+Publication may additionally return:
 
-## Compatibility and lower-level tools
+- `MERGE_POLICY_PREFLIGHT_REQUIRED`;
+- `MERGE_POLICY_AFFECTED_VALIDATION_REQUIRED`;
+- `STALE_MERGE_PREFLIGHT`;
+- `MERGE_UNCOVERED_DOCUMENTS`;
+- `MERGE_VALIDATION_FAILED`;
+- `MERGE_VALIDATION_UNAVAILABLE`.
 
-The following tools remain public and useful for focused diagnosis:
+Every failure leaves target branch and audit tables unchanged.
 
-- `branch_merge_preview` for structural conflicts and stable-node consequences;
+## Compatibility and diagnostic layers
+
+When target policy is unconfigured, existing direct and validation-gated merge
+calls remain compatible. The following lower-level tools remain useful for
+focused diagnosis:
+
+- `merge_policy_get` for historical admission rules;
+- `branch_merge_preview` for conflicts and stable-node consequences;
 - `branch_merge_impact` for paged target-graph analysis;
-- `branch_merge_validate` for one named target;
+- `branch_merge_validate` for one target;
 - `branch_merge_validate_affected` for the complete validation set;
-- `branch_merge` for publication.
+- `branch_merge` for policy-permitted publication.
 
-Reviewed parallel-agent work should normally start with
+Reviewed parallel-agent work should normally begin with
 `branch_merge_preflight`, not manually recreate the orchestration sequence.
