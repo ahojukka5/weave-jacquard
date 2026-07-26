@@ -38,33 +38,46 @@ python -m pytest -m real_mcp tests/e2e/test_real_mcp_workflows.py
 
 ```bash
 WEAVEC_BIN=/absolute/path/to/weavec \
-  python -m pytest -m real_e2e tests/e2e/test_real_mcp.py
+  python -m pytest -m real_e2e tests/e2e
 ```
 
-This additionally validates the program through `weavec --frontend`, builds it
-through `weavec build`, verifies the stored build through `build_get`, executes
-the returned native binary, and requires exit status 42.
+The basic native test validates through `weavec --frontend`, builds through
+`weavec build`, verifies stored artifacts through `build_get`, executes the
+returned binary, and requires exit status 42.
 
-The compiler-backed test skips when `WEAVEC_BIN` is unset or not executable.
-The test currently executes native artifacts only on POSIX systems.
+The complex program matrix additionally constructs every form and atom through
+MCP for three progressively harder programs:
+
+| Case | Language/runtime coverage | Nodes | MCP calls | Revisions | Exit |
+|---|---|---:|---:|---:|---:|
+| `while-accumulator` | locals, loop-carried values, comparison, mutation | 41 | 48 | 43 | 42 |
+| `multi-function-chain` | parameters, three helper calls, arithmetic | 59 | 66 | 61 | 35 |
+| `memory-flow` | allocation, pointer arithmetic, stores, loads, two loops, free | 136 | 143 | 138 | 100 |
+
+For each case the test:
+
+1. renders canonical source;
+2. validates and requires non-empty WIR;
+3. builds and verifies compiler manifest and diagnostics protocols;
+4. executes the native program;
+5. regenerates WIR and LLVM from the exact retained source;
+6. assembles the LLVM with `llvm-as`;
+7. checks case-specific LLVM instructions and calls;
+8. records artifact sizes, build ID, node count, MCP call count, and complete
+   reachable revision count.
+
+The compiler-backed tests skip when `WEAVEC_BIN` is unset or not executable.
+Native execution is currently POSIX-only.
 
 ## Packaged compiler qualification in CI
 
 `.github/workflows/native-e2e.yml` resolves the immutable `weavec v0.3.0`
 release metadata, selects the unique Linux x86-64 glibc archive and published
-`SHA256SUMS`, verifies the archive, and runs the native qualification through the
-real stdio MCP server.
+`SHA256SUMS`, verifies the archive, and runs the complete native matrix through
+the real stdio MCP server.
 
-The workflow then takes the exact canonical source retained by `build_get` and
-runs:
-
-```text
-weavec --frontend program.wir main.weave
-weavec --backend program.wir program.ll
-llvm-as program.ll -o program.bc
-```
-
-It requires the generated LLVM to define `main` and contain `ret i32 42`. On
-success it uploads the canonical source, MCP trace, release metadata, WIR, LLVM,
-LLVM bitcode, and JUnit report as `jacquard-packaged-weavec-qualification`.
-Failure runs retain the temporary build store and protocol evidence separately.
+Success uploads release metadata, JUnit output, the aggregate matrix summary,
+and the complete pytest temporary tree. The retained tree includes canonical
+sources, MCP traces, Jacquard build stores, compiler manifests and diagnostics,
+WIR, LLVM, bitcode, and native executables. Failure runs retain the same evidence
+separately for diagnosis.
