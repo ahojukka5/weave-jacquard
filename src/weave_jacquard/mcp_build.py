@@ -25,6 +25,9 @@ from weave_frontend import mcp_revision_reads as _mcp_revision_reads
 from weave_frontend import (
     mcp_selected_merge_preflight_batch as _mcp_selected_merge_preflight_batch,
 )
+from weave_frontend import (
+    mcp_selected_preflight_guidance as _mcp_selected_preflight_guidance,
+)
 from weave_frontend.mcp_build import main
 
 _ = (
@@ -44,11 +47,15 @@ _ = (
     _mcp_resume_snapshot,
     _mcp_merge_queue_guidance,
     _mcp_merge_impact_queue_guidance,
+    _mcp_selected_preflight_guidance,
     _mcp_revision_reads,
 )
 
 _mcp_merge_queue_guidance.install_merge_queue_guidance(_mcp_resume_snapshot.mcp)
 _mcp_merge_impact_queue_guidance.install_merge_impact_queue_guidance(
+    _mcp_resume_snapshot.mcp
+)
+_mcp_selected_preflight_guidance.install_selected_preflight_guidance(
     _mcp_resume_snapshot.mcp
 )
 
