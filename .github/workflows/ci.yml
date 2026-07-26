@@ -37,16 +37,34 @@ jobs:
       - name: Check Python syntax
         run: python -m compileall -q src tests
 
-      - name: Lint
-        id: lint
-        run: ruff check . --output-format=json > ruff-report.json
+      - name: Apply temporary Ruff fixes
+        run: ruff check . --fix
 
-      - name: Upload lint report
-        if: failure() && steps.lint.outcome == 'failure'
+      - name: Collect Ruff-fixed files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          import subprocess
+
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only"], text=True
+          ).splitlines()
+          for name in changed:
+              source = Path(name)
+              target = Path("ruff-fixed") / name
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(source, target)
+          PY
+
+      - name: Upload Ruff-fixed files
         uses: actions/upload-artifact@v4
         with:
-          name: ruff-report
-          path: ruff-report.json
+          name: ruff-fixed-files
+          path: ruff-fixed
+
+      - name: Require committed Ruff fixes
+        run: git diff --exit-code
 
       - name: Test
         run: pytest --cov=weave_frontend --cov-report=term-missing
