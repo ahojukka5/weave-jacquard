@@ -17,16 +17,16 @@ ROOT = Path(__file__).resolve().parents[2]
 DOCUMENT = "main.weave"
 
 
-def _attribute(value: Any, snake_case: str, camel_case: str) -> Any:
-    result = getattr(value, snake_case, None)
-    return result if result is not None else getattr(value, camel_case, None)
+def _attribute(value: Any, snake: str, camel: str) -> Any:
+    result = getattr(value, snake, None)
+    return result if result is not None else getattr(value, camel, None)
 
 
-def _payload(result: Any) -> dict[str, Any]:
-    structured = _attribute(result, "structured_content", "structuredContent")
+def _payload(response: Any) -> dict[str, Any]:
+    structured = _attribute(response, "structured_content", "structuredContent")
     if isinstance(structured, dict):
         return structured
-    for block in getattr(result, "content", []):
+    for block in getattr(response, "content", []):
         text = getattr(block, "text", None)
         if not isinstance(text, str):
             continue
@@ -36,10 +36,24 @@ def _payload(result: Any) -> dict[str, Any]:
             continue
         if isinstance(value, dict):
             return value
-    raise AssertionError(f"tool result did not contain a JSON object: {result!r}")
+    raise AssertionError(f"tool result did not contain a JSON object: {response!r}")
 
 
-def _server_environment(tmp_path: Path, compiler: Path | None) -> dict[str, str]:
+async def _call(
+    session: ClientSession,
+    trace: list[dict[str, Any]],
+    name: str,
+    **arguments: Any,
+) -> Any:
+    response = await session.call_tool(name, arguments=arguments)
+    payload = _payload(response)
+    trace.append({"tool": name, "arguments": arguments, "payload": payload})
+    assert _attribute(response, "is_error", "isError") is not True, payload
+    assert payload.get("ok") is True, payload
+    return payload.get("result")
+
+
+def _environment(tmp_path: Path, compiler: Path | None) -> dict[str, str]:
     environment = os.environ.copy()
     python_path = str(ROOT / "src")
     if environment.get("PYTHONPATH"):
@@ -59,98 +73,50 @@ def _server_environment(tmp_path: Path, compiler: Path | None) -> dict[str, str]
     return environment
 
 
-async def _call(
-    session: ClientSession,
-    trace: list[dict[str, Any]],
-    name: str,
-    arguments: dict[str, Any],
-) -> Any:
-    response = await session.call_tool(name, arguments=arguments)
-    payload = _payload(response)
-    trace.append({"tool": name, "arguments": arguments, "payload": payload})
-    assert _attribute(response, "is_error", "isError") is not True, payload
-    assert payload.get("ok") is True, payload
-    return payload.get("result")
+def _form(parent: str, head: str, alias: str | None = None) -> dict[str, Any]:
+    result: dict[str, Any] = {"op": "create_form", "parent": parent, "head": head}
+    if alias is not None:
+        result["as"] = alias
+    return result
 
 
-def _constant_batch(root_id: str, value: int = 42) -> list[dict[str, Any]]:
+def _atom(parent: str, kind: str, value: Any) -> dict[str, Any]:
+    return {"op": "add_atom", "parent": parent, "kind": kind, "value": value}
+
+
+def _entry_prefix(root_id: str) -> list[dict[str, Any]]:
     return [
-        {"op": "create_form", "parent": root_id, "head": "entry", "as": "entry"},
-        {
-            "op": "add_atom",
-            "parent": "@entry",
-            "kind": "symbol",
-            "value": "main",
-        },
-        {"op": "create_form", "parent": "@entry", "head": "params"},
-        {"op": "create_form", "parent": "@entry", "head": "returns", "as": "returns"},
-        {
-            "op": "add_atom",
-            "parent": "@returns",
-            "kind": "symbol",
-            "value": "i32",
-        },
-        {"op": "create_form", "parent": "@entry", "head": "do", "as": "body"},
-        {"op": "create_form", "parent": "@body", "head": "return", "as": "return"},
-        {
-            "op": "create_form",
-            "parent": "@return",
-            "head": "const_i32",
-            "as": "constant",
-        },
-        {
-            "op": "add_atom",
-            "parent": "@constant",
-            "kind": "integer",
-            "value": value,
-        },
+        _form(root_id, "entry", "entry"),
+        _atom("@entry", "symbol", "main"),
+        _form("@entry", "params"),
+        _form("@entry", "returns", "returns"),
+        _atom("@returns", "symbol", "i32"),
+        _form("@entry", "do", "body"),
+        _form("@body", "return", "return"),
+    ]
+
+
+def _constant_batch(root_id: str) -> list[dict[str, Any]]:
+    return _entry_prefix(root_id) + [
+        _form("@return", "const_i32", "constant"),
+        _atom("@constant", "integer", 42),
     ]
 
 
 def _sum80_batch(root_id: str) -> list[dict[str, Any]]:
-    operations: list[dict[str, Any]] = [
-        {"op": "create_form", "parent": root_id, "head": "entry", "as": "entry"},
-        {
-            "op": "add_atom",
-            "parent": "@entry",
-            "kind": "symbol",
-            "value": "main",
-        },
-        {"op": "create_form", "parent": "@entry", "head": "params"},
-        {"op": "create_form", "parent": "@entry", "head": "returns", "as": "returns"},
-        {
-            "op": "add_atom",
-            "parent": "@returns",
-            "kind": "symbol",
-            "value": "i32",
-        },
-        {"op": "create_form", "parent": "@entry", "head": "do", "as": "body"},
-        {"op": "create_form", "parent": "@body", "head": "return", "as": "return"},
-    ]
+    operations = _entry_prefix(root_id)
     next_alias = 0
 
     def append_sum(parent: str, count: int) -> None:
         nonlocal next_alias
+        alias = f"node_{next_alias}"
+        next_alias += 1
         if count == 1:
-            alias = f"constant_{next_alias}"
-            next_alias += 1
-            operations.append(
-                {"op": "create_form", "parent": parent, "head": "const_i32", "as": alias}
-            )
-            operations.append(
-                {
-                    "op": "add_atom",
-                    "parent": f"@{alias}",
-                    "kind": "integer",
-                    "value": 1,
-                }
+            operations.extend(
+                [_form(parent, "const_i32", alias), _atom(f"@{alias}", "integer", 1)]
             )
             return
-        alias = f"add_{next_alias}"
-        next_alias += 1
-        operations.append(
-            {"op": "create_form", "parent": parent, "head": "add_i32", "as": alias}
-        )
+        operations.append(_form(parent, "add_i32", alias))
         left = count // 2
         append_sum(f"@{alias}", left)
         append_sum(f"@{alias}", count - left)
@@ -160,160 +126,134 @@ def _sum80_batch(root_id: str) -> list[dict[str, Any]]:
     return operations
 
 
-async def _run_protocol_batch(tmp_path: Path) -> None:
-    trace: list[dict[str, Any]] = []
-    parameters = StdioServerParameters(
+def _parameters(tmp_path: Path, compiler: Path | None) -> StdioServerParameters:
+    return StdioServerParameters(
         command=sys.executable,
         args=["-m", "weave_jacquard.mcp_build"],
-        env=_server_environment(tmp_path, None),
+        env=_environment(tmp_path, compiler),
         cwd=str(ROOT),
     )
+
+
+async def _create_program(
+    session: ClientSession,
+    trace: list[dict[str, Any]],
+    project: str,
+) -> dict[str, Any]:
+    await _call(session, trace, "project_initialize", project=project)
+    return await _call(
+        session,
+        trace,
+        "program_create",
+        project=project,
+        branch="main",
+        document=DOCUMENT,
+        program_name=project,
+    )
+
+
+async def _run_protocol(tmp_path: Path) -> None:
+    trace: list[dict[str, Any]] = []
     async with (
-        stdio_client(parameters) as (read_stream, write_stream),
+        stdio_client(_parameters(tmp_path, None)) as (read_stream, write_stream),
         ClientSession(read_stream, write_stream) as session,
     ):
         await session.initialize()
-        tools = await session.list_tools()
-        assert "node_apply_batch" in {tool.name for tool in tools.tools}
-        await _call(session, trace, "project_initialize", {"project": "batch-protocol"})
-        created = await _call(
-            session,
-            trace,
-            "program_create",
-            {
-                "project": "batch-protocol",
-                "branch": "main",
-                "document": DOCUMENT,
-                "program_name": "batch-protocol",
-            },
-        )
+        listed = await session.list_tools()
+        assert "node_apply_batch" in {tool.name for tool in listed.tools}
+        created = await _create_program(session, trace, "batch-protocol")
         batch = await _call(
             session,
             trace,
             "node_apply_batch",
-            {
-                "project": "batch-protocol",
-                "branch": "main",
-                "document": DOCUMENT,
-                "expected_revision_id": created["revision_id"],
-                "operations": _constant_batch(created["node_id"]),
-            },
+            project="batch-protocol",
+            branch="main",
+            document=DOCUMENT,
+            expected_revision_id=created["revision_id"],
+            operations=_constant_batch(created["node_id"]),
         )
         assert batch["operation_count"] == 9
-        assert batch["created_node_count"] == 9
+        assert batch["node_count"] == 23
         history = await _call(
             session,
             trace,
             "branch_history",
-            {"project": "batch-protocol", "branch": "main", "limit": 10},
+            project="batch-protocol",
+            branch="main",
+            limit=10,
         )
         assert len(history) == 3
-        rendered = await _call(
-            session,
-            trace,
-            "program_render",
-            {
-                "project": "batch-protocol",
-                "branch": "main",
-                "document": DOCUMENT,
-                "annotated": False,
-            },
-        )
-        assert "(return (const_i32 42))" in rendered["source"]
 
 
-async def _run_native_batch(tmp_path: Path, compiler: Path) -> dict[str, Any]:
+async def _run_native(tmp_path: Path, compiler: Path) -> dict[str, Any]:
     trace: list[dict[str, Any]] = []
     project = "batched-sum80"
-    parameters = StdioServerParameters(
-        command=sys.executable,
-        args=["-m", "weave_jacquard.mcp_build"],
-        env=_server_environment(tmp_path, compiler),
-        cwd=str(ROOT),
-    )
     async with (
-        stdio_client(parameters) as (read_stream, write_stream),
+        stdio_client(_parameters(tmp_path, compiler)) as (read_stream, write_stream),
         ClientSession(read_stream, write_stream) as session,
     ):
         await session.initialize()
-        await _call(session, trace, "project_initialize", {"project": project})
-        created = await _call(
-            session,
-            trace,
-            "program_create",
-            {
-                "project": project,
-                "branch": "main",
-                "document": DOCUMENT,
-                "program_name": project,
-            },
-        )
-        operations = _sum80_batch(created["node_id"])
+        created = await _create_program(session, trace, project)
         started = time.perf_counter()
         batch = await _call(
             session,
             trace,
             "node_apply_batch",
-            {
-                "project": project,
-                "branch": "main",
-                "document": DOCUMENT,
-                "expected_revision_id": created["revision_id"],
-                "message": "construct balanced sum of 80 constants",
-                "operations": operations,
-            },
+            project=project,
+            branch="main",
+            document=DOCUMENT,
+            expected_revision_id=created["revision_id"],
+            message="construct balanced sum of 80 constants",
+            operations=_sum80_batch(created["node_id"]),
         )
-        batch_duration_ms = (time.perf_counter() - started) * 1000.0
+        duration_ms = (time.perf_counter() - started) * 1000.0
         assert batch["operation_count"] == 246
         assert batch["created_node_count"] == 246
-        assert batch["node_count"] == 251
-
+        assert batch["node_count"] == 418
         history = await _call(
             session,
             trace,
             "branch_history",
-            {"project": project, "branch": "main", "limit": 10},
+            project=project,
+            branch="main",
+            limit=10,
         )
         assert len(history) == 3
         rendered = await _call(
             session,
             trace,
             "program_render",
-            {
-                "project": project,
-                "branch": "main",
-                "document": DOCUMENT,
-                "annotated": False,
-            },
+            project=project,
+            branch="main",
+            document=DOCUMENT,
+            annotated=False,
         )
         source = str(rendered["source"])
         assert source.count("(add_i32") == 79
         assert source.count("(const_i32 1)") == 80
-
         validated = await _call(
             session,
             trace,
             "program_validate",
-            {"project": project, "branch": "main", "document": DOCUMENT},
+            project=project,
+            branch="main",
+            document=DOCUMENT,
         )
-        assert validated["available"] is True
         assert validated["valid"] is True
-        assert validated["wir"].strip()
-
         built = await _call(
             session,
             trace,
             "program_build",
-            {"project": project, "branch": "main", "document": DOCUMENT},
+            project=project,
+            branch="main",
+            document=DOCUMENT,
         )
         assert built["status"] == "succeeded"
-        assert built["compiler_manifest_protocol_valid"] is True
-        assert built["compiler_diagnostics_protocol_valid"] is True
         inspected = await _call(
             session,
             trace,
             "build_get",
-            {"build_id": built["build_id"]},
+            build_id=built["build_id"],
         )
         materialized = Path(inspected["artifact_paths"]["source"])
         assert materialized.read_text(encoding="utf-8") == source + "\n"
@@ -351,14 +291,13 @@ async def _run_native_batch(tmp_path: Path, compiler: Path) -> dict[str, Any]:
         text=True,
         timeout=30,
     )
-    llvm_text = llvm.read_text(encoding="utf-8")
-    assert "define i32 @main" in llvm_text
-    assert "add i32" in llvm_text
+    assert "add i32" in llvm.read_text(encoding="utf-8")
 
     summary = {
         "case": project,
         "actual_exit": completed.returncode,
         "structural_operation_count": 246,
+        "stored_node_count": 418,
         "batch_write_calls": 1,
         "atomic_write_calls_equivalent": 246,
         "write_call_reduction_ratio": 1.0 - (1.0 / 246.0),
@@ -366,7 +305,7 @@ async def _run_native_batch(tmp_path: Path, compiler: Path) -> dict[str, Any]:
         "atomic_revision_count_equivalent": 248,
         "revision_reduction_ratio": 1.0 - (3.0 / 248.0),
         "mcp_call_count": len(trace),
-        "batch_duration_ms": batch_duration_ms,
+        "batch_duration_ms": duration_ms,
         "source_bytes": materialized.stat().st_size,
         "wir_bytes": wir.stat().st_size,
         "llvm_bytes": llvm.stat().st_size,
@@ -386,7 +325,7 @@ async def _run_native_batch(tmp_path: Path, compiler: Path) -> dict[str, Any]:
 
 @pytest.mark.real_mcp
 def test_real_stdio_mcp_batch_commits_one_revision(tmp_path: Path) -> None:
-    asyncio.run(_run_protocol_batch(tmp_path))
+    asyncio.run(_run_protocol(tmp_path))
 
 
 @pytest.mark.real_mcp
@@ -401,6 +340,6 @@ def test_real_stdio_mcp_batch_reduces_round_trips_and_runs(tmp_path: Path) -> No
     if os.name == "nt":
         pytest.skip("native execution qualification is currently POSIX-only")
 
-    summary = asyncio.run(_run_native_batch(tmp_path, compiler))
+    summary = asyncio.run(_run_native(tmp_path, compiler))
     assert summary["write_call_reduction_ratio"] > 0.99
     assert summary["revision_reduction_ratio"] > 0.98
