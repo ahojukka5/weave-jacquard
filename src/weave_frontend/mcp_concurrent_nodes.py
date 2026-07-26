@@ -1,11 +1,11 @@
-"""Production MCP registration for race-safe single-node mutations."""
+"""Production MCP registration for race-safe program and node mutations."""
 
 from __future__ import annotations
 
 from typing import Any
 
 from . import mcp_server as _server
-from .concurrent_sexpr import SExpressionWorkspace
+from .concurrent_workspace import SExpressionWorkspace
 
 # The base MCP workspace factory resolves this module global when first called.
 # Install the public race-safe subclass before any tool can populate its cache.
@@ -16,6 +16,8 @@ _result = _server._result
 workspace = _server.workspace
 
 for _tool_name in (
+    "program_create",
+    "program_import",
     "node_create_form",
     "node_add_atom",
     "node_set_atom",
@@ -24,6 +26,52 @@ for _tool_name in (
     "node_wrap",
 ):
     mcp.remove_tool(_tool_name)
+
+
+@mcp.tool()
+def program_create(
+    project: str,
+    branch: str,
+    document: str,
+    program_name: str,
+    version: str = "0.1",
+    expected_revision_id: str | None = None,
+) -> dict[str, Any]:
+    """Create one program with optional optimistic branch-head concurrency."""
+
+    return _result(
+        lambda: workspace().create_program(
+            project,
+            branch,
+            document,
+            program_name=program_name,
+            version=version,
+            expected_revision_id=expected_revision_id,
+        )
+    )
+
+
+@mcp.tool()
+def program_import(
+    project: str,
+    branch: str,
+    document: str,
+    source: str,
+    replace: bool = False,
+    expected_revision_id: str | None = None,
+) -> dict[str, Any]:
+    """Import source with optional optimistic branch-head concurrency."""
+
+    return _result(
+        lambda: workspace().import_program(
+            project,
+            branch,
+            document,
+            source,
+            replace=replace,
+            expected_revision_id=expected_revision_id,
+        )
+    )
 
 
 @mcp.tool()
