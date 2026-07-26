@@ -14,16 +14,17 @@ optimistic concurrency. Use program_validate for a coherent single document. For
 a multi-document program, define a named target and use build_target_validate so
 the target metadata and ordered sources are validated from one pinned revision.
 Before combining independent branches, call branch_merge_preview, review its
-conflicts and document consequences, then pass preview_id to branch_merge so both
-reviewed heads are rechecked atomically. Build through program_build or
-build_target_build and inspect the immutable result with build_get. When a build
-fails, read mapped errors through build_diagnostics_page instead of assuming
-access to server-local artifact paths. Pass the failed build revision_id to
-node_inspect when the branch may have advanced, then use revision_diff_page to
-compare that failing state with the current branch head before repairing. Use
-branch_history_page for complete bounded history reads, revision_operations_page
-for exact grouped-edit audit rows, and branch_activity_summary to measure revision
-and operation grouping.
+conflicts and document consequences, then call branch_merge_validate for the
+named target. Publish with branch_merge using both preview_id and
+validation_target so the exact compiler-validated candidate is rechecked before
+the target branch advances. Build through program_build or build_target_build and
+inspect the immutable result with build_get. When a build fails, read mapped
+errors through build_diagnostics_page instead of assuming access to server-local
+artifact paths. Pass the failed build revision_id to node_inspect when the branch
+may have advanced, then use revision_diff_page to compare that failing state with
+the current branch head before repairing. Use branch_history_page for complete
+bounded history reads, revision_operations_page for exact grouped-edit audit rows,
+and branch_activity_summary to measure revision and operation grouping.
 """.strip()
 
 
@@ -40,7 +41,8 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "build_target_set for a reusable multi-document program",
             "build_target_validate before a named-target build",
             "branch_merge_preview after independent agent work",
-            "branch_merge with the reviewed preview_id",
+            "branch_merge_validate for the reviewed named target",
+            "branch_merge with preview_id and validation_target",
             "branch_activity_summary when measuring the workflow",
             "program_build or build_target_build",
             "build_get to inspect immutable provenance and artifact paths",
@@ -66,8 +68,8 @@ _TOPICS: dict[str, dict[str, Any]] = {
                 "Use @aliases for nodes created earlier in the same batch."
             ),
             "branch_merge": (
-                "Publish a stable-ID three-way merge. Pass a reviewed preview_id to "
-                "reject if either branch advanced."
+                "Publish a stable-ID three-way merge. Pass preview_id to reject changed "
+                "heads and validation_target to require authoritative compiler validation."
             ),
         },
         "positions": "Child positions are zero-based; omit position to append.",
@@ -110,6 +112,10 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "branch_merge_preview": (
                 "Preview conflicts and compact document consequences for two current "
                 "branch heads without mutating either branch."
+            ),
+            "branch_merge_validate": (
+                "Validate a named build target from the exact in-memory merge candidate "
+                "without publishing a revision or build artifact."
             ),
             "node_find": "Find stable IDs by form head, atom kind, or value.",
             "program_render": "Render canonical source or an annotated agent view.",
@@ -181,14 +187,23 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "stable-node change counts. A conflicting preview returns mergeable=false and "
             "the exact conflict paths."
         ),
+        "validation": (
+            "branch_merge_validate resolves one named target and its ordered sources from "
+            "the clean in-memory candidate, invokes weavec --frontend, and returns compiler, "
+            "source, WIR, and validation hashes without retaining artifacts."
+        ),
         "publish": (
-            "Pass preview_id to branch_merge. The target and source heads are rechecked in "
-            "the same SQLite write transaction; either change returns STALE_MERGE_PREVIEW "
-            "and publishes no revision."
+            "Pass preview_id and validation_target to branch_merge. The candidate is "
+            "revalidated, then both heads are checked in the SQLite write transaction. "
+            "Invalid candidates and stale heads publish no revision."
+        ),
+        "failures": (
+            "Unavailable validation returns MERGE_VALIDATION_UNAVAILABLE; compiler rejection "
+            "returns MERGE_VALIDATION_FAILED; changed heads return STALE_MERGE_PREVIEW."
         ),
         "compatibility": (
-            "branch_merge still accepts calls without preview_id, but reviewed parallel work "
-            "should use the two-phase flow. All merge publication is branch-head race-safe."
+            "branch_merge still accepts calls without preview_id or validation_target, but "
+            "reviewed parallel work should use the compiler-gated flow."
         ),
     },
     "ids": {
@@ -210,18 +225,23 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "build_target_validate pins one target definition and its ordered sources "
             "to one immutable revision before invoking weavec --frontend."
         ),
+        "merge_candidate": (
+            "branch_merge_validate invokes the same authoritative frontend on ordered "
+            "sources rendered from an uncommitted clean merge candidate."
+        ),
     },
     "targets": {
         "workflow": [
             "program_source_list to choose source documents",
             "build_target_set to store primary source, ordered additional sources, and target",
             "build_target_validate to validate the exact pinned target",
+            "branch_merge_validate to validate the target from a prospective merge",
             "build_target_build to compile the same target through weavec build",
             "build_get to inspect provenance, diagnostics, and artifacts",
         ],
         "revision_rule": (
-            "Target metadata and every selected source are resolved from the same branch head "
-            "or explicit revision. Source order is authoritative."
+            "Target metadata and every selected source are resolved from the same branch head, "
+            "explicit revision, or exact in-memory merge candidate. Source order is authoritative."
         ),
         "tools": [
             "build_target_set",
@@ -229,6 +249,7 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "build_target_get",
             "build_target_delete",
             "build_target_validate",
+            "branch_merge_validate",
             "build_target_build",
         ],
     },
