@@ -1,0 +1,51 @@
+"""Production MCP registration for revision-pinned agent resume snapshots."""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from typing import Any
+
+from .mcp_build import build_targets
+from .mcp_preflight import merge_policies
+from .mcp_server import _result, mcp, workspace
+from .resume_snapshot import ResumeSnapshotService
+
+
+@lru_cache(maxsize=1)
+def resume_snapshots() -> ResumeSnapshotService:
+    """Return the shared bounded resume-snapshot service."""
+
+    return ResumeSnapshotService(
+        workspace(),
+        build_targets(),
+        merge_policies(),
+    )
+
+
+@mcp.tool()
+def branch_resume_snapshot(
+    project: str,
+    branch: str = "main",
+    revision_id: str | None = None,
+    document_limit: int = 100,
+    target_limit: int = 50,
+    context_limit: int = 20,
+    branch_limit: int = 50,
+    history_limit: int = 10,
+    operation_limit: int = 50,
+) -> dict[str, Any]:
+    """Orient a restarted agent from one exact bounded immutable project state."""
+
+    return _result(
+        lambda: resume_snapshots().snapshot(
+            project,
+            branch,
+            revision_id=revision_id,
+            document_limit=document_limit,
+            target_limit=target_limit,
+            context_limit=context_limit,
+            branch_limit=branch_limit,
+            history_limit=history_limit,
+            operation_limit=operation_limit,
+        )
+    )
