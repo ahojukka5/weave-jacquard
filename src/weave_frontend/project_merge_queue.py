@@ -7,13 +7,16 @@ from typing import Any
 from .errors import ValidationError
 from .merge_preview import MergePreviewService
 from .project_agent_status import (
-    MAX_AGENT_STATUS_BRANCH_CATALOG,
     MAX_AGENT_STATUS_CHECKPOINT_SCAN,
     ProjectAgentStatusService,
 )
+from .project_merge_catalog import (
+    PROJECT_MERGE_CATALOG_FORMAT,
+    ProjectMergeCatalogService,
+)
 
 PROJECT_MERGE_QUEUE_FORMAT = "weave-project-merge-queue-v1"
-PROJECT_MERGE_QUEUE_CATALOG_FORMAT = "weave-project-merge-queue-catalog-v1"
+PROJECT_MERGE_QUEUE_CATALOG_FORMAT = PROJECT_MERGE_CATALOG_FORMAT
 MAX_PROJECT_MERGE_QUEUE_PAGE = 20
 MAX_PROJECT_MERGE_QUEUE_CONFLICTS = 100
 MAX_PROJECT_MERGE_QUEUE_DOCUMENTS = 200
@@ -26,10 +29,12 @@ class ProjectMergeQueueService:
         self,
         previews: MergePreviewService,
         statuses: ProjectAgentStatusService,
+        catalogs: ProjectMergeCatalogService | None = None,
     ) -> None:
         self.previews = previews
         self.statuses = statuses
         self.workspace = previews.workspace
+        self.catalogs = catalogs or ProjectMergeCatalogService(self.workspace)
 
     def page(
         self,
@@ -64,26 +69,14 @@ class ProjectMergeQueueService:
         self._validate_optional_id("catalog_id", catalog_id)
         self._validate_optional_id("start_after_source", start_after_source)
 
-        project_id = self.workspace.project_id(project)
-        members = self._catalog_members(project_id)
-        target = next(
-            (member for member in members if member["branch"] == target_branch),
-            None,
+        catalog = self.catalogs.capture(
+            project,
+            target_branch,
+            invalid_target_code="INVALID_MERGE_QUEUE_TARGET",
         )
-        if target is None:
-            raise ValidationError(
-                "INVALID_MERGE_QUEUE_TARGET",
-                f"target branch {target_branch!r} is not in the project catalog",
-            )
-        sources = [member for member in members if member["branch"] != target_branch]
-        effective_catalog_id = self.workspace.db.hash_value(
-            {
-                "format": PROJECT_MERGE_QUEUE_CATALOG_FORMAT,
-                "project": project,
-                "target": target,
-                "sources": sources,
-            }
-        )
+        target = catalog["target"]
+        sources = catalog["sources"]
+        effective_catalog_id = catalog["catalog_id"]
         if catalog_id is not None and catalog_id != effective_catalog_id:
             raise ValidationError(
                 "STALE_PROJECT_MERGE_QUEUE_CATALOG",
@@ -238,27 +231,9 @@ class ProjectMergeQueueService:
         }
 
     def _catalog_members(self, project_id: str) -> list[dict[str, str]]:
-        rows = self.workspace.db.connection.execute(
-            """SELECT name, head_revision_id
-               FROM branches
-               WHERE project_id = ?
-               ORDER BY name
-               LIMIT ?""",
-            (project_id, MAX_AGENT_STATUS_BRANCH_CATALOG + 1),
-        ).fetchall()
-        if len(rows) > MAX_AGENT_STATUS_BRANCH_CATALOG:
-            raise ValidationError(
-                "MERGE_QUEUE_BRANCH_FANOUT_EXCEEDED",
-                "project merge queue supports at most "
-                f"{MAX_AGENT_STATUS_BRANCH_CATALOG} branches",
-            )
-        return [
-            {
-                "branch": str(row["name"]),
-                "head_revision_id": str(row["head_revision_id"]),
-            }
-            for row in rows
-        ]
+        """Compatibility delegate for older internal callers."""
+
+        return self.catalogs.members(project_id)
 
     @staticmethod
     def _validate_limit(name: str, value: Any, maximum: int) -> None:
