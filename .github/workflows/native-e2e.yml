@@ -15,7 +15,6 @@ concurrency:
 
 env:
   WEAVEC_RELEASE: v0.3.0
-  WEAVEC_ARCHIVE: weavec-v0.3.0-linux-x86_64-glibc.tar.gz
 
 jobs:
   native-e2e:
@@ -38,66 +37,64 @@ jobs:
           python -m pip install -e .
           python -m pip install pytest
 
-      - name: Inspect weavec release metadata
+      - name: Resolve immutable weavec release assets
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set +e
-          gh api \
-            "repos/ahojukka5/weavec/releases/tags/$WEAVEC_RELEASE" \
-            > release-metadata.json \
-            2> release-error.txt
-          status="$?"
-          set -e
-          printf 'status=%s\n' "$status" >> "$GITHUB_OUTPUT"
-          if [[ "$status" -eq 0 ]]; then
-            python - <<'PY'
+          set -euo pipefail
+          gh api "repos/ahojukka5/weavec/releases/tags/$WEAVEC_RELEASE" \
+            > release-metadata.json
+
+          python - <<'PY'
           import json
+          import os
           from pathlib import Path
 
           release = json.loads(Path("release-metadata.json").read_text(encoding="utf-8"))
+          assets = release.get("assets", [])
+          archives = [
+              asset
+              for asset in assets
+              if asset["name"].endswith("-linux-x86_64-glibc.tar.gz")
+          ]
+          checksums = [asset for asset in assets if asset["name"] == "SHA256SUMS"]
+          assert len(archives) == 1, [asset["name"] for asset in assets]
+          assert len(checksums) == 1, [asset["name"] for asset in assets]
+
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a", encoding="utf-8") as stream:
+              stream.write(f"archive_name={archives[0]['name']}\n")
+              stream.write(f"archive_url={archives[0]['browser_download_url']}\n")
+              stream.write(f"checksum_url={checksums[0]['browser_download_url']}\n")
+
           print("release:", release["tag_name"])
-          for asset in release.get("assets", []):
-              print("asset:", asset["name"], asset["size"])
+          print("archive:", archives[0]["name"], archives[0]["size"])
+          print("checksum:", checksums[0]["name"], checksums[0]["size"])
           PY
-          else
-            cat release-error.txt
-          fi
 
-      - name: Upload release metadata on failure
-        if: steps.release.outputs.status != '0'
-        uses: actions/upload-artifact@v4
-        with:
-          name: weavec-release-metadata
-          path: |
-            release-metadata.json
-            release-error.txt
-          if-no-files-found: warn
-
-      - name: Require published release
-        if: steps.release.outputs.status != '0'
-        run: exit 1
-
-      - name: Download immutable packaged weavec
+      - name: Download and verify packaged weavec
         env:
-          GH_TOKEN: ${{ github.token }}
+          ARCHIVE_NAME: ${{ steps.release.outputs.archive_name }}
+          ARCHIVE_URL: ${{ steps.release.outputs.archive_url }}
+          CHECKSUM_URL: ${{ steps.release.outputs.checksum_url }}
         run: |
           set -euo pipefail
           mkdir -p dist compiler
-          gh release download "$WEAVEC_RELEASE" \
-            --repo ahojukka5/weavec \
-            --pattern "$WEAVEC_ARCHIVE" \
-            --pattern SHA256SUMS \
-            --dir dist
+          curl --fail --location --retry 3 \
+            "$ARCHIVE_URL" \
+            --output "dist/$ARCHIVE_NAME"
+          curl --fail --location --retry 3 \
+            "$CHECKSUM_URL" \
+            --output dist/SHA256SUMS
 
-          grep -F " $WEAVEC_ARCHIVE" dist/SHA256SUMS > dist/GLIBC-SHA256SUM
+          grep -F " $ARCHIVE_NAME" dist/SHA256SUMS > dist/GLIBC-SHA256SUM
           (
             cd dist
             sha256sum --check GLIBC-SHA256SUM
           )
 
-          tar -C compiler -xzf "dist/$WEAVEC_ARCHIVE"
+          tar -C compiler -xzf "dist/$ARCHIVE_NAME"
           compiler_path="$(find compiler -type f -path '*/bin/weavec' -print -quit)"
           test -n "$compiler_path"
           test -x "$compiler_path"
@@ -124,6 +121,7 @@ jobs:
           mkdir -p qualification
           cp "$source_path" qualification/main.weave
           cp "$trace_path" qualification/qualification-trace.json
+          cp release-metadata.json qualification/weavec-release.json
 
           "$WEAVEC_BIN" --frontend \
             qualification/program.wir \
