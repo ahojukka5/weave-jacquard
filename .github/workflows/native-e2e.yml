@@ -45,7 +45,6 @@ jobs:
         run: |
           set +e
           gh api \
-            --repo ahojukka5/weavec \
             "repos/ahojukka5/weavec/releases/tags/$WEAVEC_RELEASE" \
             > release-metadata.json \
             2> release-error.txt
