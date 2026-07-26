@@ -120,6 +120,7 @@ jobs:
             tests/e2e/test_real_mcp_algorithmic_stress.py \
             tests/e2e/test_real_mcp_batch_edit.py \
             tests/e2e/test_real_mcp_workflow_equivalence.py \
+            tests/e2e/test_real_mcp_compiler_repair.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
@@ -146,6 +147,7 @@ jobs:
               "binary-search-batch16",
               "batched-sum80",
               "atomic-batch-equivalence-sum32",
+              "compiler-guided-repair",
           }, by_name
           assert by_name["while-accumulator"]["actual_exit"] == 42
           assert by_name["multi-function-chain"]["actual_exit"] == 35
@@ -162,6 +164,12 @@ jobs:
           assert equivalence["wir_identical"] is True
           assert equivalence["llvm_identical"] is True
           assert equivalence["bitcode_identical"] is True
+          repair = by_name["compiler-guided-repair"]
+          assert repair["actual_exit"] == 0
+          assert repair["diagnostic_code"] == "backend.unknown-expression-operator"
+          assert repair["diagnostic_node_id"] == repair["repaired_node_id"]
+          assert repair["failed_build_retained"] is True
+          assert repair["failed_build_published_executable"] is False
           assert all(summary["llvm_bytes"] > 0 for summary in summaries)
           assert all(summary["bitcode_bytes"] > 0 for summary in summaries)
 
