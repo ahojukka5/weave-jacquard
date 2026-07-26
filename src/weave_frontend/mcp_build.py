@@ -13,12 +13,14 @@ from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
 from .mcp_guidance import install_runtime_guidance
 from .mcp_server import _result, mcp, workspace
+from .merge_preview import MergePreviewService
 from .revision_diff import RevisionNodeDiffService
 from .revision_inspection import RevisionNodeInspectionService
 from .target_validation import BuildTargetValidator
 
 install_runtime_guidance(mcp)
 mcp.remove_tool("node_inspect")
+mcp.remove_tool("branch_merge")
 
 
 @lru_cache(maxsize=1)
@@ -42,6 +44,11 @@ def revision_diffs() -> RevisionNodeDiffService:
 
 
 @lru_cache(maxsize=1)
+def merge_previews() -> MergePreviewService:
+    return MergePreviewService(workspace())
+
+
+@lru_cache(maxsize=1)
 def compiler_bridge() -> CompilerBridge:
     return CompilerBridge(
         workspace(),
@@ -62,6 +69,40 @@ def build_targets() -> BuildTargetRegistry:
 @lru_cache(maxsize=1)
 def build_target_validator() -> BuildTargetValidator:
     return BuildTargetValidator(build_targets())
+
+
+@mcp.tool()
+def branch_merge_preview(
+    project: str,
+    target_branch: str,
+    source_branch: str,
+) -> dict[str, object]:
+    """Preview a stable-ID merge without advancing either branch."""
+
+    return _result(
+        lambda: merge_previews().preview(project, target_branch, source_branch)
+    )
+
+
+@mcp.tool()
+def branch_merge(
+    project: str,
+    target_branch: str,
+    source_branch: str,
+    preview_id: str | None = None,
+    author: str = "merge-agent",
+) -> dict[str, object]:
+    """Merge branch heads, optionally enforcing an unchanged reviewed preview."""
+
+    return _result(
+        lambda: merge_previews().merge(
+            project,
+            target_branch,
+            source_branch,
+            preview_id=preview_id,
+            author=author,
+        )
+    )
 
 
 @mcp.tool()
