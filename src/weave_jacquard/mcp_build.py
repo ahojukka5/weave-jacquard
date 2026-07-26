@@ -2,6 +2,9 @@
 
 import weave_frontend.mcp_concurrent_nodes as _mcp_concurrent_nodes
 from weave_frontend import mcp_agent_checkpoint as _mcp_agent_checkpoint
+from weave_frontend import (
+    mcp_agent_checkpoint_timeline as _mcp_agent_checkpoint_timeline,
+)
 from weave_frontend import mcp_build_discovery as _mcp_build_discovery
 from weave_frontend import mcp_concurrent_branches as _mcp_concurrent_branches
 from weave_frontend import mcp_concurrent_context as _mcp_concurrent_context
@@ -21,6 +24,7 @@ _ = (
     _mcp_concurrent_context,
     _mcp_preflight,
     _mcp_agent_checkpoint,
+    _mcp_agent_checkpoint_timeline,
     _mcp_resume_snapshot,
     _mcp_revision_reads,
 )
