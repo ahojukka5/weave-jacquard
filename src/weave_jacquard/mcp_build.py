@@ -2,6 +2,7 @@
 
 import weave_frontend.mcp_concurrent_nodes as _mcp_concurrent_nodes
 from weave_frontend import mcp_build_discovery as _mcp_build_discovery
+from weave_frontend import mcp_concurrent_branches as _mcp_concurrent_branches
 from weave_frontend import mcp_concurrent_context as _mcp_concurrent_context
 from weave_frontend import mcp_concurrent_targets as _mcp_concurrent_targets
 from weave_frontend import mcp_policy as _mcp_policy
@@ -11,6 +12,7 @@ from weave_frontend.mcp_build import main
 
 _ = (
     _mcp_concurrent_nodes,
+    _mcp_concurrent_branches,
     _mcp_build_discovery,
     _mcp_concurrent_targets,
     _mcp_policy,
