@@ -38,7 +38,15 @@ jobs:
         run: python -m compileall -q src tests
 
       - name: Lint
-        run: ruff check .
+        id: lint
+        run: ruff check . --output-format=json > ruff-report.json
+
+      - name: Upload lint report
+        if: failure() && steps.lint.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruff-report
+          path: ruff-report.json
 
       - name: Test
         run: pytest --cov=weave_frontend --cov-report=term-missing
