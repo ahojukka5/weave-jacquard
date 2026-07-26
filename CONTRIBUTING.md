@@ -88,11 +88,12 @@ Read `docs/single-node-concurrency.md`,
 `docs/reproducible-branch-creation.md`,
 `docs/agent-resume-snapshot.md`,
 `docs/agent-checkpoints.md`,
-`docs/agent-checkpoint-timeline.md`, and
-`docs/project-agent-status.md` before changing branch writes, fork semantics,
-one-call orientation reads, handoff protocols, checkpoint supervision, or
-project-wide agent status reads. Consult `docs/write-concurrency-audit.md` before
-adding a new mutating tool.
+`docs/agent-checkpoint-timeline.md`,
+`docs/project-agent-status.md`, and
+`docs/project-merge-queue.md` before changing branch writes, fork semantics,
+one-call orientation reads, handoff protocols, checkpoint supervision,
+project-wide agent status, or project merge-queue reads. Consult
+`docs/write-concurrency-audit.md` before adding a new mutating tool.
 
 In particular:
 
@@ -129,6 +130,16 @@ In particular:
 - project agent status must not infer inactivity, correctness, completion,
   blockage, or review readiness from timestamps, checkpoint lag, status labels,
   or program root hashes;
+- project merge queues must bind one exact target head and every source head in a
+  stable catalog, rejecting source or target changes rather than mixing previews;
+- merge-queue pages must independently bound source count, checkpoint scanning,
+  conflicts, and changed-document evidence while reporting totals and truncation;
+- merge-queue `mergeable` values must mean structural preview success only and
+  must not imply policy admission, target coverage, compiler validation,
+  preflight identity, publication-head stability, or human readiness;
+- merge-queue lexical ordering must remain deterministic pagination and must not
+  be interpreted as priority, urgency, age, quality, checkpoint freshness, or
+  readiness;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
