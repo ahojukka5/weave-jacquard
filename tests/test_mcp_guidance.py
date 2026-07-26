@@ -62,7 +62,10 @@ def test_workflow_defaults_to_one_call_merge_preflight() -> None:
     assert "current head" in steps[-1]
 
 
-def test_instructions_explain_preflight_revalidation() -> None:
+def test_instructions_explain_preflight_revalidation_and_target_policy() -> None:
+    assert "merge_policy_set" in INSTRUCTIONS
+    assert "current target branch policy is authoritative" in INSTRUCTIONS
+    assert "cannot weaken admission" in INSTRUCTIONS
     assert "branch_merge_preflight" in INSTRUCTIONS
     assert "publication_tool" in INSTRUCTIONS
     assert "publication_arguments" in INSTRUCTIONS
@@ -111,8 +114,31 @@ def test_history_help_preserves_pagination_metric_and_audit_contract() -> None:
     assert "Do not maximize batch size" in help_value["interpretation"]
 
 
-def test_merge_help_preserves_preflight_and_publication_contract() -> None:
+def test_policy_help_preserves_target_authority_and_history_contract() -> None:
+    help_value = weave_help("policy")["help"]
+    assert "merge_policy_set" in help_value["set"]
+    assert "immutable revision" in help_value["set"]
+    assert "merge_policy_get" in help_value["get"]
+    assert "first-parent" in help_value["get"]
+    assert "revision_id" in help_value["get"]
+    assert "target branch policy" in help_value["authority"]
+    assert "source_policy_ignored=true" in help_value["authority"]
+    assert "cannot weaken" in help_value["authority"]
+    assert "directly on that target" in help_value["change"]
+    assert "invalidates older preview and preflight" in help_value["change"]
+    assert "configured=false" in help_value["compatibility"]
+    assert help_value["strict_default"] == {
+        "require_preflight": True,
+        "require_affected_validation": True,
+        "allow_uncovered_documents": False,
+        "max_affected_targets": "choose a bounded project-appropriate value",
+    }
+
+
+def test_merge_help_preserves_policy_preflight_and_publication_contract() -> None:
     help_value = weave_help("merge")["help"]
+    assert "target policy controls" in help_value["policy"]
+    assert "source differences" in help_value["policy"]
     assert "branch_merge_preflight" in help_value["preflight"]
     assert "exact branch heads" in help_value["preflight"]
     assert "complete affected-target validation set" in help_value["preflight"]
@@ -126,23 +152,37 @@ def test_merge_help_preserves_preflight_and_publication_contract() -> None:
     assert "without starting a compiler" in help_value["validation"]
     assert "publication_tool" in help_value["publish"]
     assert "publication_arguments" in help_value["publish"]
+    assert "Policy-aware preflight is recomputed" in help_value["publish"]
     assert "evidence" in help_value["publish"]
     assert "MERGE_UNCOVERED_DOCUMENTS" in help_value["failures"]
     assert "MERGE_VALIDATION_UNAVAILABLE" in help_value["failures"]
     assert "MERGE_VALIDATION_FAILED" in help_value["failures"]
     assert "STALE_MERGE_PREVIEW" in help_value["failures"]
-    assert "Lower-level" in help_value["compatibility"]
+    assert "MERGE_POLICY_PREFLIGHT_REQUIRED" in help_value["failures"]
+    assert "MERGE_POLICY_AFFECTED_VALIDATION_REQUIRED" in help_value["failures"]
+    assert "MERGE_POLICY_VIOLATION" in help_value["failures"]
+    assert "STALE_MERGE_PREFLIGHT" in help_value["failures"]
+    assert "TOO_MANY_AFFECTED_TARGETS" in help_value["failures"]
+    assert "target policy permits" in help_value["compatibility"]
 
 
-def test_read_help_exposes_preflight_and_diagnostic_layers() -> None:
-    tools = weave_help("read")["help"]["tools"]
-    assert "branch_merge_preflight" in tools
-    assert "exact preview identity" in tools["branch_merge_preflight"]
-    assert "branch_merge_preview" in tools
-    assert "branch_merge_impact" in tools
-    assert "branch_merge_validate" in tools
-    assert "branch_merge_validate_affected" in tools
-    assert "aggregate" in tools["branch_merge_validate_affected"]
+def test_read_and_write_help_expose_policy_tools() -> None:
+    read_tools = weave_help("read")["help"]["tools"]
+    write_tools = weave_help("write")["help"]["tools"]
+    assert "merge_policy_get" in read_tools
+    assert "first-parent" in read_tools["merge_policy_get"]
+    assert "branch_merge_preflight" in read_tools
+    assert "target-authoritative policy" in read_tools["branch_merge_preflight"]
+    assert "exact preview identity" in read_tools["branch_merge_preflight"]
+    assert "branch_merge_preview" in read_tools
+    assert "branch_merge_impact" in read_tools
+    assert "branch_merge_validate" in read_tools
+    assert "branch_merge_validate_affected" in read_tools
+    assert "aggregate" in read_tools["branch_merge_validate_affected"]
+    assert "merge_policy_set" in write_tools
+    assert "directly on the branch" in write_tools["merge_policy_set"]
+    assert "branch_merge" in write_tools
+    assert "policy" in write_tools["branch_merge"]
 
 
 def test_validation_distinguishes_stored_and_merge_candidate_paths() -> None:
@@ -168,6 +208,8 @@ def test_target_help_preserves_source_order_and_preflight_contract() -> None:
     ]
     assert "exact in-memory merge candidate" in help_value["revision_rule"]
     assert "Source order is authoritative" in help_value["revision_rule"]
+    assert "merge_policy_get" in help_value["tools"]
+    assert "merge_policy_set" in help_value["tools"]
     assert "branch_merge_preflight" in help_value["tools"]
     assert "branch_merge_impact" in help_value["tools"]
     assert "branch_merge_validate" in help_value["tools"]
