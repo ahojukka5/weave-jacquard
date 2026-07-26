@@ -2,8 +2,8 @@
 
 ## Purpose
 
-This audit records which Jacquard branch-mutating paths publish from one captured
-base revision and which paths still need strengthening.
+This audit records the publication boundary for every known Jacquard MCP path
+that advances an existing branch head.
 
 ## Compare-and-set safe
 
@@ -13,36 +13,44 @@ base revision and which paths still need strengthening.
 - `node_apply_batch`;
 - `build_target_set`;
 - `build_target_delete`;
+- `context_add`;
+- `merge_policy_set`;
 - branch merge preview/preflight publication;
 - compiler-gated merge publication.
 
 These paths capture one or more reviewed branch heads and recheck them inside the
-same SQLite transaction that publishes the revision. Program, node, batch, and
-target writes accept optional `expected_revision_id`; successful direct writes
-report `base_revision_id`.
+same SQLite transaction that publishes the revision. Program, node, batch,
+target, context, and policy writes accept optional `expected_revision_id` where
+one target branch is mutated; successful direct writes report
+`base_revision_id`.
 
-## Context-document mutations requiring a separate design
+Context and policy publication use the stronger content-document invariant: the
+content-addressed `documents` row, dynamic operation payload, inherited and new
+revision-document links, immutable revision, and conditional branch update all
+commit or roll back together.
 
-The following paths insert or reuse a `documents` row in one transaction and only
-later publish the revision that references it:
+## Other writes
 
-- `context_add`;
-- `merge_policy_set`.
+Project initialization creates the project, initial revision, and main branch as
+one database operation. Branch creation copies one current source head while
+inserting a new branch row; it does not overwrite an existing branch. Explicit
+checkout intentionally moves a branch to a caller-selected project revision and
+is not a prepared state transformation.
 
-Adding only a branch compare-and-set would prevent branch clobbering but could
-still leave an unreferenced document row when publication loses a race. They need
-an atomic document-plus-revision publication primitive or an equivalent
-transactional callback inside `_commit`.
+Native builds and validations are pinned reads of immutable revisions and do not
+advance branches. Read-only tools do not participate in this audit.
 
-The required invariant is stronger than branch safety:
+## Ongoing rule
 
-- the context document row must be inserted or reused;
-- its revision link and operation audit row must be published;
-- the branch head must be conditionally advanced;
-- every part must commit or roll back as one SQLite transaction.
+Any new existing-branch mutation must document and test:
 
-## Non-goals
+1. the exact branch state read;
+2. optional prepared-state expectation semantics;
+3. the transaction that publishes all persistent consequences;
+4. the conditional branch-head update;
+5. rollback evidence for stale or mid-publication failure;
+6. response provenance identifying the selected base.
 
-This audit does not classify read-only tools, native builds pinned to immutable
-revisions, or branch creation from an explicitly selected source head as stale
-state overwrites.
+A write that creates auxiliary persistent rows must publish those rows and their
+revision references in the same transaction. Preventing branch clobbering alone
+is insufficient when a failed attempt could leave orphan state.
