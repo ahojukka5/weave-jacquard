@@ -31,6 +31,7 @@ class MergeValidationSetService:
         *,
         preview_id: str | None = None,
         allow_uncovered_documents: bool = False,
+        max_target_validations: int = MAX_AFFECTED_TARGET_VALIDATIONS,
     ) -> dict[str, Any]:
         """Return deterministic validation evidence for all affected candidate targets."""
 
@@ -39,6 +40,7 @@ class MergeValidationSetService:
                 "INVALID_UNCOVERED_DOCUMENT_POLICY",
                 "allow_uncovered_documents must be a boolean",
             )
+        self._validate_max_target_validations(max_target_validations)
 
         impact = self.impacts.analyze(
             project,
@@ -54,12 +56,12 @@ class MergeValidationSetService:
             for item in impact["affected_targets"]
             if item["after"] is None
         ]
-        if len(surviving) > MAX_AFFECTED_TARGET_VALIDATIONS:
+        if len(surviving) > max_target_validations:
             raise ValidationError(
                 "TOO_MANY_AFFECTED_TARGETS",
                 "prospective merge affects "
                 f"{len(surviving)} surviving targets; maximum is "
-                f"{MAX_AFFECTED_TARGET_VALIDATIONS}",
+                f"{max_target_validations}",
             )
 
         uncovered = list(impact["uncovered_changed_documents"])
@@ -102,6 +104,7 @@ class MergeValidationSetService:
             "preview_id": impact["preview_id"],
             "merged_root_hash": impact["merged_root_hash"],
             "allow_uncovered_documents": allow_uncovered_documents,
+            "max_target_validations": max_target_validations,
             "uncovered_changed_documents": uncovered,
             "affected_surviving_targets": [str(item["name"]) for item in surviving],
             "skipped_removed_targets": removed,
@@ -126,6 +129,7 @@ class MergeValidationSetService:
             ],
             "uncovered_changed_documents": uncovered,
             "allow_uncovered_documents": allow_uncovered_documents,
+            "max_target_validations": max_target_validations,
             "coverage_passed": coverage_passed,
             "affected_target_count": impact["total_affected_target_count"],
             "affected_surviving_target_count": len(surviving),
@@ -171,6 +175,20 @@ class MergeValidationSetService:
             raise ValidationError(
                 "INCOMPLETE_MERGE_VALIDATION_SET",
                 "not every affected surviving target produced a passing validation",
+            )
+
+    @staticmethod
+    def _validate_max_target_validations(value: int) -> None:
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or value < 1
+            or value > MAX_AFFECTED_TARGET_VALIDATIONS
+        ):
+            raise ValidationError(
+                "INVALID_AFFECTED_TARGET_LIMIT",
+                "max_target_validations must be between 1 and "
+                f"{MAX_AFFECTED_TARGET_VALIDATIONS}",
             )
 
     @staticmethod
