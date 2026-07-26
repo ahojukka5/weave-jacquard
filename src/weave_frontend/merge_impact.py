@@ -35,10 +35,39 @@ class MergeTargetImpactService:
     ) -> dict[str, Any]:
         """Return one bounded deterministic page of affected named targets."""
 
-        self._validate_preview_id(preview_id)
         self._validate_start_index(start_index)
         self._validate_limit(limit)
+        result = self.analyze(
+            project,
+            target_branch,
+            source_branch,
+            preview_id=preview_id,
+        )
+        affected = result.pop("affected_targets")
+        page = affected[start_index : start_index + limit]
+        next_index = start_index + len(page)
+        has_more = next_index < len(affected)
+        return {
+            **result,
+            "start_index": start_index,
+            "limit": limit,
+            "returned_count": len(page),
+            "has_more": has_more,
+            "next_index": next_index if has_more else None,
+            "affected_targets": page,
+        }
 
+    def analyze(
+        self,
+        project: str,
+        target_branch: str,
+        source_branch: str,
+        *,
+        preview_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Return complete deterministic impact data for internal orchestration."""
+
+        self._validate_preview_id(preview_id)
         candidate = self.previews.candidate(project, target_branch, source_branch)
         if preview_id is not None and preview_id != candidate["preview_id"]:
             raise ValidationError(
@@ -59,8 +88,7 @@ class MergeTargetImpactService:
         )
 
         changed_documents = {
-            str(change["document"])
-            for change in candidate["document_changes"]
+            str(change["document"]) for change in candidate["document_changes"]
         }
         changed_program_documents = sorted(
             document
@@ -80,6 +108,9 @@ class MergeTargetImpactService:
             after_targets,
             set(changed_program_documents),
         )
+        affected_candidate_names = {
+            str(item["name"]) for item in affected if item["after"] is not None
+        }
         candidate_covered_documents = sorted(
             {
                 document
@@ -92,9 +123,6 @@ class MergeTargetImpactService:
             set(changed_program_documents) - set(candidate_covered_documents)
         )
 
-        page = affected[start_index : start_index + limit]
-        next_index = start_index + len(page)
-        has_more = next_index < len(affected)
         return {
             "format": MERGE_TARGET_IMPACT_FORMAT,
             "project": project,
@@ -112,33 +140,9 @@ class MergeTargetImpactService:
             "total_target_count_before": len(before_targets),
             "total_target_count_after": len(after_targets),
             "total_affected_target_count": len(affected),
-            "unaffected_target_count": max(0, len(after_targets) - len(affected)),
-            "start_index": start_index,
-            "limit": limit,
-            "returned_count": len(page),
-            "has_more": has_more,
-            "next_index": next_index if has_more else None,
-            "affected_targets": page,
+            "unaffected_target_count": len(after_targets) - len(affected_candidate_names),
+            "affected_targets": affected,
         }
-
-    def all_affected(
-        self,
-        project: str,
-        target_branch: str,
-        source_branch: str,
-        *,
-        preview_id: str | None = None,
-    ) -> dict[str, Any]:
-        """Return the complete impact result for internal validation orchestration."""
-
-        return self.page(
-            project,
-            target_branch,
-            source_branch,
-            preview_id=preview_id,
-            start_index=0,
-            limit=MAX_MERGE_TARGET_IMPACT_PAGE_SIZE,
-        )
 
     def _targets(
         self,
