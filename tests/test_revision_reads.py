@@ -4,8 +4,7 @@ from typing import Any
 
 import pytest
 
-from weave_frontend import NotFoundError
-from weave_frontend import mcp_revision_reads
+from weave_frontend import NotFoundError, mcp_revision_reads
 from weave_frontend.revision_reads import RevisionReadService
 
 
