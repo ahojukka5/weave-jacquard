@@ -18,8 +18,8 @@ Primary executables: **`weave-mcp`** and **`weave-build`**
 Jacquard owns:
 
 - single-node and bounded transactional edits with stable node identities;
-- immutable revisions, parallel branches, structural merge, measured branch activity,
-  and bounded stable-node revision diffs;
+- immutable revisions, parallel branches, previewed race-safe structural merge,
+  measured branch activity, and bounded stable-node revision diffs;
 - project-, document-, and symbol-scoped context;
 - compiler-corpus-backed grammar help;
 - authoritative validation through `weavec --frontend`;
@@ -42,7 +42,7 @@ grammar-neutral revision service responsible only for:
 - projects, branches, checkout, and history;
 - immutable state load and commit;
 - common-ancestor discovery;
-- merge orchestration through workspace-specific hooks.
+- merge preview and publication through workspace-specific stable-ID hooks.
 
 Language structure is not duplicated in Python; `weavec` remains authoritative.
 The current implementation package remains internal, while new public imports
@@ -94,7 +94,8 @@ project_initialize
 → node_apply_batch for a coherent known structure
 → node_inspect
 → program_validate
-→ branch_merge
+→ branch_merge_preview
+→ branch_merge(preview_id = reviewed preview)
 → branch_activity_summary when measuring the workflow
 → program_build
 → build_get
@@ -110,7 +111,8 @@ program_source_list
 → build_target_set
 → structural source edits
 → build_target_validate
-→ branch_merge
+→ branch_merge_preview
+→ branch_merge(preview_id = reviewed preview)
 → build_target_build
 → build_get
 → build_diagnostics_page when the build failed
@@ -126,6 +128,14 @@ stored order.
 operations. Temporary `@aliases` refer to nodes created earlier in the same
 request. The complete batch publishes as one revision or rolls back; existing
 single-node tools remain available for uncertain edits and repairs.
+
+For independent branches, `branch_merge_preview` reports exact conflict paths or
+a prospective merged root with compact per-document stable-node consequences.
+Its deterministic `preview_id` binds the project, merge direction, common
+ancestor, and both reviewed branch heads. Passing that ID to `branch_merge`
+rechecks both heads in the same SQLite write transaction and returns
+`STALE_MERGE_PREVIEW` without publication if either branch advanced. Direct
+merges without a preview remain supported and are also branch-head race-safe.
 
 For long branches, `branch_history_page` returns bounded first-parent pages with
 an explicit continuation. `revision_operations_page` returns exact immutable
@@ -243,7 +253,8 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - **Help:** `weave_help`, `grammar_help`
 - **Projects and branches:** `project_initialize`, `branch_create`,
   `branch_list`, `branch_history`, `branch_history_page`,
-  `revision_operations_page`, `branch_activity_summary`, `branch_merge`
+  `revision_operations_page`, `branch_activity_summary`, `branch_merge_preview`,
+  `branch_merge`
 - **Programs:** `program_create`, `program_import`, `program_list`,
   `program_source_list`, `program_render`, `program_validate`, `program_build`
 - **Named targets:** `build_target_set`, `build_target_list`,
@@ -262,6 +273,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - [MCP tool reference](docs/mcp.md)
 - [Transactional structural edits](docs/edit-transactions.md)
 - [Branch activity observability](docs/branch-activity.md)
+- [Two-phase merge previews](docs/merge-preview.md)
 - [Build diagnostic inspection](docs/build-diagnostics.md)
 - [Revision-pinned node inspection](docs/revision-node-inspection.md)
 - [Stable-node revision diffs](docs/revision-diff.md)
