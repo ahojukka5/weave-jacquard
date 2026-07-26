@@ -41,4 +41,16 @@ jobs:
         run: ruff check .
 
       - name: Test
-        run: pytest -q --tb=short --cov=weave_frontend --cov-report=term-missing
+        run: |
+          set -o pipefail
+          pytest -q --tb=short --cov=weave_frontend --cov-report=term-missing \
+            2>&1 | tee pytest.log
+
+      - name: Upload unit failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacquard-unit-test-failure
+          path: pytest.log
+          if-no-files-found: error
+          retention-days: 7
