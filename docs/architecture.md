@@ -6,13 +6,14 @@ A coding agent should not have to emit and maintain a complete source file.
 Instead, it operates on a versioned program tree through a compact tool surface:
 
 ```text
-DISCOVER → INSPECT → MUTATE → VALIDATE → BUILD → TEST → MERGE
+DISCOVER → INSPECT → MUTATE → VALIDATE → PREVIEW → MERGE → BUILD → TEST
 ```
 
 Jacquard owns syntax-tree identity, immutable revisions, transactional safety,
-canonical source materialization, and build provenance. The agent concentrates
-on local algorithmic decisions. The authoritative language implementation and
-native compiler remains [`weavec`](https://github.com/ahojukka5/weavec).
+canonical source materialization, build provenance, and reviewed branch
+publication. The agent concentrates on local algorithmic decisions. The
+authoritative language implementation and native compiler remains
+[`weavec`](https://github.com/ahojukka5/weavec).
 
 ## 2. Program structure
 
@@ -44,8 +45,11 @@ derivatives of a pinned program revision.
 - `program_render`
 - `node_find`
 - `node_inspect`
+- `revision_diff_page`
+- `branch_merge_preview`
 - `context_get`
 - `build_get`
+- `build_diagnostics_page`
 
 ### Mutation
 
@@ -60,7 +64,7 @@ derivatives of a pinned program revision.
 - `node_apply_batch`
 - `context_add`
 
-### Verification, build, and history
+### Verification, build, merge, and history
 
 - `program_validate`
 - `program_build`
@@ -73,14 +77,17 @@ derivatives of a pinned program revision.
 - `branch_create`
 - `branch_list`
 - `branch_history`
+- `branch_history_page`
+- `revision_operations_page`
+- `branch_activity_summary`
 - `branch_merge`
 
-The MCP server is a transport layer over the same workspace and compiler-bridge
-services used by the Python implementation.
+The MCP server is a transport layer over the same workspace, merge-preview, and
+compiler-bridge services used by the Python implementation.
 
 ## 4. Structural write modes
 
-Jacquard supports two complementary write modes.
+Jacquard supports two complementary source-edit modes.
 
 ### Single-node edits
 
@@ -156,8 +163,12 @@ produced.
 
 Single-node publication uses one transaction per edit. Batched publication uses
 one transaction for the complete operation list and a compare-and-set branch
-update. Both preserve the same revision DAG and audit model; no schema migration
-is required.
+update. Merge publication uses one transaction that rechecks both captured
+branch heads, writes the validated merged snapshot, records both parents, and
+compare-and-set advances only the target branch.
+
+All three modes preserve the same revision DAG and audit model; no schema
+migration is required.
 
 A production implementation may later deduplicate immutable nodes or modules by
 content hash, but measurements—not aesthetics—should drive that change.
@@ -200,7 +211,7 @@ Internal history is not a physical backup. Production operation also requires
 consistent database backups, integrity checks, artifact retention, and orphan
 cleanup.
 
-## 9. Parallel agents and merge
+## 9. Parallel agents, preview, and merge
 
 Every agent receives:
 
@@ -210,16 +221,45 @@ Every agent receives:
 - pinned interfaces and context;
 - tests and acceptance criteria.
 
-Merge compares a common base revision with both branch heads.
+Three-way merge compares a common base revision with both branch heads.
 
 - one branch changed a node and the other did not: take the change;
 - both produced identical content: take either;
 - both changed the same identity differently: conflict;
 - independent node changes: merge automatically.
 
+`branch_merge_preview` performs that stable-ID merge without publishing. It
+returns either exact conflict paths or a validated prospective merged root with
+compact per-document node consequences. Complete merged trees are not sent over
+MCP.
+
+The deterministic `weave-merge-preview-v1` identity binds:
+
+```text
+project
++ target and source branch names
++ common ancestor revision
++ target head revision
++ source head revision
+```
+
+Passing the preview ID to `branch_merge` forms a two-phase publication protocol.
+The service recomputes the preview, rejects a different token, and checks both
+reviewed heads again inside the same `BEGIN IMMEDIATE` transaction that writes
+the merge revision. A changed target or source head returns
+`STALE_MERGE_PREVIEW` and publishes nothing.
+
+Calls without a preview token remain compatible. The core merge path still
+captures and atomically rechecks both current heads, so direct publication is
+race-safe. Preview-first merging remains the recommended agent workflow because
+it retains explicit evidence of what was reviewed.
+
 A structurally clean merge is not enough. The merged program must subsequently
-pass compiler validation and relevant tests. A future merge-preview API should
-make semantic consequences visible before committing the merge revision.
+pass compiler validation and relevant tests. Future preview extensions may add
+validation and affected-test consequences, but they must not make preview mutate
+branches or publish build artifacts.
+
+See [`merge-preview.md`](merge-preview.md).
 
 ## 10. Versioned design context
 
@@ -245,10 +285,13 @@ saw while it worked.
 The same validated program, language version, compiler identity, target, and
 options must produce byte-identical canonical inputs and the same build key.
 
+The same project, merge direction, common ancestor, and two branch heads must
+produce the same merge preview ID and consequences.
+
 Only final user-facing `weavec` is part of the public compiler contract. Bootstrap
 stages must not leak into Jacquard's API.
 
-## 12. Measured editing results
+## 12. Measured editing and review results
 
 Real stdio MCP qualification has constructed, compiled, assembled, and executed:
 
@@ -271,6 +314,15 @@ The transaction preserves full ordered audit evidence while reducing write calls
 by more than 99% and revision count by more than 98% for that generated case.
 Hardware-dependent elapsed time is recorded as evidence but is not a correctness
 gate.
+
+The real MCP review path additionally qualifies:
+
+- compiler diagnostic to stable-node repair;
+- historical node inspection after branch advancement;
+- bounded forward and reverse revision diffs;
+- clean merge preview and token-enforced publication;
+- stale preview rejection after source-branch advancement;
+- non-mutating conflict preview and conflict publication rejection.
 
 ## 13. Incremental compilation
 
@@ -295,7 +347,7 @@ This should wait for real multi-module workloads and explicit interface objects.
 Current major omissions include:
 
 - a formal machine-readable grammar and capability registry from `weavec`;
-- semantic diff and two-phase merge preview;
+- merge-preview validation and affected-test consequences;
 - revisioned module-interface objects and dependency hashes;
 - affected-test selection;
 - sandboxed program execution tools;
@@ -307,7 +359,7 @@ Current major omissions include:
 
 ### M1 — measured agent ergonomics
 
-- retain tool-order, failure, repair, and validation traces;
+- retain tool-order, failure, repair, validation, and review traces;
 - compare single-edit and coherent-batch workflows on real agents;
 - improve bounded inspection and grammar guidance from observed failures;
 - add batch preview only if trace evidence shows it is needed.
@@ -320,10 +372,10 @@ Current major omissions include:
 
 ### M3 — robust parallel development
 
-- semantic diffs and merge previews;
-- stale-preview protection;
-- explicit interface objects and versions;
-- edit scopes and affected-test selection.
+- extend merge previews with validation and affected-test consequences;
+- add explicit interface objects and versions;
+- add edit scopes and affected-test selection;
+- retain deterministic stale-preview protection as the publication boundary.
 
 ### M4 — execution and scale
 
