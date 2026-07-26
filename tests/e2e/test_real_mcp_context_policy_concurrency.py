@@ -188,7 +188,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             branch="main",
             scope_name="main.weave",
         )
-        assert any(row["document_id"] == context["document_id"] for row in context_rows)
+        assert any(row["id"] == context["document_id"] for row in context_rows)
 
         stale_context = await _call_error(
             session,
