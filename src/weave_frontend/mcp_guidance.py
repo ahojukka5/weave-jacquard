@@ -24,14 +24,16 @@ returned publication_tool with publication_arguments; publication repeats every
 gate and atomically rechecks both branch heads. Use branch_merge_preview,
 branch_merge_impact, branch_merge_validate, and branch_merge_validate_affected
 only when investigating an individual layer. Build through program_build or
-build_target_build and inspect the immutable result with build_get. When a build
-fails, read mapped errors through build_diagnostics_page instead of assuming
-access to server-local artifact paths. Pass the failed build revision_id to
-node_inspect when the branch may have advanced, then use revision_diff_page to
-compare that failing state with the current branch head before repairing. Use
-branch_history_page for complete bounded history reads,
-revision_operations_page for exact grouped-edit audit rows, and
-branch_activity_summary to measure revision and operation grouping.
+build_target_build. If the exact build ID is no longer in context, recover it
+through build_list_page, carry catalog_id across pages when stable membership is
+required, and choose only a verified project-matching summary. Inspect the chosen
+immutable build with build_get. When a build fails, read mapped errors through
+build_diagnostics_page instead of assuming access to server-local artifact paths.
+Pass the failed build revision_id to node_inspect when the branch may have
+advanced, then use revision_diff_page to compare that failing state with the
+current branch head before repairing. Use branch_history_page for complete
+bounded history reads, revision_operations_page for exact grouped-edit audit
+rows, and branch_activity_summary to measure revision and operation grouping.
 """.strip()
 
 
@@ -52,6 +54,7 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "branch_merge with the returned publication_arguments when ready",
             "branch_activity_summary when measuring the workflow",
             "program_build or build_target_build",
+            "build_list_page when recovering an unknown stored build ID",
             "build_get to inspect immutable provenance and artifact paths",
             "build_diagnostics_page to read mapped errors after a failed build",
             "node_inspect with the failed revision_id before repairing a mapped node",
@@ -161,6 +164,10 @@ _TOPICS: dict[str, dict[str, Any]] = {
                 "Measure revisions, operations, merges, authors, and grouping."
             ),
             "grammar_help": "Search the weavec surface corpus for exact examples.",
+            "build_list_page": (
+                "Scan up to 200 stored build IDs, verify each member through build_get "
+                "admission, and return compact project-matching summaries."
+            ),
             "build_get": "Inspect one verified stored build and its artifact paths.",
             "build_diagnostics_page": (
                 "Read mapped retained errors without opening server-local files."
@@ -340,6 +347,19 @@ _TOPICS: dict[str, dict[str, Any]] = {
     "builds": {
         "explicit": "program_build compiles an explicit ordered document set.",
         "named": "build_target_build compiles a stored revisioned target.",
+        "discover": (
+            "When a build ID is unknown, call build_list_page for the project. It verifies "
+            "at most 200 catalog members and returns compact summaries without artifact paths."
+        ),
+        "catalog": (
+            "Build IDs are content-derived, so discovery uses lexical order rather than "
+            "filesystem time. Pass catalog_id and next_after_build_id across pages when stable "
+            "membership is required; STALE_BUILD_CATALOG means restart the enumeration."
+        ),
+        "rejections": (
+            "rejected_builds contains only build IDs and verification error codes. Never pass "
+            "a rejected ID to downstream work as though it were a usable build."
+        ),
         "inspect": (
             "build_get verifies the stored manifest and returns immutable provenance and "
             "artifact paths. build_diagnostics_page returns mapped diagnostic entries in "
