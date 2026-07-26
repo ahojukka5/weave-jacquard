@@ -89,8 +89,8 @@ In particular:
 - invalid AST mutations must be rejected atomically;
 - committed revisions must remain immutable;
 - branch heads must advance only after successful validation;
-- a structural write must publish from one captured base revision through a
-  transactional compare-and-set branch update;
+- single-node and batch structural writes must publish from one captured base
+  revision through a transactional compare-and-set branch update;
 - prepared node and batch writes must reject stale `expected_revision_id` state;
 - merge must use a common base revision;
 - merged states must be semantically validated;
