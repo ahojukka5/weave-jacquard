@@ -6,10 +6,7 @@ from typing import Any
 
 from .errors import ValidationError
 from .merge_impact import MergeTargetImpactService
-from .merge_validation_set import (
-    MAX_AFFECTED_TARGET_VALIDATIONS,
-    MergeValidationSetService,
-)
+from .merge_validation_set import MergeValidationSetService
 
 MERGE_PREFLIGHT_FORMAT = "weave-merge-preflight-v1"
 MAX_PREFLIGHT_IMPACT_TARGETS = 200
@@ -54,11 +51,6 @@ class MergePreflightService:
                 "MERGE_POLICY_VIOLATION",
                 "target merge policy forbids uncovered-document overrides",
             )
-        max_target_validations = (
-            int(target_policy["max_affected_targets"])
-            if target_policy is not None
-            else MAX_AFFECTED_TARGET_VALIDATIONS
-        )
 
         impact = self.impacts.page(
             project,
@@ -68,13 +60,19 @@ class MergePreflightService:
             start_index=0,
             limit=MAX_PREFLIGHT_IMPACT_TARGETS,
         )
+        validation_kwargs: dict[str, Any] = {
+            "preview_id": str(impact["preview_id"]),
+            "allow_uncovered_documents": allow_uncovered_documents,
+        }
+        if target_policy is not None:
+            validation_kwargs["max_target_validations"] = int(
+                target_policy["max_affected_targets"]
+            )
         validation_set = self.validation_sets.validate(
             project,
             target_branch,
             source_branch,
-            preview_id=str(impact["preview_id"]),
-            allow_uncovered_documents=allow_uncovered_documents,
-            max_target_validations=max_target_validations,
+            **validation_kwargs,
         )
         impact_summary = {
             key: impact[key]
