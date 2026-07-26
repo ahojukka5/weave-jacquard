@@ -147,12 +147,7 @@ def _program_operations(root_id: str) -> list[dict[str, Any]]:
             _form("@main_body", "return", "main_return"),
             _form("@main_return", "add_i32", "sum"),
             _form("@sum", "call_i32", "target_call"),
-            _atom(
-                "@target_call",
-                "symbol",
-                "target_value",
-                "target_call_symbol",
-            ),
+            _atom("@target_call", "symbol", "target_value"),
             _form("@sum", "call_i32", "source_call"),
             _atom("@source_call", "symbol", "source_value"),
         ]
@@ -351,15 +346,26 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             branch="broken",
             from_branch="target",
         )
-        await _call(
+        broken_qgate = await _call(
             session,
             trace,
-            "node_set_atom",
+            "node_create_form",
             project=PROJECT,
             branch="broken",
             document=DOCUMENT,
-            node_id=aliases["target_call_symbol"],
-            value="missing_function",
+            parent_id=aliases["main_body"],
+            head="qgate",
+        )
+        await _call(
+            session,
+            trace,
+            "node_add_atom",
+            project=PROJECT,
+            branch="broken",
+            document=DOCUMENT,
+            parent_id=broken_qgate["node_id"],
+            kind="symbol",
+            value="H",
         )
         broken_preview = await _call(
             session,
