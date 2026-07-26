@@ -2,22 +2,21 @@
 
 ## Purpose
 
-Validating one manually selected program is not sufficient when a changed source
+Validating one manually selected program is insufficient when a changed source
 feeds several revisioned named targets. `branch_merge_validate_affected` combines
-merge impact analysis with authoritative frontend validation so every affected
+directional impact with authoritative frontend validation so every affected
 target surviving in the candidate is checked before publication.
 
 ```text
-branch_merge_preview
-→ branch_merge_impact
-→ branch_merge_validate_affected
-→ branch_merge(validate_affected_targets = true)
+branch_merge_preflight
+→ policy-aware complete validation set
+→ branch_merge using returned publication_arguments
 ```
 
 The validation-set operation is read-only. It creates no revision, branch update,
 build manifest, executable, or retained compiler artifact.
 
-## Request
+## Public request
 
 ```text
 branch_merge_validate_affected(
@@ -29,30 +28,38 @@ branch_merge_validate_affected(
 )
 ```
 
-The service recomputes the exact directional target impact for the current merge
-candidate. A stale preview returns `STALE_MERGE_PREVIEW`; a semantic merge
-conflict returns `MERGE_CONFLICT` before compiler startup.
+The public low-level tool uses the global compiler fanout ceiling of 64. The
+internal service additionally accepts an effective `max_target_validations` used
+by policy-aware preflight and publication.
+
+A stale preview returns `STALE_MERGE_PREVIEW`; a merge conflict returns
+`MERGE_CONFLICT` before compiler startup.
 
 ## Target selection
 
-Affected target entries come from `branch_merge_impact` in deterministic name
-order.
+Affected entries come from complete directional impact analysis in deterministic
+name order.
 
-- targets that exist in the candidate are validated;
-- removed targets are reported in `skipped_removed_targets` but cannot be
-  validated because no candidate definition remains;
+- candidate targets are validated;
+- removed targets are reported in `skipped_removed_targets`;
 - unaffected targets are not invoked;
-- compiler fanout is limited to 64 surviving affected targets per call.
+- every selected target is attempted even when an earlier target fails;
+- compiler fanout is bounded before the first compiler starts.
 
-A larger set returns `TOO_MANY_AFFECTED_TARGETS` before starting a compiler. The
-bound prevents a single MCP request from becoming an unbounded process launcher.
+The global ceiling is 64. A configured target policy may choose a lower effective
+ceiling from 1 through 64. Exceeding it returns
+`TOO_MANY_AFFECTED_TARGETS` before compiler startup.
+
+The effective `max_target_validations` appears in the result and participates in
+`validation_set_id`. Two otherwise identical candidates reviewed under different
+ceilings therefore produce different evidence identities.
 
 ## Coverage gate
 
 Changed program documents not referenced by any target surviving in the
 candidate appear in `uncovered_changed_documents`.
 
-By default, uncovered documents fail coverage before any target validation:
+By default:
 
 ```text
 coverage_passed = false
@@ -60,50 +67,47 @@ validated_target_count = 0
 ready_for_publication = false
 ```
 
-This is deliberate. Running some target validations would waste compiler work
-while still leaving the candidate incomplete as a reviewed target graph.
+Zero compiler work is deliberate: partial validation cannot make an uncovered
+candidate ready.
 
-`allow_uncovered_documents=true` is an explicit override. The uncovered list is
-still returned and participates in validation-set identity. The override does
-not pretend those documents were validated; it records that the caller accepted
-the gap.
+`allow_uncovered_documents=true` records explicit acceptance of the gap. It does
+not claim those documents were validated. Policy-aware preflight allows the flag
+only when the authoritative target policy permits it.
 
 ## Individual validations
 
-For each selected target, Jacquard invokes the same exact-candidate service used
-by `branch_merge_validate`:
+For each selected target:
 
 ```text
 candidate target + ordered canonical sources
 → weavec --frontend
 ```
 
-The public validation set includes compact per-target evidence:
+Compact evidence includes:
 
-- target name;
-- impact reasons and changed source documents;
+- target and impact reasons;
+- changed source documents;
 - deterministic individual validation ID;
 - ordered documents;
 - compiler SHA-256;
-- availability, validity, return code, and timeout state;
+- availability, validity, return code, and timeout;
 - diagnostic and bounded stderr;
 - WIR SHA-256 and byte count.
 
-All selected targets are attempted. A failed or unavailable earlier target does
-not hide later failures. This gives reviewers the complete bounded failure set in
-one response.
+A failed or unavailable earlier target does not hide later failures.
 
 ## Aggregate result
 
 `weave-merge-validation-set-v1` reports:
 
 - preview, ancestor, both heads, and merged root;
-- directional changed and covered document sets;
-- uncovered-document policy and coverage result;
-- total affected and surviving affected target counts;
+- directional changed and covered documents;
+- uncovered policy and coverage result;
+- effective `max_target_validations`;
+- total affected and surviving target counts;
 - removed targets skipped;
-- validated, passed, failed, and unavailable counts and names;
-- compact target validation records;
+- validated, passed, failed, and unavailable counts/names;
+- compact target records;
 - `ready_for_publication`.
 
 A set is ready only when:
@@ -115,30 +119,32 @@ AND every attempted target was available and valid
 ```
 
 Zero surviving affected targets form a valid empty compiler set only when
-coverage passes. This supports metadata-only or explicitly allowed uncovered
-merges without inventing a fake target.
+coverage passes.
 
 ## Validation-set identity
 
-The deterministic `validation_set_id` binds:
+`validation_set_id` binds:
 
 ```text
 format
 + preview ID
-+ prospective merged root hash
-+ uncovered-document policy and list
-+ ordered surviving affected target names
++ prospective merged-root hash
++ uncovered policy and list
++ effective max-target-validations ceiling
++ ordered surviving target names
 + removed target names
 + ordered individual validation IDs
 ```
 
-The same candidate, compiler identities, source hashes, target graph, and policy
-produce the same set identity.
+The same candidate, compiler identities, source hashes, target graph, ceiling,
+and uncovered policy produce the same identity.
 
-Like an individual validation response, the set is evidence rather than a bearer
-token. Publication repeats the complete validation set.
+The set is evidence, not a bearer token. Publication recomputes either the set or
+policy-aware preflight before writing.
 
-## Publication gate
+## Publication paths
+
+### Direct all-target mode
 
 ```text
 branch_merge(
@@ -147,47 +153,43 @@ branch_merge(
   source_branch,
   preview_id,
   validate_affected_targets = true,
-  allow_uncovered_documents = false,
-)
+  allow_uncovered_documents = false)
 ```
 
-Publication performs:
+When target policy permits this mode, publication recomputes impact, applies the
+effective ceiling, validates all selected targets, enforces readiness, and
+atomically rechecks both heads.
 
-1. exact impact recomputation;
-2. coverage enforcement;
-3. bounded validation of all surviving affected targets;
-4. aggregate readiness enforcement;
-5. use of the validation set's preview ID;
-6. atomic recheck of both heads inside merge publication;
-7. immutable two-parent revision creation.
+### Policy-aware preflight replay
 
-The response records `affected_validation_enforced`, the uncovered-document
-policy, and the complete validation set.
+```text
+branch_merge(
+  ...,
+  validate_affected_targets = true,
+  preflight_id = reviewed preflight)
+```
+
+Publication recomputes policy-aware preflight once, compares exact identity, and
+reuses its validation set for publication. It does not launch a redundant second
+compiler fanout before the same transactional head check.
 
 ## Failure codes
 
-- `MERGE_UNCOVERED_DOCUMENTS`: coverage failed and no override was supplied;
-- `TOO_MANY_AFFECTED_TARGETS`: more than 64 surviving targets require validation;
-- `MERGE_VALIDATION_UNAVAILABLE`: at least one selected target lacked compiler
-  validation;
-- `MERGE_VALIDATION_FAILED`: at least one selected target was rejected;
-- `INCOMPLETE_MERGE_VALIDATION_SET`: internal completeness invariant failed;
-- `STALE_MERGE_PREVIEW`: either branch advanced;
-- `MERGE_CONFLICT`: stable-ID merge was not clean.
+- `INVALID_AFFECTED_TARGET_LIMIT`: effective limit outside 1–64;
+- `TOO_MANY_AFFECTED_TARGETS`: surviving affected count exceeds effective limit;
+- `MERGE_UNCOVERED_DOCUMENTS`: coverage failed without permitted override;
+- `MERGE_VALIDATION_UNAVAILABLE`: one or more compiler validations unavailable;
+- `MERGE_VALIDATION_FAILED`: one or more targets rejected;
+- `INCOMPLETE_MERGE_VALIDATION_SET`: completeness invariant failed;
+- `STALE_MERGE_PREVIEW`: branch heads changed;
+- `MERGE_CONFLICT`: stable-ID merge is not clean.
 
-Every failure leaves the target branch unchanged.
+Configured target policies may reject the selected mode earlier. Every failure
+leaves the target branch unchanged.
 
-## Validation modes
+## Compatibility
 
-`branch_merge` preserves three modes:
-
-- direct structural merge;
-- one explicit `validation_target`;
-- `validate_affected_targets=true`.
-
-A call cannot combine the single-target and all-target modes.
-`allow_uncovered_documents` is meaningful only with all-target validation.
-Ambiguous combinations return `INVALID_MERGE_VALIDATION_MODE`.
-
-Reviewed parallel-agent work should use the all-affected mode. Single-target
-validation remains useful for focused investigation and compatibility.
+`branch_merge` preserves direct, one-target, and all-target modes where the
+effective target policy permits them. Reviewed protected-branch work should use
+`branch_merge_preflight` and its returned arguments. The low-level validation-set
+tool remains useful for focused investigation.
