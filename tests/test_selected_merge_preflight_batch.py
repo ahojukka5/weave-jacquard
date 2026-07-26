@@ -351,7 +351,11 @@ def test_selected_batch_rechecks_whole_catalog_after_compilation(tmp_path: Path)
     [
         ([], None, "INVALID_SELECTED_PREFLIGHT_SOURCES"),
         (["ready", "ready"], None, "INVALID_SELECTED_PREFLIGHT_SOURCES"),
-        (["ready"] * (MAX_SELECTED_MERGE_PREFLIGHT_SOURCES + 1), None, "INVALID_SELECTED_PREFLIGHT_SOURCES"),
+        (
+            ["ready"] * (MAX_SELECTED_MERGE_PREFLIGHT_SOURCES + 1),
+            None,
+            "INVALID_SELECTED_PREFLIGHT_SOURCES",
+        ),
         (["ready"], ["missing"], "INVALID_SELECTED_PREFLIGHT_OVERRIDES"),
         (["ready"], ["ready", "ready"], "INVALID_SELECTED_PREFLIGHT_OVERRIDES"),
     ],
