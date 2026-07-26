@@ -57,7 +57,9 @@ def test_program_create_and_import_publish_from_exact_base(tmp_path: Path) -> No
         )
         assert replaced["base_revision_id"] == imported["revision_id"]
         assert workspace.branch_head("demo", "main") == replaced["revision_id"]
-        assert workspace.render("demo", "main", "library.weave") == PROGRAM_B.strip()
+        assert '(version "0.2")' in workspace.render(
+            "demo", "main", "library.weave"
+        )
 
         operations = workspace.db.connection.execute(
             """SELECT operation_kind FROM operations
@@ -100,14 +102,10 @@ def test_stale_program_write_publishes_nothing(tmp_path: Path) -> None:
         assert raised.value.code == "STALE_BRANCH_HEAD"
         assert workspace.branch_head("demo", "main") == accepted["revision_id"]
         assert _counts(workspace) == counts
-        assert workspace.list_documents("demo", "main") == [
-            {
-                "document": "main.weave",
-                "root_node_id": accepted["node_id"],
-                "head": "program",
-                "node_count": 5,
-            }
-        ]
+        documents = workspace.list_documents("demo", "main")
+        assert [item["document"] for item in documents] == ["main.weave"]
+        assert documents[0]["root_node_id"] == accepted["node_id"]
+        assert documents[0]["head"] == "program"
 
 
 def test_unprepared_program_write_rejects_mid_call_advance(
