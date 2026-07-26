@@ -1,0 +1,107 @@
+name: Packaged weavec native E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  WEAVEC_RELEASE: v0.3.0
+  WEAVEC_ARCHIVE: weavec-v0.3.0-linux-x86_64-glibc.tar.gz
+
+jobs:
+  native-e2e:
+    name: Real MCP to packaged weavec
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out Jacquard
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Jacquard and test tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install pytest
+
+      - name: Download immutable packaged weavec
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist compiler
+          gh release download "$WEAVEC_RELEASE" \
+            --repo ahojukka5/weavec \
+            --pattern "$WEAVEC_ARCHIVE" \
+            --pattern SHA256SUMS \
+            --dir dist
+
+          grep -F " $WEAVEC_ARCHIVE" dist/SHA256SUMS > dist/GLIBC-SHA256SUM
+          (
+            cd dist
+            sha256sum --check GLIBC-SHA256SUM
+          )
+
+          tar -C compiler -xzf "dist/$WEAVEC_ARCHIVE"
+          compiler_path="$(find compiler -type f -path '*/bin/weavec' -print -quit)"
+          test -n "$compiler_path"
+          test -x "$compiler_path"
+          command -v clang
+          command -v llvm-as
+          file "$compiler_path"
+          printf 'WEAVEC_BIN=%s/%s\n' "$GITHUB_WORKSPACE" "$compiler_path" \
+            >> "$GITHUB_ENV"
+
+      - name: Build and run through real MCP
+        run: |
+          set -euo pipefail
+          base="$RUNNER_TEMP/jacquard-native-e2e"
+          python -m pytest \
+            -m real_e2e \
+            tests/e2e/test_real_mcp.py \
+            --basetemp "$base"
+
+          source_path="$(find "$base" -type f -path '*/builds/*/sources/000-main.weave' -print -quit)"
+          trace_path="$(find "$base" -type f -name qualification-trace.json -print -quit)"
+          test -n "$source_path"
+          test -n "$trace_path"
+
+          mkdir -p qualification
+          cp "$source_path" qualification/main.weave
+          cp "$trace_path" qualification/qualification-trace.json
+
+          "$WEAVEC_BIN" --frontend \
+            qualification/program.wir \
+            qualification/main.weave
+          "$WEAVEC_BIN" --backend \
+            qualification/program.wir \
+            qualification/program.ll
+          llvm-as qualification/program.ll -o qualification/program.bc
+
+          grep -F 'define i32 @main' qualification/program.ll
+          grep -F 'ret i32 42' qualification/program.ll
+          test -s qualification/program.wir
+          test -s qualification/program.ll
+          test -s qualification/program.bc
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacquard-packaged-weavec-qualification
+          path: qualification
+          if-no-files-found: error
+          retention-days: 14
