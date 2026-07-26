@@ -18,9 +18,9 @@ Primary executables: **`weave-mcp`** and **`weave-build`**
 Jacquard owns:
 
 - single-node and bounded transactional edits with stable node identities;
-- immutable revisions, parallel branches, previewed race-safe structural merge,
-  named-target impact analysis, compiler-gated merge publication, measured branch
-  activity, and bounded stable-node revision diffs;
+- immutable revisions, parallel branches, deterministic one-call merge preflight,
+  directional target impact, complete affected-target compiler gates, race-safe
+  publication, measured branch activity, and bounded stable-node revision diffs;
 - project-, document-, and symbol-scoped context;
 - compiler-corpus-backed grammar help;
 - authoritative validation through `weavec --frontend`;
@@ -95,11 +95,9 @@ project_initialize
 → node_apply_batch for a coherent known structure
 → node_inspect
 → program_validate
-→ branch_merge_preview
-→ branch_merge_impact
-→ branch_merge_validate(build_target = application)
-→ branch_merge(preview_id = reviewed preview,
-               validation_target = application)
+→ branch_merge_preflight
+→ review ready_for_publication, impact, coverage, and validation_set
+→ branch_merge using returned publication_arguments
 → branch_activity_summary when measuring the workflow
 → program_build
 → build_get
@@ -115,11 +113,9 @@ program_source_list
 → build_target_set
 → structural source edits
 → build_target_validate
-→ branch_merge_preview
-→ branch_merge_impact
-→ branch_merge_validate(build_target = each affected target)
-→ branch_merge(preview_id = reviewed preview,
-               validation_target = named target)
+→ branch_merge_preflight
+→ review every affected surviving target and uncovered document
+→ branch_merge using returned publication_arguments
 → build_target_build
 → build_get
 → build_diagnostics_page when the build failed
@@ -136,35 +132,44 @@ operations. Temporary `@aliases` refer to nodes created earlier in the same
 request. The complete batch publishes as one revision or rolls back; existing
 single-node tools remain available for uncertain edits and repairs.
 
-For independent branches, `branch_merge_preview` reports exact conflict paths or
-a prospective merged root with compact per-document stable-node consequences.
-Its deterministic `preview_id` binds the project, merge direction, common
-ancestor, and both reviewed branch heads.
+For independent branches, `branch_merge_preflight` composes the complete
+non-mutating review sequence:
 
-`branch_merge_impact` maps only the changes introduced by merging the source into
-the current target. It reports named targets that are added, removed, modified,
-or affected through primary/additional source changes. It also lists changed
-program documents that no surviving candidate target covers. Target entries are
-sorted and paginated in pages of at most 200.
+```text
+stable-ID merge preview
++ directional named-target impact
++ candidate target coverage
++ every affected surviving target validated by weavec --frontend
+```
 
-Coverage is calculated from targets that exist after the prospective merge. A
-removed target therefore cannot hide a changed source from the uncovered set.
-Uncovered documents are explicit review signals: automatic target validation
-cannot prove them through a named target.
+The response identifies the exact common ancestor and branch heads, prospective
+merged-root hash, bounded affected-target summary, uncovered changed documents,
+complete validation set, and `ready_for_publication`. A ready result includes
+`publication_tool="branch_merge"` and exact `publication_arguments`.
 
-`branch_merge_validate` resolves a named target from the prospective state,
-renders its ordered canonical sources, and invokes `weavec --frontend` without
-creating a revision or retaining a build artifact. The result includes source,
-compiler, WIR, and validation hashes plus bounded compiler output.
+The preflight result is evidence rather than a bearer token. Calling the returned
+publication operation repeats impact analysis, coverage enforcement, and all
+affected-target frontend validations. Both branch heads are then rechecked in the
+same SQLite write transaction that publishes the immutable two-parent merge.
 
-Passing both `preview_id` and `validation_target` to `branch_merge` repeats the
-compiler check and then rechecks both branch heads in the same SQLite write
-transaction that publishes the merge. Compiler rejection returns
-`MERGE_VALIDATION_FAILED`; missing compiler availability returns
-`MERGE_VALIDATION_UNAVAILABLE`; branch advancement returns
-`STALE_MERGE_PREVIEW`. Every failure leaves the target unchanged. Direct merges
-without preview or validation remain supported and are still branch-head
-race-safe.
+Uncovered changed documents block preflight by default before compiler startup.
+`allow_uncovered_documents=true` is an explicit review decision recorded in the
+preflight, validation-set identity, and merge result; it does not claim those
+documents were validated.
+
+The lower-level tools remain useful for focused investigation:
+
+- `branch_merge_preview` reports structural conflicts and stable-node
+  consequences;
+- `branch_merge_impact` pages directional named-target consequences;
+- `branch_merge_validate` validates one named target;
+- `branch_merge_validate_affected` returns the complete bounded validation set.
+
+Compiler rejection returns `MERGE_VALIDATION_FAILED`; missing compiler
+availability returns `MERGE_VALIDATION_UNAVAILABLE`; uncovered documents return
+`MERGE_UNCOVERED_DOCUMENTS`; branch advancement returns `STALE_MERGE_PREVIEW`.
+Every failure leaves the target branch unchanged. Direct merge compatibility is
+preserved, but reviewed parallel-agent work should use preflight.
 
 For long branches, `branch_history_page` returns bounded first-parent pages with
 an explicit continuation. `revision_operations_page` returns exact immutable
@@ -282,8 +287,9 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - **Help:** `weave_help`, `grammar_help`
 - **Projects and branches:** `project_initialize`, `branch_create`,
   `branch_list`, `branch_history`, `branch_history_page`,
-  `revision_operations_page`, `branch_activity_summary`, `branch_merge_preview`,
-  `branch_merge_impact`, `branch_merge_validate`, `branch_merge`
+  `revision_operations_page`, `branch_activity_summary`,
+  `branch_merge_preflight`, `branch_merge_preview`, `branch_merge_impact`,
+  `branch_merge_validate`, `branch_merge_validate_affected`, `branch_merge`
 - **Programs:** `program_create`, `program_import`, `program_list`,
   `program_source_list`, `program_render`, `program_validate`, `program_build`
 - **Named targets:** `build_target_set`, `build_target_list`,
@@ -302,8 +308,10 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - [MCP tool reference](docs/mcp.md)
 - [Transactional structural edits](docs/edit-transactions.md)
 - [Branch activity observability](docs/branch-activity.md)
+- [One-call merge preflight](docs/merge-preflight.md)
 - [Two-phase merge previews](docs/merge-preview.md)
 - [Merge target impact analysis](docs/merge-impact.md)
+- [Affected-target validation sets](docs/merge-validation-set.md)
 - [Merge candidate validation](docs/merge-validation.md)
 - [Build diagnostic inspection](docs/build-diagnostics.md)
 - [Revision-pinned node inspection](docs/revision-node-inspection.md)
