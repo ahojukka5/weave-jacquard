@@ -13,11 +13,15 @@ grammar_help before using an unfamiliar Weave form. Use expected_revision_id for
 optimistic concurrency. Use program_validate for a coherent single document. For
 a multi-document program, define a named target and use build_target_validate so
 the target metadata and ordered sources are validated from one pinned revision.
-Before combining independent branches, call branch_merge_preflight. Review its
-bounded directional impact, uncovered documents, and complete affected-target
-compiler evidence. When ready_for_publication is true, call the returned
-publication_tool with publication_arguments; publication repeats every gate and
-atomically rechecks both branch heads. Use branch_merge_preview,
+Protected branches may use merge_policy_set to require preflight, complete
+affected-target validation, strict uncovered-document handling, and a lower
+compiler fanout bound. The current target branch policy is authoritative; a
+different source policy is visible but cannot weaken admission. Before combining
+independent branches, call branch_merge_preflight. Review its target and source
+policies, bounded directional impact, uncovered documents, and complete
+affected-target compiler evidence. When ready_for_publication is true, call the
+returned publication_tool with publication_arguments; publication repeats every
+gate and atomically rechecks both branch heads. Use branch_merge_preview,
 branch_merge_impact, branch_merge_validate, and branch_merge_validate_affected
 only when investigating an individual layer. Build through program_build or
 build_target_build and inspect the immutable result with build_get. When a build
@@ -70,9 +74,13 @@ _TOPICS: dict[str, dict[str, Any]] = {
                 "Apply up to 256 flat ordinary node operations as one revision. "
                 "Use @aliases for nodes created earlier in the same batch."
             ),
+            "merge_policy_set": (
+                "Publish an immutable target-branch admission policy. Policy changes "
+                "must be made directly on the branch whose admission rules should change."
+            ),
             "branch_merge": (
                 "Publish a stable-ID three-way merge. Prefer arguments returned by "
-                "branch_merge_preflight so preview, coverage, all affected targets, "
+                "branch_merge_preflight so policy, preview, coverage, all affected targets, "
                 "and both branch heads are rechecked."
             ),
         },
@@ -113,9 +121,14 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "revision_diff_page": (
                 "Compare stable nodes between two immutable revisions in bounded pages."
             ),
+            "merge_policy_get": (
+                "Resolve the effective first-parent merge policy at a branch head or exact "
+                "historical project revision."
+            ),
             "branch_merge_preflight": (
-                "Compose exact preview identity, directional impact, coverage, and every "
-                "affected surviving target validation into one non-mutating review result."
+                "Compose target-authoritative policy, visible source policy, exact preview "
+                "identity, directional impact, coverage, and every affected surviving target "
+                "validation into one non-mutating review result."
             ),
             "branch_merge_preview": (
                 "Preview conflicts and compact document consequences for two current "
@@ -193,7 +206,40 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "revision count."
         ),
     },
+    "policy": {
+        "set": (
+            "merge_policy_set publishes a new immutable revision on the selected target "
+            "branch. It may require preflight replay, all-affected validation, strict "
+            "uncovered handling, and a lower affected-target fanout ceiling."
+        ),
+        "get": (
+            "merge_policy_get resolves first-parent policy history and supports an exact "
+            "revision_id for reproducible review."
+        ),
+        "authority": (
+            "The current target branch policy governs publication. A different source "
+            "policy is returned with source_policy_ignored=true but cannot weaken the target."
+        ),
+        "change": (
+            "To loosen a protected branch, call merge_policy_set directly on that target. "
+            "The new revision invalidates older preview and preflight identities."
+        ),
+        "compatibility": (
+            "When configured=false, existing direct, single-target, and all-target merge "
+            "modes remain compatible."
+        ),
+        "strict_default": {
+            "require_preflight": True,
+            "require_affected_validation": True,
+            "allow_uncovered_documents": False,
+            "max_affected_targets": "choose a bounded project-appropriate value",
+        },
+    },
     "merge": {
+        "policy": (
+            "Preflight resolves target and source policies first. The target policy controls "
+            "admission and fanout; source differences are visible but ignored as authority."
+        ),
         "preflight": (
             "branch_merge_preflight is the default review call. It returns exact branch "
             "heads, preview and merged-root identity, bounded directional target impact, "
@@ -217,19 +263,23 @@ _TOPICS: dict[str, dict[str, Any]] = {
         ),
         "publish": (
             "When preflight ready_for_publication is true, call publication_tool with "
-            "publication_arguments. The complete validation set is repeated, then both "
-            "heads are checked in the SQLite write transaction. A preflight is evidence, "
-            "not a token that bypasses revalidation."
+            "publication_arguments. Policy-aware preflight is recomputed and its identity "
+            "compared, then both heads are checked in the SQLite write transaction. A "
+            "preflight is evidence, not a token that bypasses revalidation."
         ),
         "failures": (
             "Coverage gaps return MERGE_UNCOVERED_DOCUMENTS; unavailable validation returns "
             "MERGE_VALIDATION_UNAVAILABLE; compiler rejection returns "
-            "MERGE_VALIDATION_FAILED; changed heads return STALE_MERGE_PREVIEW."
+            "MERGE_VALIDATION_FAILED; changed heads return STALE_MERGE_PREVIEW. Configured "
+            "policies may additionally return MERGE_POLICY_PREFLIGHT_REQUIRED, "
+            "MERGE_POLICY_AFFECTED_VALIDATION_REQUIRED, MERGE_POLICY_VIOLATION, "
+            "STALE_MERGE_PREFLIGHT, or TOO_MANY_AFFECTED_TARGETS."
         ),
         "compatibility": (
             "Lower-level preview, impact, single-target validation, all-target validation, "
-            "and direct merge calls remain available. Reviewed parallel work should use "
-            "branch_merge_preflight and its returned publication arguments."
+            "and direct merge calls remain available where target policy permits. Reviewed "
+            "parallel work should use branch_merge_preflight and its returned publication "
+            "arguments."
         ),
     },
     "ids": {
@@ -278,6 +328,8 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "build_target_get",
             "build_target_delete",
             "build_target_validate",
+            "merge_policy_get",
+            "merge_policy_set",
             "branch_merge_preflight",
             "branch_merge_impact",
             "branch_merge_validate",
