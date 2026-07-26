@@ -8,6 +8,7 @@ from .errors import ValidationError
 from .merge_preview import MergePreviewService
 from .project_agent_status import (
     MAX_AGENT_STATUS_BRANCH_CATALOG,
+    MAX_AGENT_STATUS_CHECKPOINT_SCAN,
     ProjectAgentStatusService,
 )
 
@@ -48,7 +49,7 @@ class ProjectMergeQueueService:
         self._validate_limit(
             "checkpoint_scan_limit",
             checkpoint_scan_limit,
-            self.statuses.__class__.__module__ and 500,
+            MAX_AGENT_STATUS_CHECKPOINT_SCAN,
         )
         self._validate_limit(
             "conflict_limit",
