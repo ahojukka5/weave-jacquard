@@ -329,7 +329,7 @@ async def _run_stdio_qualification(
             )
             assert inspected["build_id"] == built["build_id"]
             materialized = Path(inspected["artifact_paths"]["source"])
-            assert materialized.read_text(encoding="utf-8") == source
+            assert materialized.read_text(encoding="utf-8") == source + "\n"
 
             executable = Path(inspected["artifact_paths"]["executable"])
             completed = subprocess.run(
