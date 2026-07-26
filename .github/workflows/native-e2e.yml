@@ -20,7 +20,7 @@ jobs:
   native-e2e:
     name: Real MCP to packaged weavec
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Check out Jacquard
@@ -109,40 +109,52 @@ jobs:
           printf 'WEAVEC_BIN=%s/%s\n' "$GITHUB_WORKSPACE" "$compiler_path" \
             >> "$GITHUB_ENV"
 
-      - name: Build and run through real MCP
+      - name: Build and run complex programs through real MCP
         run: |
           set -euo pipefail
           base="$RUNNER_TEMP/jacquard-native-e2e"
           python -m pytest \
             -m real_e2e \
             tests/e2e/test_real_mcp.py \
+            tests/e2e/test_real_mcp_program_matrix.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
-          source_path="$(find "$base" -type f -path '*/builds/*/sources/000-main.weave' -print -quit)"
-          trace_path="$(find "$base" -type f -name qualification-trace.json -print -quit)"
-          test -n "$source_path"
-          test -n "$trace_path"
-
           mkdir -p qualification
-          cp "$source_path" qualification/main.weave
-          cp "$trace_path" qualification/qualification-trace.json
           cp release-metadata.json qualification/weavec-release.json
           cp qualification-pytest.xml qualification/
+          cp -a "$base" qualification/pytest-temp
 
-          "$WEAVEC_BIN" --frontend \
-            qualification/program.wir \
-            qualification/main.weave
-          "$WEAVEC_BIN" --backend \
-            qualification/program.wir \
-            qualification/program.ll
-          llvm-as qualification/program.ll -o qualification/program.bc
+          BASE="$base" python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
 
-          grep -F 'define i32 @main' qualification/program.ll
-          grep -F 'ret i32 42' qualification/program.ll
-          test -s qualification/program.wir
-          test -s qualification/program.ll
-          test -s qualification/program.bc
+          base = Path(os.environ["BASE"])
+          summaries = [
+              json.loads(path.read_text(encoding="utf-8"))
+              for path in sorted(base.rglob("qualification-summary.json"))
+          ]
+          by_name = {summary["case"]: summary for summary in summaries}
+          assert set(by_name) == {
+              "while-accumulator",
+              "multi-function-chain",
+              "memory-flow",
+          }, by_name
+          assert by_name["while-accumulator"]["actual_exit"] == 42
+          assert by_name["multi-function-chain"]["actual_exit"] == 35
+          assert by_name["memory-flow"]["actual_exit"] == 100
+          assert all(summary["llvm_bytes"] > 0 for summary in summaries)
+          assert all(summary["bitcode_bytes"] > 0 for summary in summaries)
+
+          output = Path("qualification/program-matrix-summary.json")
+          output.write_text(
+              json.dumps(summaries, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          for summary in summaries:
+              print(json.dumps(summary, sort_keys=True))
+          PY
 
       - name: Upload native failure evidence
         if: failure()
