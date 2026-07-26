@@ -26,11 +26,11 @@ server for Weave. The central object is a versioned program tree. Textual
 8. **Do not duplicate the Weave grammar.** `weavec` is authoritative. Grammar
    help is derived from its source corpus and completed programs are validated
    by its frontend.
-9. **Merge structurally, preview explicitly, validate before publication.**
+9. **Merge structurally, analyze impact, validate before publication.**
    Non-overlapping node changes may merge automatically; incompatible changes
    must produce a clear conflict. Independent agents should preview the merge,
-   validate a named target from the exact candidate, and publish with both the
-   preview and validation gate.
+   identify affected named targets and uncovered changed documents, validate the
+   relevant exact candidate targets, and publish with the reviewed gates.
 10. **Context is versioned.** Interfaces, contracts, invariants, and design
     documents used by an agent must be reproducible from its base revision.
 11. **Rendering is deterministic.** Identical database state and renderer version
@@ -46,7 +46,7 @@ server for Weave. The central object is a versioned program tree. Textual
 - Batch aliases are temporary names for stable IDs created in that transaction.
 - Annotated source may display IDs, but canonical program meaning does not depend
   on them.
-- Merge, diff, preview, and MCP mutations target IDs, never line numbers.
+- Merge, diff, preview, impact, and MCP mutations target IDs, never line numbers.
 
 ## Structural writes
 
@@ -65,13 +65,24 @@ form, atom, edge, or location and publish one revision per successful call.
 Do not turn the batch tool into source replacement, a nested AST upload, an
 unbounded request, or a way to bypass validation.
 
-## Merge preview, validation, and publication
+## Merge preview, impact, validation, and publication
 
 `branch_merge_preview` is read-only. Its deterministic token must bind the
 project, merge direction, common ancestor, target head, and source head. A clean
 preview may report compact consequences but must never publish a snapshot or
 advance a branch. A conflict preview must return exact conflict paths without
 throwing away the reviewed head identities.
+
+`branch_merge_impact` must compare the current target state with the prospective
+merged state. It reports only consequences introduced by merging the source into
+that target, not edits already present on the target branch. It must classify
+added, removed, modified, and source-affected named targets deterministically and
+paginate public target entries.
+
+Target coverage must be computed from target definitions that survive in the
+candidate. A removed target cannot hide a changed source document from
+`uncovered_changed_documents`. Uncovered documents are explicit review signals:
+they are not automatically invalid, but no candidate named target proves them.
 
 `branch_merge_validate` must operate on the exact clean in-memory candidate. It
 must resolve the named target and ordered sources from that candidate, invoke the
@@ -116,6 +127,7 @@ inference without changing the public MCP API.
 - `src/weave_frontend/batch_edit.py`: bounded transactional structural edits.
 - `src/weave_frontend/revision_diff.py`: bounded stable-node revision diffs.
 - `src/weave_frontend/merge_preview.py`: deterministic two-phase merge previews.
+- `src/weave_frontend/merge_impact.py`: named-target and coverage impact analysis.
 - `src/weave_frontend/merge_validation.py`: exact-candidate compiler validation.
 - `src/weave_frontend/grammar_help.py`: guidance derived from compiler examples.
 - `src/weave_frontend/weavec.py`: authoritative frontend validation adapter.
@@ -126,6 +138,7 @@ inference without changing the public MCP API.
 - `docs/mcp.md`: MCP workflow and public tool contract.
 - `docs/edit-transactions.md`: bounded batch request and publication contract.
 - `docs/merge-preview.md`: preview identity and atomic merge publication.
+- `docs/merge-impact.md`: affected targets and uncovered candidate documents.
 - `docs/merge-validation.md`: exact-candidate validation and compiler gate.
 - `tests/`: executable specifications and real-MCP qualifications.
 
@@ -147,7 +160,7 @@ pytest
 
 ## Merge expectations
 
-A passing structural merge is not enough. Before publishing reviewed parallel
-work, validate its exact candidate through a named target. After publication,
-preserve unique node IDs and run any native build or execution checks required by
-the task.
+A passing structural merge is not enough. Review its affected target graph and
+uncovered documents, then validate the exact candidate through the relevant named
+targets before publication. After publication, preserve unique node IDs and run
+any native build or execution checks required by the task.
