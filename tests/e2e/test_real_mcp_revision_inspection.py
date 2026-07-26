@@ -153,6 +153,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
 
 
 @pytest.mark.real_mcp
+@pytest.mark.real_e2e
 def test_real_mcp_inspects_current_and_historical_stable_node(tmp_path: Path) -> None:
     trace = asyncio.run(_run(tmp_path))
     inspections = [entry for entry in trace if entry["tool"] == "node_inspect"]
