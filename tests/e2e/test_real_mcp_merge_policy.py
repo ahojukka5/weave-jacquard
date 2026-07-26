@@ -466,8 +466,9 @@ def test_real_mcp_enforces_target_branch_merge_policy(tmp_path: Path) -> None:
         entry for entry in trace if entry["tool"] == "branch_merge_preflight"
     ]
     assert len(policies) == 4
-    assert len(preflights) == 4
+    assert len(preflights) == 5
     assert preflights[0]["payload"]["result"]["ready_for_publication"] is True
     assert preflights[1]["payload"]["error"]["code"] == "MERGE_POLICY_VIOLATION"
     assert preflights[2]["payload"]["result"]["source_policy_ignored"] is True
     assert preflights[3]["payload"]["error"]["code"] == "TOO_MANY_AFFECTED_TARGETS"
+    assert preflights[4]["payload"]["result"]["ready_for_publication"] is True
