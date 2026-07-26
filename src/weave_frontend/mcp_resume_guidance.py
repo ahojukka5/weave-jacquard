@@ -17,6 +17,14 @@ _CHECKPOINT_READ_DESCRIPTION = (
     "Resolve the newest verified structured checkpoint on a branch head or exact "
     "first-parent revision history."
 )
+_CHECKPOINT_HISTORY_DESCRIPTION = (
+    "Page verified first-parent checkpoints with independent checkpoint and revision-scan "
+    "bounds plus an exact continuation revision."
+)
+_CHECKPOINT_COMPARE_DESCRIPTION = (
+    "Compare two exact checkpoint revisions as structural progress deltas without "
+    "inferring completion, resolution, or ancestry."
+)
 _CHECKPOINT_WRITE_DESCRIPTION = (
     "Publish a bounded structured objective, progress, next-step, question, and "
     "validation handoff as one immutable revision."
@@ -42,6 +50,14 @@ work, concrete next steps, unresolved questions, and validation evidence.
 Checkpoint publication does not change program state, but it advances the branch
 with an immutable verified handoff revision. Use branch_checkpoint_get for a
 focused historical handoff read when the complete resume snapshot is unnecessary.
+
+For supervision or retrospective audit, use branch_checkpoint_history_page. Set
+both limit and revision_scan_limit because checkpoints may be sparse, and carry
+next_revision_id into start_revision_id for deterministic continuation. Use
+branch_checkpoint_compare only with exact revisions that published checkpoints.
+Treat added and removed items as structural differences: a removed next step or
+question does not itself prove completion or resolution, and the comparison does
+not imply first-parent ancestry.
 """.strip()
 
 INSTRUCTIONS = f"{_base.INSTRUCTIONS}\n{_RESUME_INSTRUCTION}"
@@ -99,13 +115,52 @@ _CHECKPOINT_TOPIC: dict[str, Any] = {
         "branch_checkpoint_get resolves the newest verified checkpoint on the selected "
         "revision's first-parent history. Historical reads never borrow a later checkpoint."
     ),
+    "history": (
+        "branch_checkpoint_history_page returns verified checkpoints newest-to-oldest. "
+        "Bound both returned checkpoints and scanned revisions, then continue from the "
+        "exact next_revision_id."
+    ),
+    "compare": (
+        "branch_checkpoint_compare reports exact status, objective, summary, list, and "
+        "program-root differences between two checkpoint revisions without semantic "
+        "inference or ancestry assumptions."
+    ),
     "resume": (
         "A checkpoint returns branch_resume_snapshot arguments pinned to its own revision. "
         "The full resume snapshot includes the same checkpoint in agent_checkpoint."
     ),
     "errors": (
         "STALE_BRANCH_HEAD rejects stale publication. INVALID_AGENT_CHECKPOINT rejects "
-        "invalid fields, formats, hashes, or stored checkpoint documents."
+        "invalid stored checkpoint evidence. CHECKPOINT_REVISION_REQUIRED rejects a "
+        "comparison endpoint that did not publish a checkpoint."
+    ),
+}
+
+_CHECKPOINT_TIMELINE_TOPIC: dict[str, Any] = {
+    "page": (
+        "Use branch_checkpoint_history_page for supervisory history. limit bounds returned "
+        "checkpoints; revision_scan_limit independently bounds sparse first-parent scanning."
+    ),
+    "continuation": (
+        "When has_more is true, pass next_revision_id as start_revision_id. The continuation "
+        "is an immutable first unscanned revision rather than a mutable page number."
+    ),
+    "entries": (
+        "Each entry contains verified checkpoint identity, revision metadata, program root, "
+        "status, objective, bounded summary evidence, field counts, and a complete exact "
+        "branch_resume_snapshot call."
+    ),
+    "compare": (
+        "Use branch_checkpoint_compare with exact checkpoint_revision_id values. It returns "
+        "ordered additions and removals for completed, next_steps, open_questions, and "
+        "validation plus status, objective, summary, and program-root changes."
+    ),
+    "interpretation": (
+        "Deltas are structural only. Removal does not prove completion, resolution, or "
+        "invalidation, and base/target naming does not establish ancestry."
+    ),
+    "identity": (
+        "page_id and comparison_id hash the complete deterministic returned evidence."
     ),
 }
 
@@ -117,6 +172,12 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
         return {"ok": True, "topic": topic, "help": deepcopy(_RESUME_TOPIC)}
     if topic == "checkpoint":
         return {"ok": True, "topic": topic, "help": deepcopy(_CHECKPOINT_TOPIC)}
+    if topic == "checkpoint_timeline":
+        return {
+            "ok": True,
+            "topic": topic,
+            "help": deepcopy(_CHECKPOINT_TIMELINE_TOPIC),
+        }
 
     response = _base.weave_help(topic)
     help_value = deepcopy(response["help"])
@@ -129,6 +190,10 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
     elif topic == "read":
         help_value["tools"]["branch_resume_snapshot"] = _RESUME_READ_DESCRIPTION
         help_value["tools"]["branch_checkpoint_get"] = _CHECKPOINT_READ_DESCRIPTION
+        help_value["tools"][
+            "branch_checkpoint_history_page"
+        ] = _CHECKPOINT_HISTORY_DESCRIPTION
+        help_value["tools"]["branch_checkpoint_compare"] = _CHECKPOINT_COMPARE_DESCRIPTION
     elif topic == "write":
         help_value["tools"]["branch_checkpoint_create"] = _CHECKPOINT_WRITE_DESCRIPTION
     return {**response, "help": help_value}
@@ -156,7 +221,7 @@ def install_resume_guidance(server: _FastMCPServer) -> None:
         weave_help,
         name="weave_help",
         description=(
-            "Explain structural, revision, checkpoint, resume, validation, and build "
-            "workflows."
+            "Explain structural, revision, checkpoint, supervision, resume, validation, "
+            "and build workflows."
         ),
     )
