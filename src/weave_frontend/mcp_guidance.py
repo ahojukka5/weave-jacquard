@@ -13,19 +13,21 @@ grammar_help before using an unfamiliar Weave form. Use expected_revision_id for
 optimistic concurrency. Use program_validate for a coherent single document. For
 a multi-document program, define a named target and use build_target_validate so
 the target metadata and ordered sources are validated from one pinned revision.
-Before combining independent branches, call branch_merge_preview, then
-branch_merge_impact to identify affected named targets and changed documents with
-no target coverage. Review those consequences, validate the relevant named
-targets, and publish with branch_merge using preview_id and validation_target so
-the exact compiler-validated candidate is rechecked before the target branch
-advances. Build through program_build or build_target_build and inspect the
-immutable result with build_get. When a build fails, read mapped errors through
-build_diagnostics_page instead of assuming access to server-local artifact paths.
-Pass the failed build revision_id to node_inspect when the branch may have
-advanced, then use revision_diff_page to compare that failing state with the
-current branch head before repairing. Use branch_history_page for complete
-bounded history reads, revision_operations_page for exact grouped-edit audit rows,
-and branch_activity_summary to measure revision and operation grouping.
+Before combining independent branches, call branch_merge_preflight. Review its
+bounded directional impact, uncovered documents, and complete affected-target
+compiler evidence. When ready_for_publication is true, call the returned
+publication_tool with publication_arguments; publication repeats every gate and
+atomically rechecks both branch heads. Use branch_merge_preview,
+branch_merge_impact, branch_merge_validate, and branch_merge_validate_affected
+only when investigating an individual layer. Build through program_build or
+build_target_build and inspect the immutable result with build_get. When a build
+fails, read mapped errors through build_diagnostics_page instead of assuming
+access to server-local artifact paths. Pass the failed build revision_id to
+node_inspect when the branch may have advanced, then use revision_diff_page to
+compare that failing state with the current branch head before repairing. Use
+branch_history_page for complete bounded history reads,
+revision_operations_page for exact grouped-edit audit rows, and
+branch_activity_summary to measure revision and operation grouping.
 """.strip()
 
 
@@ -41,10 +43,9 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "program_validate for a coherent single document",
             "build_target_set for a reusable multi-document program",
             "build_target_validate before a named-target build",
-            "branch_merge_preview after independent agent work",
-            "branch_merge_impact to find affected targets and uncovered documents",
-            "branch_merge_validate for each relevant reviewed target",
-            "branch_merge with preview_id and validation_target",
+            "branch_merge_preflight after independent agent work",
+            "review impact, coverage, and complete affected-target validation",
+            "branch_merge with the returned publication_arguments when ready",
             "branch_activity_summary when measuring the workflow",
             "program_build or build_target_build",
             "build_get to inspect immutable provenance and artifact paths",
@@ -70,8 +71,9 @@ _TOPICS: dict[str, dict[str, Any]] = {
                 "Use @aliases for nodes created earlier in the same batch."
             ),
             "branch_merge": (
-                "Publish a stable-ID three-way merge. Pass preview_id to reject changed "
-                "heads and validation_target to require authoritative compiler validation."
+                "Publish a stable-ID three-way merge. Prefer arguments returned by "
+                "branch_merge_preflight so preview, coverage, all affected targets, "
+                "and both branch heads are rechecked."
             ),
         },
         "positions": "Child positions are zero-based; omit position to append.",
@@ -111,6 +113,10 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "revision_diff_page": (
                 "Compare stable nodes between two immutable revisions in bounded pages."
             ),
+            "branch_merge_preflight": (
+                "Compose exact preview identity, directional impact, coverage, and every "
+                "affected surviving target validation into one non-mutating review result."
+            ),
             "branch_merge_preview": (
                 "Preview conflicts and compact document consequences for two current "
                 "branch heads without mutating either branch."
@@ -120,8 +126,12 @@ _TOPICS: dict[str, dict[str, Any]] = {
                 "and expose changed program documents with no candidate target coverage."
             ),
             "branch_merge_validate": (
-                "Validate a named build target from the exact in-memory merge candidate "
+                "Validate one named target from the exact in-memory merge candidate "
                 "without publishing a revision or build artifact."
+            ),
+            "branch_merge_validate_affected": (
+                "Validate the complete bounded set of affected surviving targets and "
+                "aggregate pass, failure, availability, and coverage evidence."
             ),
             "node_find": "Find stable IDs by form head, atom kind, or value.",
             "program_render": "Render canonical source or an annotated agent view.",
@@ -164,14 +174,14 @@ _TOPICS: dict[str, dict[str, Any]] = {
         ),
         "inspection": (
             "node_inspect defaults to the selected branch head. Pass revision_id to read "
-            "the exact immutable project revision even when it is no longer the branch head; "
-            "the response reports both revision_id and branch_head_revision_id."
+            "the exact immutable project revision even when it is no longer the branch "
+            "head; the response reports both revision_id and branch_head_revision_id."
         ),
         "diff": (
             "revision_diff_page compares one document across two project-owned immutable "
-            "revisions. Omit target_revision_id to compare against the selected branch head. "
-            "When has_more is true, pass next_index as start_index; immutable revisions make "
-            "the continuation stable."
+            "revisions. Omit target_revision_id to compare against the selected branch "
+            "head. When has_more is true, pass next_index as start_index; immutable "
+            "revisions make the continuation stable."
         ),
         "summary": (
             "branch_activity_summary traverses complete first-parent history and "
@@ -184,37 +194,42 @@ _TOPICS: dict[str, dict[str, Any]] = {
         ),
     },
     "merge": {
+        "preflight": (
+            "branch_merge_preflight is the default review call. It returns exact branch "
+            "heads, preview and merged-root identity, bounded directional target impact, "
+            "coverage gaps, the complete affected-target validation set, and publication "
+            "arguments. It never advances a branch."
+        ),
         "preview": (
             "branch_merge_preview binds project, branch direction, common ancestor, and "
             "both current heads into a deterministic preview_id. It never advances a branch."
         ),
-        "consequences": (
-            "A clean preview reports the merged root hash, changed documents, and compact "
-            "stable-node change counts. A conflicting preview returns mergeable=false and "
-            "the exact conflict paths."
-        ),
         "impact": (
-            "branch_merge_impact explains which named targets are added, removed, modified, "
-            "or affected by changed source documents. It separately reports changed program "
-            "documents that no target in the candidate covers."
+            "branch_merge_impact reports only changes introduced by merging the source "
+            "into the current target. It classifies affected named targets and changed "
+            "program documents with no surviving candidate target coverage."
         ),
         "validation": (
-            "branch_merge_validate resolves one named target and its ordered sources from "
-            "the clean in-memory candidate, invokes weavec --frontend, and returns compiler, "
-            "source, WIR, and validation hashes without retaining artifacts."
+            "branch_merge_validate inspects one named target. "
+            "branch_merge_validate_affected validates every affected surviving target in "
+            "deterministic order, aggregates failures, and blocks uncovered documents by "
+            "default without starting a compiler."
         ),
         "publish": (
-            "Pass preview_id and validation_target to branch_merge. The candidate is "
-            "revalidated, then both heads are checked in the SQLite write transaction. "
-            "Invalid candidates and stale heads publish no revision."
+            "When preflight ready_for_publication is true, call publication_tool with "
+            "publication_arguments. The complete validation set is repeated, then both "
+            "heads are checked in the SQLite write transaction. A preflight is evidence, "
+            "not a token that bypasses revalidation."
         ),
         "failures": (
-            "Unavailable validation returns MERGE_VALIDATION_UNAVAILABLE; compiler rejection "
-            "returns MERGE_VALIDATION_FAILED; changed heads return STALE_MERGE_PREVIEW."
+            "Coverage gaps return MERGE_UNCOVERED_DOCUMENTS; unavailable validation returns "
+            "MERGE_VALIDATION_UNAVAILABLE; compiler rejection returns "
+            "MERGE_VALIDATION_FAILED; changed heads return STALE_MERGE_PREVIEW."
         ),
         "compatibility": (
-            "branch_merge still accepts calls without preview_id or validation_target, but "
-            "reviewed parallel work should use the impact-aware compiler-gated flow."
+            "Lower-level preview, impact, single-target validation, all-target validation, "
+            "and direct merge calls remain available. Reviewed parallel work should use "
+            "branch_merge_preflight and its returned publication arguments."
         ),
     },
     "ids": {
@@ -237,8 +252,9 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "to one immutable revision before invoking weavec --frontend."
         ),
         "merge_candidate": (
-            "branch_merge_validate invokes the same authoritative frontend on ordered "
-            "sources rendered from an uncommitted clean merge candidate."
+            "branch_merge_preflight and branch_merge_validate_affected invoke the same "
+            "authoritative frontend on every affected surviving target from one exact "
+            "uncommitted clean merge candidate."
         ),
     },
     "targets": {
@@ -246,14 +262,15 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "program_source_list to choose source documents",
             "build_target_set to store primary source, ordered additional sources, and target",
             "build_target_validate to validate the exact pinned target",
-            "branch_merge_impact to identify affected targets and uncovered documents",
-            "branch_merge_validate to validate a target from a prospective merge",
+            "branch_merge_preflight to review impact, coverage, and all affected targets",
+            "branch_merge with returned publication_arguments when preflight is ready",
             "build_target_build to compile the same target through weavec build",
             "build_get to inspect provenance, diagnostics, and artifacts",
         ],
         "revision_rule": (
-            "Target metadata and every selected source are resolved from the same branch head, "
-            "explicit revision, or exact in-memory merge candidate. Source order is authoritative."
+            "Target metadata and every selected source are resolved from the same branch "
+            "head, explicit revision, or exact in-memory merge candidate. Source order is "
+            "authoritative."
         ),
         "tools": [
             "build_target_set",
@@ -261,8 +278,10 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "build_target_get",
             "build_target_delete",
             "build_target_validate",
+            "branch_merge_preflight",
             "branch_merge_impact",
             "branch_merge_validate",
+            "branch_merge_validate_affected",
             "build_target_build",
         ],
     },
@@ -277,12 +296,13 @@ _TOPICS: dict[str, dict[str, Any]] = {
         "repair": (
             "On failure, page diagnostics by build ID, pass the returned revision_id to "
             "node_inspect for the mapped stable node_id, compare that revision with the "
-            "current branch through revision_diff_page, repair with a structural tool, then "
-            "validate and build the new revision."
+            "current branch through revision_diff_page, repair with a structural tool, "
+            "then validate and build the new revision."
         ),
         "ownership": (
             "Jacquard owns revision pinning, canonical sources, node maps, and provenance; "
-            "weavec owns lowering, LLVM generation, runtime selection, linking, and publication."
+            "weavec owns lowering, LLVM generation, runtime selection, linking, and "
+            "publication."
         ),
     },
     "bulk": {
