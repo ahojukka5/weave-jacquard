@@ -38,7 +38,16 @@ jobs:
         run: python -m compileall -q src tests
 
       - name: Lint
-        run: ruff check .
+        run: ruff check . --output-format=json > ruff-results.json
+
+      - name: Upload Ruff diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-activity-ruff-failure
+          path: ruff-results.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Test
         run: pytest --cov=weave_frontend --cov-report=term-missing
