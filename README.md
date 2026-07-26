@@ -18,7 +18,7 @@ Primary executables: **`weave-mcp`** and **`weave-build`**
 Jacquard owns:
 
 - single-node and bounded transactional edits with stable node identities;
-- immutable revisions, parallel branches, and structural three-way merge;
+- immutable revisions, parallel branches, structural merge, and measured branch activity;
 - project-, document-, and symbol-scoped context;
 - compiler-corpus-backed grammar help;
 - authoritative validation through `weavec --frontend`;
@@ -94,6 +94,7 @@ project_initialize
 → node_inspect
 → program_validate
 → branch_merge
+→ branch_activity_summary when measuring the workflow
 → program_build
 → build_get
 ```
@@ -118,6 +119,10 @@ stored order.
 operations. Temporary `@aliases` refer to nodes created earlier in the same
 request. The complete batch publishes as one revision or rolls back; existing
 single-node tools remain available for uncertain edits and repairs.
+
+For long branches, `branch_history_page` returns bounded first-parent pages with
+an explicit continuation. `branch_activity_summary` reports complete revision,
+operation, merge, author, and edit-grouping metrics without changing history.
 
 ## Compiler boundary
 
@@ -213,7 +218,8 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 
 - **Help:** `weave_help`, `grammar_help`
 - **Projects and branches:** `project_initialize`, `branch_create`,
-  `branch_list`, `branch_history`, `branch_merge`
+  `branch_list`, `branch_history`, `branch_history_page`,
+  `branch_activity_summary`, `branch_merge`
 - **Programs:** `program_create`, `program_import`, `program_list`,
   `program_source_list`, `program_render`, `program_validate`, `program_build`
 - **Named targets:** `build_target_set`, `build_target_list`,
@@ -231,6 +237,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - [Architecture](docs/architecture.md)
 - [MCP tool reference](docs/mcp.md)
 - [Transactional structural edits](docs/edit-transactions.md)
+- [Branch activity observability](docs/branch-activity.md)
 - [Compiler bridge](docs/compiler-bridge.md)
 - [Revisioned build targets](docs/build-targets.md)
 - [Target validation](docs/target-validation.md)

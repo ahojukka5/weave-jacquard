@@ -14,7 +14,8 @@ optimistic concurrency. Use program_validate for a coherent single document. For
 a multi-document program, define a named target and use build_target_validate so
 the target metadata and ordered sources are validated from one pinned revision.
 Build through program_build or build_target_build and inspect the immutable result
-with build_get.
+with build_get. Use branch_history_page for complete bounded history reads and
+branch_activity_summary to measure revision and operation grouping.
 """.strip()
 
 
@@ -31,6 +32,7 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "build_target_set for a reusable multi-document program",
             "build_target_validate before a named-target build",
             "branch_merge after independent agent work",
+            "branch_activity_summary when measuring the workflow",
             "program_build or build_target_build",
             "build_get to inspect immutable artifacts and diagnostics",
         ],
@@ -85,10 +87,41 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "node_inspect": "Return an ID-bearing local subtree and grammar hint.",
             "node_find": "Find stable IDs by form head, atom kind, or value.",
             "program_render": "Render canonical source or an annotated agent view.",
-            "program_source_list": "List compiler source documents at a branch head or revision.",
+            "program_source_list": (
+                "List compiler source documents at a branch head or revision."
+            ),
+            "branch_history_page": (
+                "Read bounded first-parent pages with an explicit continuation."
+            ),
+            "branch_activity_summary": (
+                "Measure revisions, operations, merges, authors, and grouping."
+            ),
             "grammar_help": "Search the weavec surface corpus for exact examples.",
             "build_get": "Inspect one stored build and its immutable artifact paths.",
         }
+    },
+    "history": {
+        "page": (
+            "Call branch_history_page without start_revision_id for the first page. "
+            "When has_more is true, pass next_revision_id as the next start."
+        ),
+        "bounds": (
+            "Page limits are 1..200 and each continuation must be reachable from "
+            "the selected branch head."
+        ),
+        "stability": (
+            "Compare branch_head_revision_id across pages when a stable multi-page "
+            "read is required; restart if the branch advanced."
+        ),
+        "summary": (
+            "branch_activity_summary traverses complete first-parent history and "
+            "reports operation kinds, single and grouped revisions, merges, authors, "
+            "and revisions avoided by grouping."
+        ),
+        "interpretation": (
+            "Metrics are descriptive. Do not maximize batch size merely to reduce "
+            "revision count."
+        ),
     },
     "ids": {
         "rule": "Use returned n_* IDs; never locate code by line number.",
@@ -136,7 +169,7 @@ _TOPICS: dict[str, dict[str, Any]] = {
         "named": "build_target_build compiles a stored revisioned target.",
         "inspect": "build_get returns the stored manifest and artifact paths.",
         "ownership": (
-            "weave_frontend owns revision pinning, canonical sources, node maps, and provenance; "
+            "Jacquard owns revision pinning, canonical sources, node maps, and provenance; "
             "weavec owns lowering, LLVM generation, runtime selection, linking, and publication."
         ),
     },
