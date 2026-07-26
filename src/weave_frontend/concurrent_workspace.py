@@ -1,8 +1,9 @@
-"""Race-safe public workspace for program and node mutations."""
+"""Race-safe public workspace for program, node, and context mutations."""
 
 from __future__ import annotations
 
 from typing import Any
+from uuid import uuid4
 
 from .concurrent_sexpr import SExpressionWorkspace as _NodeConcurrentWorkspace
 from .errors import ValidationError
@@ -10,7 +11,7 @@ from .sexpr import make_atom, make_form, parse_source, validate_tree
 
 
 class SExpressionWorkspace(_NodeConcurrentWorkspace):
-    """Public workspace whose program and node writes compare-and-set branches."""
+    """Public workspace whose direct writes compare-and-set branch heads."""
 
     def create_program(
         self,
@@ -102,6 +103,50 @@ class SExpressionWorkspace(_NodeConcurrentWorkspace):
         result["base_revision_id"] = base_revision_id
         return result
 
+    def add_context(
+        self,
+        project: str,
+        branch: str,
+        *,
+        scope_kind: str,
+        scope_name: str,
+        title: str,
+        body: str,
+        expected_revision_id: str | None = None,
+        author: str = "agent",
+    ) -> dict[str, Any]:
+        if scope_kind not in {"project", "document", "symbol"}:
+            raise ValidationError(
+                "INVALID_SCOPE",
+                "scope_kind must be project, document, or symbol",
+            )
+        base_revision_id, state = self._state_for_write(
+            project,
+            branch,
+            expected_revision_id=expected_revision_id,
+        )
+        revision, document_id = self._commit_content_document(
+            project,
+            branch,
+            base_revision_id,
+            state,
+            scope_kind=scope_kind,
+            scope_name=scope_name,
+            title=title,
+            body=body,
+            message=f"add context {title}",
+            author=author,
+            operation_kind="add_context",
+            operation_target=scope_name,
+            operation_payload={},
+        )
+        return {
+            "revision_id": revision,
+            "base_revision_id": base_revision_id,
+            "branch": branch,
+            "document_id": document_id,
+        }
+
     def _commit_program_mutation(
         self,
         project: str,
@@ -123,3 +168,73 @@ class SExpressionWorkspace(_NodeConcurrentWorkspace):
             expected_branch_heads={branch: base_revision_id},
             stale_error_code="STALE_BRANCH_HEAD",
         )
+
+    def _commit_content_document(
+        self,
+        project: str,
+        branch: str,
+        base_revision_id: str,
+        state: dict[str, dict[str, Any]],
+        *,
+        scope_kind: str,
+        scope_name: str,
+        title: str,
+        body: str,
+        message: str,
+        author: str,
+        operation_kind: str,
+        operation_target: str | None,
+        operation_payload: dict[str, Any],
+    ) -> tuple[str, str]:
+        content_hash = self.db.hash_value(
+            {
+                "scope_kind": scope_kind,
+                "scope_name": scope_name,
+                "title": title,
+                "body": body,
+            }
+        )
+        prepared: dict[str, str] = {}
+
+        def prepare_transaction(connection):
+            existing = connection.execute(
+                "SELECT id FROM documents WHERE content_hash = ?",
+                (content_hash,),
+            ).fetchone()
+            if existing is not None:
+                document_id = str(existing["id"])
+            else:
+                document_id = str(uuid4())
+                connection.execute(
+                    """INSERT INTO documents(
+                           id, scope_kind, scope_name, title, body, content_hash
+                       ) VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        document_id,
+                        scope_kind,
+                        scope_name,
+                        title,
+                        body,
+                        content_hash,
+                    ),
+                )
+            prepared["document_id"] = document_id
+            payload = dict(operation_payload)
+            payload["document_id"] = document_id
+            return (
+                [(operation_kind, operation_target, payload)],
+                [document_id],
+            )
+
+        revision = self._commit(
+            project,
+            branch,
+            state,
+            message=message,
+            author=author,
+            operations=(),
+            expected_branch_heads={branch: base_revision_id},
+            stale_error_code="STALE_BRANCH_HEAD",
+            prepare_transaction=prepare_transaction,
+        )
+        return revision, prepared["document_id"]
