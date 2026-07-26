@@ -17,6 +17,7 @@ LIBRARY = """(program
   (name \"resume-library\")
   (version \"0.1\"))
 """
+SUPPORT = LIBRARY.replace('name "resume-library"', 'name "resume-support"')
 
 
 def _service(
@@ -45,13 +46,20 @@ def _build_reviewed_state(
         LIBRARY,
         expected_revision_id=program["revision_id"],
     )
+    support = workspace.import_program(
+        "demo",
+        "main",
+        "support.weave",
+        SUPPORT,
+        expected_revision_id=library["revision_id"],
+    )
     target = targets.set(
         "demo",
         "main",
         "application",
         "main.weave",
-        additional_documents=["library.weave"],
-        expected_revision_id=library["revision_id"],
+        additional_documents=["library.weave", "support.weave"],
+        expected_revision_id=support["revision_id"],
     )
     long_body = "x" * (MAX_CONTEXT_PREVIEW_CHARS + 25)
     context = workspace.add_context(
@@ -90,9 +98,11 @@ def test_resume_snapshot_composes_one_exact_reviewed_state(tmp_path: Path) -> No
         assert snapshot["branch_head_revision_id"] == reviewed_revision
         assert snapshot["revision_is_branch_head"] is True
         assert snapshot["revision"]["root_hash"]
+        assert snapshot["limits"]["target_source_limit"] == 50
         assert [item["document"] for item in snapshot["program_documents"]] == [
             "library.weave",
             "main.weave",
+            "support.weave",
         ]
         assert all(len(item["source_sha256"]) == 64 for item in snapshot["program_documents"])
         assert all(item["source_bytes"] > 0 for item in snapshot["program_documents"])
@@ -100,7 +110,10 @@ def test_resume_snapshot_composes_one_exact_reviewed_state(tmp_path: Path) -> No
             {
                 "name": "application",
                 "document": "main.weave",
-                "additional_documents": ["library.weave"],
+                "additional_document_count": 2,
+                "returned_additional_document_count": 2,
+                "additional_documents_truncated": False,
+                "additional_documents": ["library.weave", "support.weave"],
                 "compiler_target": "native",
                 "root_node_id": snapshot["build_targets"][0]["root_node_id"],
             }
@@ -189,6 +202,7 @@ def test_resume_snapshot_reports_bounded_truncation(tmp_path: Path) -> None:
             revision_id=reviewed_revision,
             document_limit=1,
             target_limit=1,
+            target_source_limit=1,
             context_limit=1,
             branch_limit=1,
             history_limit=1,
@@ -199,6 +213,8 @@ def test_resume_snapshot_reports_bounded_truncation(tmp_path: Path) -> None:
         assert snapshot["program_documents_truncated"] is True
         assert snapshot["returned_build_target_count"] == 1
         assert snapshot["build_targets_truncated"] is False
+        assert snapshot["build_targets"][0]["returned_additional_document_count"] == 1
+        assert snapshot["build_targets"][0]["additional_documents_truncated"] is True
         assert snapshot["returned_context_count"] == 1
         assert snapshot["contexts_truncated"] is True
         assert snapshot["returned_branch_count"] == 1
@@ -215,6 +231,7 @@ def test_resume_snapshot_reports_bounded_truncation(tmp_path: Path) -> None:
     [
         ("document_limit", 0),
         ("target_limit", 101),
+        ("target_source_limit", 201),
         ("context_limit", True),
         ("branch_limit", "bad"),
         ("history_limit", 51),
