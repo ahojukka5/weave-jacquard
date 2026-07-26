@@ -37,6 +37,11 @@ jobs:
           python -m pip install -e .
           python -m pip install pytest
 
+      - name: Install native verification tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang file llvm
+
       - name: Resolve immutable weavec release assets
         id: release
         env:
