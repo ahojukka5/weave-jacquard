@@ -40,7 +40,8 @@ Every list and atom has an ID such as `n_3a12cce48fe14f99`.
 - moving a node preserves its ID;
 - new nodes receive new IDs;
 - branches retain IDs inherited from their base revision;
-- structural merge compares IDs rather than line numbers.
+- structural merge compares IDs rather than line numbers;
+- revision diffs compare immutable states through the same IDs.
 
 `program_render(annotated=true)` and `node_inspect` expose these IDs. Compiler
 sources never include annotations. Each materialized source receives a separate
@@ -150,6 +151,7 @@ program_source_list
 → build_get
 → build_diagnostics_page when the build failed
 → node_inspect(revision_id = failed revision) before repair
+→ revision_diff_page(base_revision_id = failed revision) against current head
 ```
 
 ## Build inspection
@@ -278,6 +280,50 @@ This is the preferred way to inspect a mapped diagnostic after a branch has
 advanced: pass the failed build's `revision_id` and the diagnostic `node_id`.
 See [`revision-node-inspection.md`](revision-node-inspection.md).
 
+### `revision_diff_page`
+
+Compare one document across two immutable project revisions through stable node
+IDs, without rendering and transferring two complete programs.
+
+```text
+project
+document
+base_revision_id
+branch = "main"
+target_revision_id = optional; defaults to branch head
+start_index = 0
+limit = 50
+```
+
+The explicit revisions must belong to `project`. They need not be related by
+ancestry or reachable from the selected branch. The branch identifies the current
+head and supplies the target when `target_revision_id` is omitted.
+
+Each changed node contains compact `before` and `after` descriptors with its
+kind, form head or atom value, parent, sibling position, and child count. Change
+kinds are:
+
+- `added` and `removed`;
+- `kind_changed`, `head_changed`, and `value_changed`;
+- `parent_changed` and `position_changed`;
+- `child_count_changed`.
+
+One stable ID produces one row, which may carry several change kinds. Common and
+added nodes follow target preorder; removed nodes follow afterward in base
+preorder. A document present on only one side produces an all-added or
+all-removed diff. A document absent from both sides is rejected.
+
+`start_index` must be non-negative and `limit` must be 1–200. The response
+includes exact revision identities, whether the target is the branch head,
+document-presence and node-count metadata, total and per-kind change counts, and
+an explicit continuation. When `has_more` is true, pass `next_index` as the next
+`start_index`. Both selected revisions are immutable, so the page order is
+stable.
+
+Use `node_inspect` with the relevant revision to expand any changed node into a
+bounded local subtree. See [`revision-diff.md`](revision-diff.md) for the complete
+contract and compiler-guided repair flow.
+
 Other inspection and context tools:
 
 - `node_find`: find stable IDs by form head, atom kind, or exact value.
@@ -286,16 +332,16 @@ Other inspection and context tools:
 - `context_add`: store project-, document-, or symbol-scoped design material.
 - `context_get`: retrieve context visible at the current branch revision.
 
-Reading may return a useful local subtree. Writing remains transactional: one
-single edit or one bounded coherent batch either publishes completely or not at
-all.
+Reading may return a useful local subtree or a bounded change page. Writing
+remains transactional: one single edit or one bounded coherent batch either
+publishes completely or not at all.
 
 ## Failure and publication semantics
 
 - Rejected single edits and batches do not advance branches.
 - Validation and build failures do not mutate program revisions.
 - Builds never advance branches.
-- Historical inspection never checks out or rewrites a revision.
+- Historical inspection and revision diffs never check out or rewrite revisions.
 - Missing or duplicate sources fail before compilation.
 - A final executable exists only after compiler process, compiler manifest, and
   compiler diagnostics success.
