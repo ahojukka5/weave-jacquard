@@ -16,7 +16,7 @@ from typing import Any
 from uuid import uuid4
 
 from .database import Database
-from .errors import ConflictError, NotFoundError
+from .errors import ConflictError, NotFoundError, ValidationError
 
 JsonObject = dict[str, Any]
 
@@ -126,9 +126,25 @@ class RevisionWorkspace:
         target_branch: str,
         source_branch: str,
         author: str = "merge-agent",
+        expected_target_head: str | None = None,
+        expected_source_head: str | None = None,
     ) -> MergeResult:
+        """Merge current branch heads, rejecting stale expected heads atomically."""
+
         target_head = self.branch_head(project, target_branch)
         source_head = self.branch_head(project, source_branch)
+        self._require_expected_head(
+            target_branch,
+            target_head,
+            expected_target_head,
+            code="STALE_MERGE_PREVIEW",
+        )
+        self._require_expected_head(
+            source_branch,
+            source_head,
+            expected_source_head,
+            code="STALE_MERGE_PREVIEW",
+        )
         base = self._common_ancestor(target_head, source_head)
         base_state = self._state_at_revision(base)
         ours = self._state_at_revision(target_head)
@@ -142,9 +158,23 @@ class RevisionWorkspace:
             message=f"merge {source_branch} into {target_branch}",
             author=author,
             operations=[
-                ("merge", target_branch, {"source": source_branch, "base": base})
+                (
+                    "merge",
+                    target_branch,
+                    {
+                        "source": source_branch,
+                        "base": base,
+                        "target_head": target_head,
+                        "source_head": source_head,
+                    },
+                )
             ],
             parent2=source_head,
+            expected_branch_heads={
+                target_branch: target_head,
+                source_branch: source_head,
+            },
+            stale_error_code="STALE_MERGE_PREVIEW",
         )
         return MergeResult(
             revision,
@@ -152,6 +182,20 @@ class RevisionWorkspace:
             source_branch,
             tuple(sorted(changed)),
         )
+
+    @staticmethod
+    def _require_expected_head(
+        branch: str,
+        actual: str,
+        expected: str | None,
+        *,
+        code: str,
+    ) -> None:
+        if expected is not None and actual != expected:
+            raise ValidationError(
+                code,
+                f"branch {branch!r} advanced from {expected!r} to {actual!r}",
+            )
 
     def _state(self, project: str, branch: str) -> dict[str, JsonObject]:
         return self._state_at_revision(self.branch_head(project, branch))
@@ -177,9 +221,15 @@ class RevisionWorkspace:
         operations: Iterable[tuple[str, str | None, JsonObject]],
         parent2: str | None = None,
         extra_document_ids: Iterable[str] = (),
+        expected_branch_heads: dict[str, str] | None = None,
+        stale_error_code: str = "STALE_BRANCH_HEAD",
     ) -> str:
         project_id = self.project_id(project)
-        parent1 = self.branch_head(project, branch)
+        parent1 = (
+            expected_branch_heads[branch]
+            if expected_branch_heads is not None and branch in expected_branch_heads
+            else self.branch_head(project, branch)
+        )
         revision_id = str(uuid4())
         root_hash = self.db.hash_value(modules)
         parent_documents = self.db.connection.execute(
@@ -189,6 +239,23 @@ class RevisionWorkspace:
         document_ids = {str(row["document_id"]) for row in parent_documents}
         document_ids.update(extra_document_ids)
         with self.db.transaction() as connection:
+            if expected_branch_heads is not None:
+                for expected_branch, expected_head in sorted(
+                    expected_branch_heads.items()
+                ):
+                    row = connection.execute(
+                        """SELECT head_revision_id FROM branches
+                           WHERE project_id = ? AND name = ?""",
+                        (project_id, expected_branch),
+                    ).fetchone()
+                    actual_head = str(row["head_revision_id"]) if row is not None else None
+                    if actual_head != expected_head:
+                        raise ValidationError(
+                            stale_error_code,
+                            f"branch {expected_branch!r} advanced from "
+                            f"{expected_head!r} to {actual_head!r}",
+                        )
+
             connection.execute(
                 """INSERT INTO revisions(
                        id, project_id, parent1_id, parent2_id, message, author, root_hash
@@ -237,11 +304,23 @@ class RevisionWorkspace:
                        VALUES (?, ?)""",
                     (revision_id, document_id),
                 )
-            connection.execute(
-                """UPDATE branches SET head_revision_id = ?
-                   WHERE project_id = ? AND name = ?""",
-                (revision_id, project_id, branch),
-            )
+            if expected_branch_heads is None:
+                connection.execute(
+                    """UPDATE branches SET head_revision_id = ?
+                       WHERE project_id = ? AND name = ?""",
+                    (revision_id, project_id, branch),
+                )
+            else:
+                updated = connection.execute(
+                    """UPDATE branches SET head_revision_id = ?
+                       WHERE project_id = ? AND name = ? AND head_revision_id = ?""",
+                    (revision_id, project_id, branch, parent1),
+                )
+                if updated.rowcount != 1:
+                    raise ValidationError(
+                        stale_error_code,
+                        f"branch {branch!r} advanced while publishing the revision",
+                    )
         return revision_id
 
     def _parents(self, revision: str) -> tuple[str | None, str | None]:
