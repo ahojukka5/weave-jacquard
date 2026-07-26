@@ -117,6 +117,7 @@ jobs:
             -m real_e2e \
             tests/e2e/test_real_mcp.py \
             tests/e2e/test_real_mcp_program_matrix.py \
+            tests/e2e/test_real_mcp_algorithmic_stress.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
@@ -140,10 +141,12 @@ jobs:
               "while-accumulator",
               "multi-function-chain",
               "memory-flow",
+              "binary-search-batch16",
           }, by_name
           assert by_name["while-accumulator"]["actual_exit"] == 42
           assert by_name["multi-function-chain"]["actual_exit"] == 35
           assert by_name["memory-flow"]["actual_exit"] == 100
+          assert by_name["binary-search-batch16"]["actual_exit"] == 26
           assert all(summary["llvm_bytes"] > 0 for summary in summaries)
           assert all(summary["bitcode_bytes"] > 0 for summary in summaries)
 
