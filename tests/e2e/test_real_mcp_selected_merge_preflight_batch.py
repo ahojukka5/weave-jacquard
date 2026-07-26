@@ -92,8 +92,24 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
-def main() -> int:
-    if len(sys.argv) < 8 or sys.argv[1] != "build":
+def frontend() -> int:
+    if len(sys.argv) < 4:
+        return 2
+    wir_path = Path(sys.argv[2])
+    source_paths = [Path(value) for value in sys.argv[3:]]
+    text = "\n".join(path.read_text(encoding="utf-8") for path in source_paths)
+    if "force-build-failure" in text:
+        print("selected batch fake frontend failure", file=sys.stderr)
+        return 11
+    wir_path.write_text(
+        "module selected_merge_preflight_batch\n",
+        encoding="utf-8",
+    )
+    return 0
+
+
+def build() -> int:
+    if len(sys.argv) < 8:
         return 2
     source = Path(sys.argv[2])
     output = Path(sys.argv[sys.argv.index("-o") + 1])
@@ -110,6 +126,14 @@ def main() -> int:
     write_json(manifest_path, manifest(source, output, "succeeded", "complete"))
     write_json(diagnostics_path, diagnostics("succeeded", "complete", 0))
     return 0
+
+
+def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "--frontend":
+        return frontend()
+    if len(sys.argv) > 1 and sys.argv[1] == "build":
+        return build()
+    return 2
 
 
 if __name__ == "__main__":
@@ -201,7 +225,10 @@ def _schema(tool: Any) -> dict[str, Any]:
     return value
 
 
-async def _run(tmp_path: Path, compiler: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+async def _run(
+    tmp_path: Path,
+    compiler: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     trace: list[dict[str, Any]] = []
     parameters = StdioServerParameters(
         command=sys.executable,
