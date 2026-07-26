@@ -49,7 +49,7 @@ never contain annotations. Materialized sources receive separate
 
 ## Recommended protected-branch workflow
 
-A project may publish a strict target-branch policy once:
+A project may publish a strict target-branch policy:
 
 ```text
 merge_policy_set(
@@ -88,7 +88,7 @@ Core tools:
 - `revision_operations_page`: exact immutable operation audit pages.
 - `branch_activity_summary`: complete first-parent workflow metrics.
 - `merge_policy_get`: read effective first-parent policy.
-- `merge_policy_set`: publish a policy in a new immutable revision.
+- `merge_policy_set`: publish policy in a new immutable revision.
 - `branch_merge_preflight`: one-call non-mutating admission review.
 - `branch_merge_preview`: low-level structural preview.
 - `branch_merge_impact`: low-level directional target impact.
@@ -100,26 +100,12 @@ Core tools:
 
 ```text
 project
-a branch = "main"
+branch = "main"
 require_preflight = true
 require_affected_validation = true
 allow_uncovered_documents = false
 max_affected_targets = 64
 author = "policy-agent"
-```
-
-The actual argument is `branch`; the `a` prefixes above are not syntax and are
-omitted in calls:
-
-```text
-merge_policy_set(
-  project,
-  branch = "main",
-  require_preflight = true,
-  require_affected_validation = true,
-  allow_uncovered_documents = false,
-  max_affected_targets = 64,
-  author = "policy-agent")
 ```
 
 The format is `weave-merge-policy-v1`. A successful call:
@@ -195,15 +181,14 @@ It returns:
 - exact ancestor, target-head, source-head, preview, and merged-root identities;
 - `target_merge_policy` and `source_merge_policy`;
 - `source_policy_ignored`;
-- a bounded impact summary;
-- the complete `weave-merge-validation-set-v1`;
+- bounded impact summary;
+- complete `weave-merge-validation-set-v1`;
 - `ready_for_publication`;
 - `publication_tool = "branch_merge"`;
 - exact `publication_arguments`, including policy-bound `preflight_id`.
 
-The public impact summary contains at most 200 target entries. Truncation is
-reported explicitly and affects presentation only; complete internal impact
-still drives validation.
+The public impact summary contains at most 200 target entries. Truncation affects
+presentation only; complete internal impact still drives validation.
 
 A forbidden uncovered override returns `MERGE_POLICY_VIOLATION` before impact or
 compiler work. A policy fanout violation returns `TOO_MANY_AFFECTED_TARGETS`
@@ -228,8 +213,8 @@ source_branch
 
 The `weave-merge-preview-v1` `preview_id` binds project, merge direction, common
 ancestor, target head, and source head. A clean preview returns prospective root
-and compact per-document stable-node consequences. A conflict preview returns
-`mergeable=false` and exact conflict paths. Neither mutates a branch.
+and compact stable-node consequences. A conflict preview returns
+`mergeable=false` and exact paths. Neither mutates a branch.
 
 ### `branch_merge_impact`
 
@@ -317,7 +302,7 @@ Modes remain compatible when target policy permits them:
 - complete `validate_affected_targets=true`;
 - exact policy-aware preflight replay.
 
-A call cannot combine single-target and all-target validation. A preflight replay
+A call cannot combine single-target and all-target validation. Preflight replay
 requires all-target validation and no `validation_target`.
 
 Configured target policy may require preflight and all-target validation, forbid
@@ -331,8 +316,8 @@ before publication:
 - `TOO_MANY_AFFECTED_TARGETS`.
 
 For `preflight_id`, Jacquard recomputes policy-aware preflight once, compares the
-exact identity, enforces its validation set, and publishes with its preview ID.
-It does not launch a redundant second compiler fanout for the same candidate.
+identity, enforces its validation set, and publishes with its preview ID. It does
+not launch a redundant second compiler fanout for the same candidate.
 
 Both target and source heads are then rechecked in the same SQLite
 `BEGIN IMMEDIATE` transaction that writes the two-parent merge revision. A branch
