@@ -161,6 +161,7 @@ def test_node_tool_returns_structured_stale_error(monkeypatch) -> None:
     assert response["error"] == {
         "code": "STALE_BRANCH_HEAD",
         "message": "branch advanced",
+        "node_id": None,
     }
 
 
