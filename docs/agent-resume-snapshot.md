@@ -19,6 +19,7 @@ branch_resume_snapshot(
   revision_id = optional,
   document_limit = 100,
   target_limit = 50,
+  target_source_limit = 50,
   context_limit = 20,
   branch_limit = 50,
   history_limit = 10,
@@ -72,8 +73,9 @@ bounds produces the same ID. Changing the selected revision, a current branch
 head, branch list, or output bounds may change the ID because the returned
 orientation evidence changed.
 
-The snapshot is read-only. It creates no branch, revision, operation, context,
-build, compiler artifact, or filesystem output.
+The response includes the effective limit values used for the call. The snapshot
+is read-only. It creates no branch, revision, operation, context, build, compiler
+artifact, or filesystem output.
 
 ## Program summaries
 
@@ -95,9 +97,21 @@ reported through `build_targets` instead.
 
 ## Build targets and policy
 
-Build targets are parsed through the normal revisioned target registry and
-include compact name, primary source, ordered additional sources, compiler
-target, and stable target-root ID.
+Build targets are parsed through the normal revisioned target registry. Each
+summary contains:
+
+- name and stable target-root ID;
+- primary source;
+- total and returned additional-source counts;
+- bounded ordered additional sources and an explicit truncation flag;
+- requested compiler target.
+
+`target_limit` bounds target definitions. `target_source_limit` independently
+bounds the additional source list inside each returned target. The primary source
+is always reported.
+
+Every returned target is checked against program documents in the exact selected
+revision. A target cannot borrow a source from the current branch head.
 
 `merge_policy` is resolved through the same first-parent policy registry used by
 merge preflight and publication. An unconfigured historical state returns the
@@ -133,19 +147,25 @@ selected revision, including parsed JSON payloads.
 Second merge parents are reported on each revision but are not traversed by the
 first-parent resume history.
 
-## Bounds
+## Bounded work
 
 All public limits are positive integers. Maximums are:
 
 - 200 program documents;
 - 100 build targets;
+- 200 additional sources per returned target;
 - 100 context documents;
 - 200 project branches;
 - 50 first-parent history entries;
 - 200 current-revision operations.
 
+Program, target, branch, context, and operation collections use count-plus-limit
+queries. A small return limit does not require full target parsing or full branch
+enumeration. Program source rendering is performed only for returned documents.
+
 Each bounded collection reports total count, returned count, and a truncation
-flag. History reports its own continuation. Invalid limits return
+flag. Each target reports the same evidence for its nested additional-source
+list. History reports its own continuation. Invalid limits return
 `INVALID_RESUME_SNAPSHOT_LIMIT` before project state is summarized.
 
 ## Reproducible follow-up actions
@@ -174,7 +194,9 @@ build ID, not chronological. The snapshot never invents a “latest build.”
 - missing branch or project uses the normal not-found contract;
 - a foreign or unknown explicit revision is rejected as not belonging to the
   selected project;
-- invalid bounds return `INVALID_RESUME_SNAPSHOT_LIMIT`.
+- invalid bounds return `INVALID_RESUME_SNAPSHOT_LIMIT`;
+- malformed historical target metadata or missing target sources use the normal
+  target/document validation contract.
 
 No partial snapshot is returned on request-level failure.
 
@@ -187,14 +209,14 @@ Direct tests prove:
 - canonical source hashes and byte counts;
 - named targets, policy, context previews, operations, branches, and history;
 - historical isolation after later source and policy changes;
-- explicit truncation and continuation evidence;
+- top-level and nested target-source truncation evidence;
 - validation of every bound;
 - foreign-revision rejection.
 
-The production stdio lifecycle creates a reviewed multi-document state with a
-build target, context, merge policy, and historical branch. It then advances main
-and proves reviewed, historical, current, and deliberately truncated snapshots
-remain internally consistent.
+The production stdio lifecycle creates a reviewed three-document state with a
+multi-source build target, context, merge policy, and historical branch. It then
+advances main and proves reviewed, historical, current, and deliberately
+truncated snapshots remain internally consistent.
 
 Standard CI retains `resume-snapshot-trace.json`. The packaged `weavec` workflow
 verifies that the final MCP registration does not regress native builds, merge
