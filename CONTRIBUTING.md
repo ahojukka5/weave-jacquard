@@ -87,11 +87,12 @@ Read `docs/single-node-concurrency.md`,
 `docs/context-policy-concurrency.md`,
 `docs/reproducible-branch-creation.md`,
 `docs/agent-resume-snapshot.md`,
-`docs/agent-checkpoints.md`, and
-`docs/agent-checkpoint-timeline.md` before changing branch writes, fork
-semantics, one-call orientation reads, handoff protocols, or supervisory
-checkpoint reads. Consult `docs/write-concurrency-audit.md` before adding a new
-mutating tool.
+`docs/agent-checkpoints.md`,
+`docs/agent-checkpoint-timeline.md`, and
+`docs/project-agent-status.md` before changing branch writes, fork semantics,
+one-call orientation reads, handoff protocols, checkpoint supervision, or
+project-wide agent status reads. Consult `docs/write-concurrency-audit.md` before
+adding a new mutating tool.
 
 In particular:
 
@@ -120,6 +121,14 @@ In particular:
   checkpoints;
 - checkpoint list deltas must remain structural evidence and must not infer
   completion, resolution, invalidation, ancestry, or chronology;
+- project-wide branch pages must use one exact catalog of branch names and head
+  revisions, and stale catalogs must be rejected rather than mixed;
+- project branch catalogs and page sizes must have explicit fanout bounds;
+- per-branch checkpoint discovery must have an independent first-parent scan
+  bound and distinguish incomplete search from complete no-checkpoint evidence;
+- project agent status must not infer inactivity, correctness, completion,
+  blockage, or review readiness from timestamps, checkpoint lag, status labels,
+  or program root hashes;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
