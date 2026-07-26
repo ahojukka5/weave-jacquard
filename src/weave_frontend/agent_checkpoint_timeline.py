@@ -56,7 +56,14 @@ class AgentCheckpointTimelineService:
             scanned_revision_count += 1
             current = revision["parent1_id"]
             if checkpoint is not None:
-                entries.append(self._timeline_entry(revision, checkpoint))
+                entries.append(
+                    self._timeline_entry(
+                        project,
+                        branch,
+                        revision,
+                        checkpoint,
+                    )
+                )
 
         result: dict[str, Any] = {
             "format": CHECKPOINT_TIMELINE_FORMAT,
@@ -234,6 +241,8 @@ class AgentCheckpointTimelineService:
 
     @staticmethod
     def _timeline_entry(
+        project: str,
+        branch: str,
         revision: dict[str, Any],
         checkpoint: dict[str, Any],
     ) -> dict[str, Any]:
@@ -259,6 +268,8 @@ class AgentCheckpointTimelineService:
             "resume": {
                 "tool": "branch_resume_snapshot",
                 "arguments": {
+                    "project": project,
+                    "branch": branch,
                     "revision_id": revision["id"],
                 },
             },
