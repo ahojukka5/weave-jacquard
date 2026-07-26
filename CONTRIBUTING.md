@@ -85,10 +85,11 @@ revision semantics, grammar, validation rules, merge behavior, or public API.
 Read `docs/single-node-concurrency.md`,
 `docs/program-target-concurrency.md`,
 `docs/context-policy-concurrency.md`,
-`docs/reproducible-branch-creation.md`, and
-`docs/agent-resume-snapshot.md` before changing branch writes, fork semantics, or
-one-call orientation reads. Consult `docs/write-concurrency-audit.md` before
-adding a new mutating tool.
+`docs/reproducible-branch-creation.md`,
+`docs/agent-resume-snapshot.md`, and
+`docs/agent-checkpoints.md` before changing branch writes, fork semantics,
+one-call orientation reads, or handoff protocols. Consult
+`docs/write-concurrency-audit.md` before adding a new mutating tool.
 
 In particular:
 
@@ -102,9 +103,15 @@ In particular:
 - auxiliary persistent rows, operation payloads, revision links, and the branch
   update must commit or roll back together;
 - a revision-pinned composite read must not mix programs, targets, policy,
-  context, operations, or history from a newer branch head;
+  context, operations, checkpoints, or history from a newer branch head;
 - bounded composite reads must expose totals, returned counts, and truncation;
+- checkpoint publication must preserve the captured program root hash;
+- checkpoint readers must verify scope, format, structure, and content hash;
+- historical checkpoint resolution must follow only the selected revision's
+  first-parent history and must never borrow a later handoff;
+- checkpoint resume arguments must remain pinned to the publishing revision;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
-- design context and contracts must be versioned with program state.
+- design context, contracts, and agent handoffs must be versioned with program
+  state.
