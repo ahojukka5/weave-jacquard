@@ -60,7 +60,8 @@ sources never include annotations. Each materialized source receives a separate
 - `branch_activity_summary`: measure complete first-parent revision, operation,
   merge, author, and edit-grouping activity.
 - `branch_merge_preview`: preview stable-ID merge conflicts and consequences.
-- `branch_merge`: publish a merge, optionally enforcing a reviewed preview.
+- `branch_merge_validate`: validate a named target from the exact merge candidate.
+- `branch_merge`: publish a merge, optionally enforcing preview and compiler gates.
 
 `branch_history_page` accepts page sizes from 1 to 200. Begin without a start
 revision; when `has_more` is true, pass `next_revision_id` as the next
@@ -111,6 +112,43 @@ Per-document summaries report add/remove/modify status, document hashes, node
 counts, changed stable-node count, and aggregate revision-diff change kinds.
 Complete merged trees are never returned.
 
+### `branch_merge_validate`
+
+Validate one named target from the exact clean in-memory merge candidate without
+publishing a revision or build artifact.
+
+```text
+project
+target_branch
+source_branch
+build_target
+preview_id = optional reviewed preview
+```
+
+The target definition and its ordered source documents are resolved from the
+prospective merged state. Jacquard renders those canonical sources and invokes:
+
+```text
+weavec --frontend program.wir source0.weave source1.weave ...
+```
+
+A supplied stale preview returns `STALE_MERGE_PREVIEW`. A merge conflict returns
+`MERGE_CONFLICT` before compiler startup. The response format
+`weave-merge-validation-v1` includes:
+
+- preview, ancestor, target-head, source-head, and merged-root identities;
+- target configuration and ordered document names;
+- stable source-root IDs, source hashes, and source byte counts;
+- compiler path and binary SHA-256;
+- availability, validity, return code, timeout state, and optional diagnostic;
+- stdout and stderr bounded to 8,192 characters with truncation flags;
+- WIR SHA-256 and byte count, but not WIR contents.
+
+The deterministic `validation_id` binds the preview, merged root, target
+configuration, ordered source hashes, and compiler hash. Validation creates no
+revision and retains no temporary source or WIR files. See
+[`merge-validation.md`](merge-validation.md).
+
 ### `branch_merge`
 
 ```text
@@ -118,21 +156,35 @@ project
 target_branch
 source_branch
 preview_id = optional
+validation_target = optional named build target
 author = "merge-agent"
 ```
 
-When `preview_id` is supplied, Jacquard recomputes the current preview. A token
-mismatch returns `STALE_MERGE_PREVIEW`; a matching conflict preview returns
-`MERGE_CONFLICT`. Neither publishes a revision.
+When `validation_target` is present, Jacquard recomputes the current candidate,
+validates that named target through `weavec --frontend`, and rejects unavailable
+or failed validation with `MERGE_VALIDATION_UNAVAILABLE` or
+`MERGE_VALIDATION_FAILED`. The validation's exact preview ID becomes the
+publication token.
 
-For a matching clean preview, both reviewed branch heads are checked again in the
-same SQLite `BEGIN IMMEDIATE` transaction that writes the merge revision. The
-target update uses compare-and-set semantics. The merge revision records the
+When `preview_id` is supplied, a token mismatch returns
+`STALE_MERGE_PREVIEW`; a matching conflict preview returns `MERGE_CONFLICT`.
+Neither publishes a revision.
+
+For a matching clean candidate, both reviewed branch heads are checked again in
+the same SQLite `BEGIN IMMEDIATE` transaction that writes the merge revision.
+The target update uses compare-and-set semantics. The merge revision records the
 reviewed common ancestor and both parent heads in its operation payload.
 
-Calls without `preview_id` remain supported. Direct merges still capture and
-atomically recheck both current heads, but preview-first merging is recommended
-for independent agent work. See [`merge-preview.md`](merge-preview.md).
+A branch change before validation changes the preview ID. A branch change during
+or after validation fails the transactional head check. The candidate that
+passes the compiler is therefore the only candidate that can be published by the
+validated call.
+
+Calls without `preview_id` or `validation_target` remain supported. Direct merges
+still capture and atomically recheck both current heads, but the complete
+preview-validation-publication flow is recommended for independent agent work.
+See [`merge-preview.md`](merge-preview.md) and
+[`merge-validation.md`](merge-validation.md).
 
 ## Program documents
 
@@ -190,6 +242,8 @@ immutable revision graph as its source documents.
 - `build_target_delete`: delete a target in a new revision.
 - `build_target_validate`: validate target metadata and ordered sources from one
   pinned revision.
+- `branch_merge_validate`: validate the same target from an uncommitted merge
+  candidate.
 - `build_target_build`: compile the exact same revisioned target.
 
 Recommended flow:
@@ -200,7 +254,9 @@ program_source_list
 → structural source edits
 → build_target_validate
 → branch_merge_preview
-→ branch_merge(preview_id = reviewed preview)
+→ branch_merge_validate(build_target = named target)
+→ branch_merge(preview_id = reviewed preview,
+               validation_target = named target)
 → build_target_build
 → build_get
 → build_diagnostics_page when the build failed
@@ -386,18 +442,19 @@ Other inspection and context tools:
 - `context_add`: store project-, document-, or symbol-scoped design material.
 - `context_get`: retrieve context visible at the current branch revision.
 
-Reading may return a useful local subtree, bounded change page, or merge preview.
-Writing remains transactional: one single edit, one coherent batch, or one merge
-either publishes completely or not at all.
+Reading may return a useful local subtree, bounded change page, merge preview, or
+merge-validation record. Writing remains transactional: one single edit, one
+coherent batch, or one merge either publishes completely or not at all.
 
 ## Failure and publication semantics
 
 - Rejected single edits and batches do not advance branches.
 - Validation and build failures do not mutate program revisions.
 - Builds never advance branches.
-- Merge previews, historical inspection, and revision diffs never check out or
-  rewrite revisions.
+- Merge previews, merge candidate validation, historical inspection, and revision
+  diffs never check out or rewrite revisions.
 - Conflict previews and stale preview tokens publish no merge revision.
+- Unavailable or failed merge validation publishes no merge revision.
 - Merge publication atomically rechecks both captured branch heads.
 - Missing or duplicate sources fail before compilation.
 - A final executable exists only after compiler process, compiler manifest, and
