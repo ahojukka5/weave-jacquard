@@ -124,6 +124,7 @@ jobs:
             tests/e2e/test_real_mcp_revision_inspection.py \
             tests/e2e/test_real_mcp_revision_diff.py \
             tests/e2e/test_real_mcp_merge_preview.py \
+            tests/e2e/test_real_mcp_merge_validation.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
@@ -220,6 +221,33 @@ jobs:
           assert merges[1]["payload"]["error"]["code"] == "STALE_MERGE_PREVIEW"
           assert previews[2]["payload"]["result"]["mergeable"] is False
           assert merges[2]["payload"]["error"]["code"] == "MERGE_CONFLICT"
+
+          validation_traces = list(base.rglob("merge-validation-trace.json"))
+          assert len(validation_traces) == 1, validation_traces
+          validation_trace = json.loads(
+              validation_traces[0].read_text(encoding="utf-8")
+          )
+          validations = [
+              entry
+              for entry in validation_trace
+              if entry["tool"] == "branch_merge_validate"
+          ]
+          validated_merges = [
+              entry
+              for entry in validation_trace
+              if entry["tool"] == "branch_merge"
+          ]
+          assert len(validations) == 2
+          assert validations[0]["payload"]["result"]["valid"] is True
+          assert validations[0]["payload"]["result"]["wir_bytes"] > 0
+          assert validations[1]["payload"]["result"]["valid"] is False
+          assert validated_merges[0]["payload"]["result"]["validation_enforced"] is True
+          assert validated_merges[0]["payload"]["result"]["merge_validation"][
+              "valid"
+          ] is True
+          assert validated_merges[1]["payload"]["error"]["code"] == (
+              "MERGE_VALIDATION_FAILED"
+          )
 
           output = Path("qualification/program-matrix-summary.json")
           output.write_text(
