@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 
-from weave_frontend.errors import ValidationError
 from weave_frontend import mcp_policy
+from weave_frontend.errors import ValidationError
 
 
 class _Policies:
