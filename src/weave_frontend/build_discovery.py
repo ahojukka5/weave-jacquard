@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
+from .compiler_artifacts import BUILD_KEY_FORMAT
 from .errors import NotFoundError, ValidationError
 
 BUILD_LIST_FORMAT = "weave-build-list-page-v1"
@@ -145,9 +146,8 @@ class BuildDiscoveryService:
         ).encode()
         return hashlib.sha256(payload).hexdigest()
 
-    @classmethod
     def _summary(
-        cls,
+        self,
         manifest: dict[str, Any],
         *,
         expected_build_id: str,
@@ -170,11 +170,11 @@ class BuildDiscoveryService:
                 "INVALID_BUILD_MANIFEST",
                 "verified build manifest ID changed during discovery",
             )
-        cls._require_string(project, "project")
-        cls._require_string(branch, "branch")
-        cls._require_string(revision_id, "revision_id")
-        cls._require_sha256(revision_hash, "revision_hash")
-        cls._require_string(document, "document")
+        self._require_string(project, "project")
+        self._require_string(branch, "branch")
+        self._require_string(revision_id, "revision_id")
+        self._require_sha256(revision_hash, "revision_hash")
+        self._require_string(document, "document")
         if (
             not isinstance(documents, list)
             or not documents
@@ -185,16 +185,34 @@ class BuildDiscoveryService:
                 "INVALID_BUILD_MANIFEST",
                 "build manifest documents must be non-empty strings led by document",
             )
-        cls._require_string(target, "target")
+        self._require_string(target, "target")
         if compiler_target is not None:
-            cls._require_string(compiler_target, "compiler_target")
-        cls._require_sha256(compiler_sha256, "compiler_sha256")
-        cls._require_string(build_key_format, "build_key_format")
+            self._require_string(compiler_target, "compiler_target")
+        self._require_sha256(compiler_sha256, "compiler_sha256")
+        self._require_string(build_key_format, "build_key_format")
         if not isinstance(artifacts, dict):
             raise ValidationError(
                 "INVALID_BUILD_MANIFEST",
                 "build manifest artifacts must be an object",
             )
+
+        self._require_revision_provenance(
+            str(project),
+            str(revision_id),
+            str(revision_hash),
+        )
+        build_key_verified = False
+        if build_key_format == BUILD_KEY_FORMAT:
+            self._require_current_build_key(
+                manifest,
+                build_id=str(build_id),
+                revision_id=str(revision_id),
+                revision_hash=str(revision_hash),
+                documents=list(documents),
+                compiler_sha256=str(compiler_sha256),
+                target=str(target),
+            )
+            build_key_verified = True
 
         return {
             "build_id": build_id,
@@ -203,12 +221,14 @@ class BuildDiscoveryService:
             "branch": branch,
             "revision_id": revision_id,
             "revision_hash": revision_hash,
+            "revision_provenance_verified": True,
             "document": document,
             "documents": list(documents),
             "target": target,
             "compiler_target": compiler_target,
             "compiler_sha256": compiler_sha256,
             "build_key_format": build_key_format,
+            "build_key_verified": build_key_verified,
             "returncode": manifest.get("returncode"),
             "compiler_diagnostics_protocol_valid": manifest.get(
                 "compiler_diagnostics_protocol_valid"
@@ -219,6 +239,106 @@ class BuildDiscoveryService:
             "executable_available": isinstance(artifacts.get("executable"), str),
             "diagnostics_available": isinstance(artifacts.get("diagnostics"), str),
         }
+
+    def _require_revision_provenance(
+        self,
+        project: str,
+        revision_id: str,
+        revision_hash: str,
+    ) -> None:
+        row = self.bridge.workspace.db.connection.execute(
+            """SELECT r.root_hash
+               FROM revisions r
+               JOIN projects p ON p.id = r.project_id
+               WHERE r.id = ? AND p.name = ?""",
+            (revision_id, project),
+        ).fetchone()
+        if row is None:
+            raise ValidationError(
+                "BUILD_REVISION_NOT_FOUND",
+                "build manifest revision does not belong to its recorded project",
+            )
+        if str(row["root_hash"]) != revision_hash:
+            raise ValidationError(
+                "BUILD_REVISION_HASH_MISMATCH",
+                "build manifest revision hash does not match immutable revision storage",
+            )
+
+    @classmethod
+    def _require_current_build_key(
+        cls,
+        manifest: dict[str, Any],
+        *,
+        build_id: str,
+        revision_id: str,
+        revision_hash: str,
+        documents: list[str],
+        compiler_sha256: str,
+        target: str,
+    ) -> None:
+        sources = manifest.get("sources")
+        artifact_hashes = manifest.get("artifact_sha256")
+        if not isinstance(sources, list) or len(sources) != len(documents):
+            raise ValidationError(
+                "BUILD_SOURCE_METADATA_MISMATCH",
+                "current build key requires one source metadata entry per document",
+            )
+        if not isinstance(artifact_hashes, dict):
+            raise ValidationError(
+                "BUILD_SOURCE_METADATA_MISMATCH",
+                "current build key requires artifact hash metadata",
+            )
+
+        key_documents: list[dict[str, str]] = []
+        for index, (document, source) in enumerate(zip(documents, sources, strict=True)):
+            if not isinstance(source, dict) or source.get("document") != document:
+                raise ValidationError(
+                    "BUILD_SOURCE_METADATA_MISMATCH",
+                    f"source metadata at index {index} does not match document order",
+                )
+            relative = source.get("source")
+            source_sha256 = source.get("source_sha256")
+            cls._require_string(
+                relative,
+                f"sources[{index}].source",
+                code="BUILD_SOURCE_METADATA_MISMATCH",
+            )
+            cls._require_sha256(
+                source_sha256,
+                f"sources[{index}].source_sha256",
+                code="BUILD_SOURCE_METADATA_MISMATCH",
+            )
+            if artifact_hashes.get(relative) != source_sha256:
+                raise ValidationError(
+                    "BUILD_SOURCE_METADATA_MISMATCH",
+                    f"source metadata hash does not match artifact hash at index {index}",
+                )
+            key_documents.append(
+                {"document": document, "source_sha256": str(source_sha256)}
+            )
+
+        if manifest.get("source_sha256") != key_documents[0]["source_sha256"]:
+            raise ValidationError(
+                "BUILD_SOURCE_METADATA_MISMATCH",
+                "primary source hash does not match the first ordered source",
+            )
+
+        payload = {
+            "format": BUILD_KEY_FORMAT,
+            "revision_hash": revision_hash,
+            "revision_id": revision_id,
+            "documents": key_documents,
+            "compiler_sha256": compiler_sha256,
+            "target": target,
+        }
+        expected_build_id = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()[:32]
+        if expected_build_id != build_id:
+            raise ValidationError(
+                "BUILD_KEY_MISMATCH",
+                "current build manifest inputs do not reproduce the stored build ID",
+            )
 
     @staticmethod
     def _matches(summary: dict[str, Any], filters: dict[str, Any]) -> bool:
@@ -280,16 +400,18 @@ class BuildDiscoveryService:
             raise ValidationError(code, f"{name} must be a non-empty string")
 
     @staticmethod
-    def _require_sha256(value: Any, name: str) -> None:
+    def _require_sha256(
+        value: Any,
+        name: str,
+        *,
+        code: str = "INVALID_BUILD_MANIFEST",
+    ) -> None:
         if (
             not isinstance(value, str)
             or len(value) != 64
             or any(character not in "0123456789abcdef" for character in value)
         ):
-            raise ValidationError(
-                "INVALID_BUILD_MANIFEST",
-                f"{name} must be lowercase SHA-256",
-            )
+            raise ValidationError(code, f"{name} must be lowercase SHA-256")
 
     @classmethod
     def _validate_start_after(cls, value: str | None) -> None:
