@@ -106,6 +106,8 @@ async def _run(tmp_path: Path) -> None:
         assert {"branch_history_page", "branch_activity_summary"} <= names
 
         initialized = await _call(session, "project_initialize", project="activity-e2e")
+        assert isinstance(initialized, list) and len(initialized) == 2
+        initial_revision_id = str(initialized[1])
         created = await _call(
             session,
             "program_create",
@@ -147,7 +149,7 @@ async def _run(tmp_path: Path) -> None:
         )
         assert second["returned_count"] == 1
         assert second["has_more"] is False
-        assert second["revisions"][0]["id"] == initialized["revision_id"]
+        assert second["revisions"][0]["id"] == initial_revision_id
 
         summary = await _call(
             session,
