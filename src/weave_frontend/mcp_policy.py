@@ -71,17 +71,21 @@ def _validate_modes(
             "INVALID_MERGE_VALIDATION_MODE",
             "allow_uncovered_documents requires validate_affected_targets",
         )
-    if preflight_id is not None:
-        if not isinstance(preflight_id, str) or not preflight_id:
-            raise ValidationError(
-                "INVALID_MERGE_PREFLIGHT_ID",
-                "preflight_id must be a non-empty string",
-            )
-        if validation_target is not None or not validate_affected_targets:
-            raise ValidationError(
-                "INVALID_MERGE_VALIDATION_MODE",
-                "preflight replay requires validate_affected_targets and no validation_target",
-            )
+    if preflight_id is not None and (
+        not isinstance(preflight_id, str) or not preflight_id
+    ):
+        raise ValidationError(
+            "INVALID_MERGE_PREFLIGHT_ID",
+            "preflight_id must be a non-empty string",
+        )
+    if preflight_id is not None and (
+        validation_target is not None or not validate_affected_targets
+    ):
+        raise ValidationError(
+            "INVALID_MERGE_VALIDATION_MODE",
+            "preflight replay requires validate_affected_targets "
+            "and no validation_target",
+        )
 
 
 def _policy_metadata(
