@@ -11,11 +11,13 @@ from .branch_activity import BranchActivityService
 from .build_inspection import BuildInspectionService
 from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
+from .errors import ValidationError
 from .mcp_guidance import install_runtime_guidance
 from .mcp_server import _result, mcp, workspace
 from .merge_impact import MergeTargetImpactService
 from .merge_preview import MergePreviewService
 from .merge_validation import MergeValidationService
+from .merge_validation_set import MergeValidationSetService
 from .revision_diff import RevisionNodeDiffService
 from .revision_inspection import RevisionNodeInspectionService
 from .target_validation import BuildTargetValidator
@@ -76,6 +78,11 @@ def merge_impacts() -> MergeTargetImpactService:
 @lru_cache(maxsize=1)
 def merge_validations() -> MergeValidationService:
     return MergeValidationService(workspace(), merge_previews(), build_targets())
+
+
+@lru_cache(maxsize=1)
+def merge_validation_sets() -> MergeValidationSetService:
+    return MergeValidationSetService(merge_impacts(), merge_validations())
 
 
 @lru_cache(maxsize=1)
@@ -140,6 +147,27 @@ def branch_merge_validate(
     )
 
 
+@mcp.tool()
+def branch_merge_validate_affected(
+    project: str,
+    target_branch: str,
+    source_branch: str,
+    preview_id: str | None = None,
+    allow_uncovered_documents: bool = False,
+) -> dict[str, object]:
+    """Validate every affected target that survives in the merge candidate."""
+
+    return _result(
+        lambda: merge_validation_sets().validate(
+            project,
+            target_branch,
+            source_branch,
+            preview_id=preview_id,
+            allow_uncovered_documents=allow_uncovered_documents,
+        )
+    )
+
+
 def _publish_merge(
     project: str,
     target_branch: str,
@@ -147,9 +175,23 @@ def _publish_merge(
     *,
     preview_id: str | None,
     validation_target: str | None,
+    validate_affected_targets: bool,
+    allow_uncovered_documents: bool,
     author: str,
 ) -> dict[str, Any]:
+    if validation_target is not None and validate_affected_targets:
+        raise ValidationError(
+            "INVALID_MERGE_VALIDATION_MODE",
+            "choose validation_target or validate_affected_targets, not both",
+        )
+    if allow_uncovered_documents and not validate_affected_targets:
+        raise ValidationError(
+            "INVALID_MERGE_VALIDATION_MODE",
+            "allow_uncovered_documents requires validate_affected_targets",
+        )
+
     validation: dict[str, Any] | None = None
+    validation_set: dict[str, Any] | None = None
     enforced_preview_id = preview_id
     if validation_target is not None:
         validation = merge_validations().validate(
@@ -161,6 +203,16 @@ def _publish_merge(
         )
         merge_validations().require_valid(validation)
         enforced_preview_id = str(validation["preview_id"])
+    elif validate_affected_targets:
+        validation_set = merge_validation_sets().validate(
+            project,
+            target_branch,
+            source_branch,
+            preview_id=preview_id,
+            allow_uncovered_documents=allow_uncovered_documents,
+        )
+        merge_validation_sets().require_ready(validation_set)
+        enforced_preview_id = str(validation_set["preview_id"])
 
     result = merge_previews().merge(
         project,
@@ -174,6 +226,9 @@ def _publish_merge(
             "validation_target": validation_target,
             "validation_enforced": validation is not None,
             "merge_validation": validation,
+            "affected_validation_enforced": validation_set is not None,
+            "allow_uncovered_documents": allow_uncovered_documents,
+            "merge_validation_set": validation_set,
         }
     )
     return result
@@ -186,9 +241,11 @@ def branch_merge(
     source_branch: str,
     preview_id: str | None = None,
     validation_target: str | None = None,
+    validate_affected_targets: bool = False,
+    allow_uncovered_documents: bool = False,
     author: str = "merge-agent",
 ) -> dict[str, object]:
-    """Publish a reviewed merge, optionally requiring compiler validation."""
+    """Publish a reviewed merge with optional single or all-target validation."""
 
     return _result(
         lambda: _publish_merge(
@@ -197,6 +254,8 @@ def branch_merge(
             source_branch,
             preview_id=preview_id,
             validation_target=validation_target,
+            validate_affected_targets=validate_affected_targets,
+            allow_uncovered_documents=allow_uncovered_documents,
             author=author,
         )
     )
