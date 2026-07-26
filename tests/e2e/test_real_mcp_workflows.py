@@ -331,7 +331,22 @@ async def _exercise_parallel_merge(
             "source_branch": "agent-beta",
         },
     )
-    rendered = await _call(
+    canonical = await _call(
+        session,
+        trace,
+        "program_render",
+        {
+            "project": project,
+            "branch": "main",
+            "document": document,
+            "annotated": False,
+        },
+    )
+    canonical_source = str(canonical["source"])
+    assert "(fn alpha)" in canonical_source
+    assert "(fn beta)" in canonical_source
+
+    annotated = await _call(
         session,
         trace,
         "program_render",
@@ -343,11 +358,9 @@ async def _exercise_parallel_merge(
             "annotate_atoms": True,
         },
     )
-    source = str(rendered["source"])
-    assert "(fn alpha)" in source
-    assert "(fn beta)" in source
-    assert f"@{alpha['node_id']}" in source
-    assert f"@{beta['node_id']}" in source
+    annotated_source = str(annotated["source"])
+    assert f"@{alpha['node_id']}" in annotated_source
+    assert f"@{beta['node_id']}" in annotated_source
 
     history = await _call(
         session,
