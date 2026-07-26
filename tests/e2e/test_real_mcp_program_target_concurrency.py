@@ -123,7 +123,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         await session.initialize()
         tools = await session.list_tools()
         by_name = {tool.name: tool for tool in tools.tools}
-        assert WRITE_TOOLS <= set(by_name)
+        assert set(by_name) >= WRITE_TOOLS
         for name in WRITE_TOOLS:
             properties = _schema(by_name[name]).get("properties")
             assert isinstance(properties, dict), by_name[name]
