@@ -18,7 +18,8 @@ Primary executables: **`weave-mcp`** and **`weave-build`**
 Jacquard owns:
 
 - single-node and bounded transactional edits with stable node identities;
-- immutable revisions, parallel branches, structural merge, and measured branch activity;
+- immutable revisions, parallel branches, structural merge, measured branch activity,
+  and bounded stable-node revision diffs;
 - project-, document-, and symbol-scoped context;
 - compiler-corpus-backed grammar help;
 - authoritative validation through `weavec --frontend`;
@@ -99,6 +100,7 @@ project_initialize
 → build_get
 → build_diagnostics_page when the build failed
 → node_inspect(revision_id = failed revision) before repair
+→ revision_diff_page(base_revision_id = failed revision) against current head
 ```
 
 Multi-document program:
@@ -113,6 +115,7 @@ program_source_list
 → build_get
 → build_diagnostics_page when the build failed
 → node_inspect(revision_id = failed revision) before repair
+→ revision_diff_page(base_revision_id = failed revision) against current head
 ```
 
 A target definition and every selected source are resolved from one immutable
@@ -137,6 +140,11 @@ server machine. Passing the returned build `revision_id` to `node_inspect`
 reproduces the exact failing subtree even after the branch has advanced. Without
 `revision_id`, the same tool continues to inspect the current branch head.
 
+`revision_diff_page` then compares the failing revision with the current branch
+head without loading two complete trees. It reports additions, removals, value
+changes, form-head changes, parent and position changes, and child-count changes
+through stable IDs in pages of at most 200 changed nodes.
+
 ## Compiler boundary
 
 Validation invokes only the public compiler frontend:
@@ -159,7 +167,8 @@ Jacquard never invokes LLVM tools, a linker, or a runtime archive directly.
 
 Every list and atom has a stable ID such as `n_3a12cce48fe14f99`. Editing or
 moving an existing node preserves its ID. Branches inherit IDs from their base
-revision, and merge compares stable identities rather than line numbers.
+revision, merge compares stable identities rather than line numbers, and
+`revision_diff_page` uses those identities to compare immutable states.
 
 Agent rendering may expose transport wrappers:
 
@@ -244,7 +253,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - **Single-node editing:** `node_create_form`, `node_add_atom`, `node_set_atom`,
   `node_move`, `node_wrap`, `node_delete`
 - **Transactional editing:** `node_apply_batch`
-- **Inspection:** `node_inspect`, `node_find`
+- **Inspection:** `node_inspect`, `node_find`, `revision_diff_page`
 - **Context:** `context_add`, `context_get`
 
 ## Further documentation
@@ -255,6 +264,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - [Branch activity observability](docs/branch-activity.md)
 - [Build diagnostic inspection](docs/build-diagnostics.md)
 - [Revision-pinned node inspection](docs/revision-node-inspection.md)
+- [Stable-node revision diffs](docs/revision-diff.md)
 - [Compiler bridge](docs/compiler-bridge.md)
 - [Revisioned build targets](docs/build-targets.md)
 - [Target validation](docs/target-validation.md)
