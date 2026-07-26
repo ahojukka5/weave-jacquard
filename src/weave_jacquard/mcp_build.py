@@ -9,6 +9,9 @@ from weave_frontend import mcp_build_discovery as _mcp_build_discovery
 from weave_frontend import mcp_concurrent_branches as _mcp_concurrent_branches
 from weave_frontend import mcp_concurrent_context as _mcp_concurrent_context
 from weave_frontend import mcp_concurrent_targets as _mcp_concurrent_targets
+from weave_frontend import (
+    mcp_merge_impact_queue_guidance as _mcp_merge_impact_queue_guidance,
+)
 from weave_frontend import mcp_merge_queue_guidance as _mcp_merge_queue_guidance
 from weave_frontend import mcp_policy as _mcp_policy
 from weave_frontend import mcp_preflight as _mcp_preflight
@@ -36,10 +39,14 @@ _ = (
     _mcp_project_merge_impact_queue,
     _mcp_resume_snapshot,
     _mcp_merge_queue_guidance,
+    _mcp_merge_impact_queue_guidance,
     _mcp_revision_reads,
 )
 
 _mcp_merge_queue_guidance.install_merge_queue_guidance(_mcp_resume_snapshot.mcp)
+_mcp_merge_impact_queue_guidance.install_merge_impact_queue_guidance(
+    _mcp_resume_snapshot.mcp
+)
 
 __all__ = ["main"]
 
