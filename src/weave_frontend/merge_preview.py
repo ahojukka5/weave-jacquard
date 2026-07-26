@@ -69,6 +69,16 @@ class MergePreviewService:
         snapshot = self._snapshot(project, target_branch, source_branch)
         return self._public_preview(snapshot)
 
+    def candidate(
+        self,
+        project: str,
+        target_branch: str,
+        source_branch: str,
+    ) -> dict[str, Any]:
+        """Return the internal preview snapshot including a clean merged state."""
+
+        return self._snapshot(project, target_branch, source_branch)
+
     def merge(
         self,
         project: str,
@@ -171,6 +181,7 @@ class MergePreviewService:
                 "merged_root_hash": None,
                 "target_root_hash": self._revision_root_hash(target_head),
                 "source_root_hash": self._revision_root_hash(source_head),
+                "_merged_state": None,
             }
 
         document_changes = self._document_changes(target_state, merged_state)
@@ -184,6 +195,7 @@ class MergePreviewService:
             "merged_root_hash": self.workspace.db.hash_value(merged_state),
             "target_root_hash": self._revision_root_hash(target_head),
             "source_root_hash": self._revision_root_hash(source_head),
+            "_merged_state": merged_state,
         }
 
     @staticmethod
@@ -191,6 +203,7 @@ class MergePreviewService:
         return {
             key: list(value) if isinstance(value, tuple) else value
             for key, value in snapshot.items()
+            if not key.startswith("_")
         }
 
     def _revision_root_hash(self, revision_id: str) -> str:
