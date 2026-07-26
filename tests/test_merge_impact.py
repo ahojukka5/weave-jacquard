@@ -20,18 +20,10 @@ def _service(sexpr_workspace) -> MergeTargetImpactService:
 
 def _program_with_atom(sexpr_workspace, document: str, value: str) -> dict[str, str]:
     created = sexpr_workspace.create_program(
-        "sexpr-demo",
-        "main",
-        document,
-        program_name=document,
+        "sexpr-demo", "main", document, program_name=document
     )
     atom = sexpr_workspace.add_atom(
-        "sexpr-demo",
-        "main",
-        document,
-        created["node_id"],
-        "string",
-        value,
+        "sexpr-demo", "main", document, created["node_id"], "string", value
     )
     return {"root_id": created["node_id"], "atom_id": atom["node_id"]}
 
@@ -56,15 +48,24 @@ def _coverage_project(sexpr_workspace):
     return docs
 
 
-def test_impact_maps_changed_sources_and_uncovered_documents(sexpr_workspace) -> None:
+def test_impact_maps_source_merge_changes_and_uncovered_documents(
+    sexpr_workspace,
+) -> None:
     docs = _coverage_project(sexpr_workspace)
     target_head = sexpr_workspace.set_atom(
         "sexpr-demo",
         "target",
+        "spare.weave",
+        docs["spare.weave"]["atom_id"],
+        "target-spare",
+    )["revision_id"]
+    sexpr_workspace.set_atom(
+        "sexpr-demo",
+        "source",
         "main.weave",
         docs["main.weave"]["atom_id"],
-        "target-main",
-    )["revision_id"]
+        "source-main",
+    )
     sexpr_workspace.set_atom(
         "sexpr-demo",
         "source",
@@ -92,6 +93,7 @@ def test_impact_maps_changed_sources_and_uncovered_documents(sexpr_workspace) ->
         "main.weave",
         "orphan.weave",
     ]
+    assert "spare.weave" not in result["changed_program_documents"]
     assert result["candidate_covered_changed_documents"] == [
         "lib.weave",
         "main.weave",
@@ -107,8 +109,7 @@ def test_impact_maps_changed_sources_and_uncovered_documents(sexpr_workspace) ->
     assert application["status"] == "unchanged"
     assert application["affected_reasons"] == ["source_document_changed"]
     assert application["changed_source_documents"] == ["lib.weave", "main.weave"]
-    main_only = result["affected_targets"][1]
-    assert main_only["changed_source_documents"] == ["main.weave"]
+    assert result["affected_targets"][1]["changed_source_documents"] == ["main.weave"]
     assert sexpr_workspace.branch_head("sexpr-demo", "target") == target_head
     assert sexpr_workspace.branch_head("sexpr-demo", "source") == source_head
 
@@ -164,11 +165,7 @@ def test_impact_paginates_deterministically(sexpr_workspace) -> None:
     sexpr_workspace.create_branch("sexpr-demo", "target", from_branch="main")
     sexpr_workspace.create_branch("sexpr-demo", "source", from_branch="main")
     sexpr_workspace.set_atom(
-        "sexpr-demo",
-        "source",
-        "main.weave",
-        doc["atom_id"],
-        "changed",
+        "sexpr-demo", "source", "main.weave", doc["atom_id"], "changed"
     )
     service = _service(sexpr_workspace)
 
@@ -208,11 +205,7 @@ def test_impact_rejects_stale_preview(sexpr_workspace) -> None:
         "sexpr-demo", "target", "source"
     )
     sexpr_workspace.set_atom(
-        "sexpr-demo",
-        "source",
-        "main.weave",
-        doc["atom_id"],
-        "advanced",
+        "sexpr-demo", "source", "main.weave", doc["atom_id"], "advanced"
     )
 
     with pytest.raises(ValidationError) as raised:
@@ -233,18 +226,10 @@ def test_impact_rejects_conflict_without_mutation(sexpr_workspace) -> None:
     sexpr_workspace.create_branch("sexpr-demo", "target", from_branch="main")
     sexpr_workspace.create_branch("sexpr-demo", "source", from_branch="main")
     target_head = sexpr_workspace.set_atom(
-        "sexpr-demo",
-        "target",
-        "main.weave",
-        doc["atom_id"],
-        "target",
+        "sexpr-demo", "target", "main.weave", doc["atom_id"], "target"
     )["revision_id"]
     source_head = sexpr_workspace.set_atom(
-        "sexpr-demo",
-        "source",
-        "main.weave",
-        doc["atom_id"],
-        "source",
+        "sexpr-demo", "source", "main.weave", doc["atom_id"], "source"
     )["revision_id"]
 
     with pytest.raises(ConflictError):
