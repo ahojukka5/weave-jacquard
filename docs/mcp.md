@@ -60,6 +60,7 @@ sources never include annotations. Each materialized source receives a separate
 - `branch_activity_summary`: measure complete first-parent revision, operation,
   merge, author, and edit-grouping activity.
 - `branch_merge_preview`: preview stable-ID merge conflicts and consequences.
+- `branch_merge_impact`: map prospective source changes to named build targets.
 - `branch_merge_validate`: validate a named target from the exact merge candidate.
 - `branch_merge`: publish a merge, optionally enforcing preview and compiler gates.
 
@@ -111,6 +112,55 @@ the target branch.
 Per-document summaries report add/remove/modify status, document hashes, node
 counts, changed stable-node count, and aggregate revision-diff change kinds.
 Complete merged trees are never returned.
+
+### `branch_merge_impact`
+
+Map the changes introduced by merging the current source head into the current
+target head to revisioned named build targets.
+
+```text
+project
+target_branch
+source_branch
+preview_id = optional reviewed preview
+start_index = 0
+limit = 50
+```
+
+A supplied stale preview returns `STALE_MERGE_PREVIEW`. A semantic merge conflict
+returns `MERGE_CONFLICT` before target analysis. The call is read-only and starts
+no compiler process.
+
+The response format is `weave-merge-target-impact-v1`. It reports:
+
+- preview, ancestor, both head revisions, and prospective merged root;
+- changed program documents;
+- changed `@build-target/*` metadata documents;
+- changed program documents covered by targets surviving in the candidate;
+- changed program documents with no surviving target coverage;
+- target counts before and after the merge;
+- affected and unaffected candidate-target counts;
+- a bounded page of affected target entries.
+
+A target is affected when its definition is added, removed, or modified, or when
+one of its primary/additional source documents changes. Each entry contains a
+status, deterministic reasons, changed source documents, and compact before/after
+target configurations.
+
+The analysis is directional. It compares the current target state with the
+prospective merged state and therefore reports only consequences introduced by
+merging the source into that target. Changes already present on the target branch
+are not reclassified as source merge impact.
+
+Candidate coverage is calculated from targets that exist after the merge. A
+removed target cannot hide a changed source from `uncovered_changed_documents`.
+An uncovered document is not automatically invalid, but no named target can
+validate it automatically.
+
+Affected targets are sorted by name. `start_index` must be non-negative and
+`limit` must be 1–200. When `has_more` is true, pass `next_index` as the next
+`start_index`. The preview binds immutable revisions, so page order is stable.
+See [`merge-impact.md`](merge-impact.md).
 
 ### `branch_merge_validate`
 
@@ -181,9 +231,9 @@ passes the compiler is therefore the only candidate that can be published by the
 validated call.
 
 Calls without `preview_id` or `validation_target` remain supported. Direct merges
-still capture and atomically recheck both current heads, but the complete
-preview-validation-publication flow is recommended for independent agent work.
-See [`merge-preview.md`](merge-preview.md) and
+still capture and atomically recheck both current heads. Impact-aware
+preview-validation-publication is recommended for independent agent work. See
+[`merge-preview.md`](merge-preview.md), [`merge-impact.md`](merge-impact.md), and
 [`merge-validation.md`](merge-validation.md).
 
 ## Program documents
@@ -242,8 +292,8 @@ immutable revision graph as its source documents.
 - `build_target_delete`: delete a target in a new revision.
 - `build_target_validate`: validate target metadata and ordered sources from one
   pinned revision.
-- `branch_merge_validate`: validate the same target from an uncommitted merge
-  candidate.
+- `branch_merge_impact`: identify candidate targets affected by a source merge.
+- `branch_merge_validate`: validate a target from an uncommitted merge candidate.
 - `build_target_build`: compile the exact same revisioned target.
 
 Recommended flow:
@@ -254,7 +304,9 @@ program_source_list
 → structural source edits
 → build_target_validate
 → branch_merge_preview
-→ branch_merge_validate(build_target = named target)
+→ branch_merge_impact
+→ review uncovered changed documents
+→ branch_merge_validate(build_target = each affected surviving target)
 → branch_merge(preview_id = reviewed preview,
                validation_target = named target)
 → build_target_build
@@ -442,17 +494,18 @@ Other inspection and context tools:
 - `context_add`: store project-, document-, or symbol-scoped design material.
 - `context_get`: retrieve context visible at the current branch revision.
 
-Reading may return a useful local subtree, bounded change page, merge preview, or
-merge-validation record. Writing remains transactional: one single edit, one
-coherent batch, or one merge either publishes completely or not at all.
+Reading may return a useful local subtree, bounded change page, merge preview,
+merge-impact page, or merge-validation record. Writing remains transactional:
+one single edit, one coherent batch, or one merge either publishes completely or
+not at all.
 
 ## Failure and publication semantics
 
 - Rejected single edits and batches do not advance branches.
 - Validation and build failures do not mutate program revisions.
 - Builds never advance branches.
-- Merge previews, merge candidate validation, historical inspection, and revision
-  diffs never check out or rewrite revisions.
+- Merge previews, merge impact analysis, merge candidate validation, historical
+  inspection, and revision diffs never check out or rewrite revisions.
 - Conflict previews and stale preview tokens publish no merge revision.
 - Unavailable or failed merge validation publishes no merge revision.
 - Merge publication atomically rechecks both captured branch heads.
