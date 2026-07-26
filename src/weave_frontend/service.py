@@ -8,8 +8,9 @@ language semantics.
 from __future__ import annotations
 
 import json
+import sqlite3
 from collections import deque
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,9 @@ from .database import Database
 from .errors import ConflictError, NotFoundError, ValidationError
 
 JsonObject = dict[str, Any]
+CommitOperation = tuple[str, str | None, JsonObject]
+CommitPreparation = tuple[Iterable[CommitOperation], Iterable[str]]
+TransactionPrepare = Callable[[sqlite3.Connection], CommitPreparation]
 
 
 @dataclass(frozen=True)
@@ -247,11 +251,12 @@ class RevisionWorkspace:
         *,
         message: str,
         author: str,
-        operations: Iterable[tuple[str, str | None, JsonObject]],
+        operations: Iterable[CommitOperation],
         parent2: str | None = None,
         extra_document_ids: Iterable[str] = (),
         expected_branch_heads: dict[str, str] | None = None,
         stale_error_code: str = "STALE_BRANCH_HEAD",
+        prepare_transaction: TransactionPrepare | None = None,
     ) -> str:
         project_id = self.project_id(project)
         parent1 = (
@@ -261,12 +266,6 @@ class RevisionWorkspace:
         )
         revision_id = str(uuid4())
         root_hash = self.db.hash_value(modules)
-        parent_documents = self.db.connection.execute(
-            "SELECT document_id FROM revision_documents WHERE revision_id = ?",
-            (parent1,),
-        ).fetchall()
-        document_ids = {str(row["document_id"]) for row in parent_documents}
-        document_ids.update(extra_document_ids)
         with self.db.transaction() as connection:
             if expected_branch_heads is not None:
                 for expected_branch, expected_head in sorted(
@@ -284,6 +283,20 @@ class RevisionWorkspace:
                             f"branch {expected_branch!r} advanced from "
                             f"{expected_head!r} to {actual_head!r}",
                         )
+
+            prepared_operations = list(operations)
+            document_ids = {
+                str(row["document_id"])
+                for row in connection.execute(
+                    "SELECT document_id FROM revision_documents WHERE revision_id = ?",
+                    (parent1,),
+                ).fetchall()
+            }
+            document_ids.update(extra_document_ids)
+            if prepare_transaction is not None:
+                dynamic_operations, dynamic_document_ids = prepare_transaction(connection)
+                prepared_operations.extend(dynamic_operations)
+                document_ids.update(dynamic_document_ids)
 
             connection.execute(
                 """INSERT INTO revisions(
@@ -312,7 +325,7 @@ class RevisionWorkspace:
                         self.db.hash_value(ast),
                     ),
                 )
-            for sequence, (kind, target, payload) in enumerate(operations):
+            for sequence, (kind, target, payload) in enumerate(prepared_operations):
                 connection.execute(
                     """INSERT INTO operations(
                            id, revision_id, sequence_number, operation_kind,
