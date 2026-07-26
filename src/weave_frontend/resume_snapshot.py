@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Any, Protocol
 
-from .build_targets import BuildTargetRegistry
+from .build_targets import BUILD_TARGET_PREFIX, BuildTargetRegistry
 from .errors import NotFoundError, ValidationError
 from .merge_policy import MergePolicyRegistry
 from .sexpr import head_symbol, walk_nodes
@@ -15,6 +15,7 @@ from .source_map import render_with_node_map
 RESUME_SNAPSHOT_FORMAT = "weave-agent-resume-snapshot-v1"
 MAX_RESUME_DOCUMENTS = 200
 MAX_RESUME_TARGETS = 100
+MAX_RESUME_TARGET_SOURCES = 200
 MAX_RESUME_CONTEXTS = 100
 MAX_RESUME_BRANCHES = 200
 MAX_RESUME_HISTORY = 50
@@ -25,11 +26,9 @@ MAX_CONTEXT_PREVIEW_CHARS = 512
 class _Workspace(Protocol):
     db: Any
 
+    def project_id(self, name: str) -> str: ...
+
     def branch_head(self, project: str, branch: str = "main") -> str: ...
-
-    def list_branches(self, project: str) -> list[dict[str, str]]: ...
-
-    def _state_at_revision(self, revision_id: str) -> dict[str, dict[str, Any]]: ...
 
 
 class ResumeSnapshotService:
@@ -53,6 +52,7 @@ class ResumeSnapshotService:
         revision_id: str | None = None,
         document_limit: int = 100,
         target_limit: int = 50,
+        target_source_limit: int = 50,
         context_limit: int = 20,
         branch_limit: int = 50,
         history_limit: int = 10,
@@ -62,6 +62,11 @@ class ResumeSnapshotService:
 
         self._validate_limit("document_limit", document_limit, MAX_RESUME_DOCUMENTS)
         self._validate_limit("target_limit", target_limit, MAX_RESUME_TARGETS)
+        self._validate_limit(
+            "target_source_limit",
+            target_source_limit,
+            MAX_RESUME_TARGET_SOURCES,
+        )
         self._validate_limit("context_limit", context_limit, MAX_RESUME_CONTEXTS)
         self._validate_limit("branch_limit", branch_limit, MAX_RESUME_BRANCHES)
         self._validate_limit("history_limit", history_limit, MAX_RESUME_HISTORY)
@@ -70,40 +75,19 @@ class ResumeSnapshotService:
         branch_head_revision_id = self.workspace.branch_head(project, branch)
         selected_revision_id = revision_id or branch_head_revision_id
         revision = self._revision(project, selected_revision_id)
-        state = self.workspace._state_at_revision(selected_revision_id)
-
-        program_names = self.targets.program_documents(
-            project,
-            branch=branch,
-            revision_id=selected_revision_id,
+        program_entries, total_program_count = self._programs(
+            selected_revision_id,
+            limit=document_limit,
         )
-        program_entries = [
-            self._program_summary(
-                name,
-                state[name],
-                revision_id=selected_revision_id,
-            )
-            for name in program_names[:document_limit]
-        ]
-
-        all_targets = self.targets.list(
-            project,
-            branch=branch,
-            revision_id=selected_revision_id,
+        target_entries, total_target_count = self._targets(
+            selected_revision_id,
+            limit=target_limit,
+            source_limit=target_source_limit,
         )
-        target_entries = [
-            {
-                "name": item["name"],
-                "document": item["document"],
-                "additional_documents": list(item["additional_documents"]),
-                "compiler_target": item["compiler_target"],
-                "root_node_id": item["root_node_id"],
-            }
-            for item in all_targets[:target_limit]
-        ]
-
-        all_branches = self.workspace.list_branches(project)
-        branch_entries = [dict(item) for item in all_branches[:branch_limit]]
+        branch_entries, total_branch_count = self._branches(
+            project,
+            limit=branch_limit,
+        )
         contexts, total_context_count = self._contexts(
             selected_revision_id,
             limit=context_limit,
@@ -129,13 +113,24 @@ class ResumeSnapshotService:
                 selected_revision_id == branch_head_revision_id
             ),
             "revision": revision,
-            "program_document_count": len(program_names),
+            "limits": {
+                "document_limit": document_limit,
+                "target_limit": target_limit,
+                "target_source_limit": target_source_limit,
+                "context_limit": context_limit,
+                "branch_limit": branch_limit,
+                "history_limit": history_limit,
+                "operation_limit": operation_limit,
+            },
+            "program_document_count": total_program_count,
             "returned_program_document_count": len(program_entries),
-            "program_documents_truncated": len(program_entries) < len(program_names),
+            "program_documents_truncated": (
+                len(program_entries) < total_program_count
+            ),
             "program_documents": program_entries,
-            "build_target_count": len(all_targets),
+            "build_target_count": total_target_count,
             "returned_build_target_count": len(target_entries),
-            "build_targets_truncated": len(target_entries) < len(all_targets),
+            "build_targets_truncated": len(target_entries) < total_target_count,
             "build_targets": target_entries,
             "merge_policy": policy,
             "context_count": total_context_count,
@@ -147,9 +142,9 @@ class ResumeSnapshotService:
             "operations_truncated": len(operations) < total_operation_count,
             "operations": operations,
             "history": history,
-            "branch_count": len(all_branches),
+            "branch_count": total_branch_count,
             "returned_branch_count": len(branch_entries),
-            "branches_truncated": len(branch_entries) < len(all_branches),
+            "branches_truncated": len(branch_entries) < total_branch_count,
             "branches": branch_entries,
             "reproducible_fork": {
                 "tool": "branch_create_at_revision",
@@ -188,6 +183,126 @@ class ResumeSnapshotService:
                 f"revision {revision_id!r} does not belong to project {project!r}"
             )
         return dict(row)
+
+    def _programs(
+        self,
+        revision_id: str,
+        *,
+        limit: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        target_pattern = f"{BUILD_TARGET_PREFIX}%"
+        total = int(
+            self.workspace.db.connection.execute(
+                """SELECT COUNT(*) AS count
+                   FROM module_snapshots
+                   WHERE revision_id = ? AND qualified_name NOT LIKE ?""",
+                (revision_id, target_pattern),
+            ).fetchone()["count"]
+        )
+        rows = self.workspace.db.connection.execute(
+            """SELECT qualified_name, ast_json
+               FROM module_snapshots
+               WHERE revision_id = ? AND qualified_name NOT LIKE ?
+               ORDER BY qualified_name
+               LIMIT ?""",
+            (revision_id, target_pattern, limit),
+        ).fetchall()
+        return (
+            [
+                self._program_summary(
+                    str(row["qualified_name"]),
+                    json.loads(str(row["ast_json"])),
+                    revision_id=revision_id,
+                )
+                for row in rows
+            ],
+            total,
+        )
+
+    def _targets(
+        self,
+        revision_id: str,
+        *,
+        limit: int,
+        source_limit: int,
+    ) -> tuple[list[dict[str, Any]], int]:
+        target_pattern = f"{BUILD_TARGET_PREFIX}%"
+        total = int(
+            self.workspace.db.connection.execute(
+                """SELECT COUNT(*) AS count
+                   FROM module_snapshots
+                   WHERE revision_id = ? AND qualified_name LIKE ?""",
+                (revision_id, target_pattern),
+            ).fetchone()["count"]
+        )
+        rows = self.workspace.db.connection.execute(
+            """SELECT qualified_name, ast_json
+               FROM module_snapshots
+               WHERE revision_id = ? AND qualified_name LIKE ?
+               ORDER BY qualified_name
+               LIMIT ?""",
+            (revision_id, target_pattern, limit),
+        ).fetchall()
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            storage_document = str(row["qualified_name"])
+            name = storage_document[len(BUILD_TARGET_PREFIX) :]
+            root = json.loads(str(row["ast_json"]))
+            config = self.targets._parse_tree(root, name=name)
+            documents = [config["document"], *config["additional_documents"]]
+            self._require_program_documents(revision_id, documents)
+            additional = list(config["additional_documents"])
+            returned_additional = additional[:source_limit]
+            result.append(
+                {
+                    "name": config["name"],
+                    "document": config["document"],
+                    "additional_document_count": len(additional),
+                    "returned_additional_document_count": len(returned_additional),
+                    "additional_documents_truncated": (
+                        len(returned_additional) < len(additional)
+                    ),
+                    "additional_documents": returned_additional,
+                    "compiler_target": config["compiler_target"],
+                    "root_node_id": root["id"],
+                }
+            )
+        return result, total
+
+    def _require_program_documents(
+        self,
+        revision_id: str,
+        documents: list[str],
+    ) -> None:
+        for document in documents:
+            row = self.workspace.db.connection.execute(
+                """SELECT 1 FROM module_snapshots
+                   WHERE revision_id = ? AND qualified_name = ?
+                     AND qualified_name NOT LIKE ?""",
+                (revision_id, document, f"{BUILD_TARGET_PREFIX}%"),
+            ).fetchone()
+            if row is None:
+                raise NotFoundError(f"program document {document!r} not found")
+
+    def _branches(
+        self,
+        project: str,
+        *,
+        limit: int,
+    ) -> tuple[list[dict[str, str]], int]:
+        project_id = self.workspace.project_id(project)
+        total = int(
+            self.workspace.db.connection.execute(
+                "SELECT COUNT(*) AS count FROM branches WHERE project_id = ?",
+                (project_id,),
+            ).fetchone()["count"]
+        )
+        rows = self.workspace.db.connection.execute(
+            """SELECT name, head_revision_id FROM branches
+               WHERE project_id = ? ORDER BY name LIMIT ?""",
+            (project_id, limit),
+        ).fetchall()
+        return ([dict(row) for row in rows], total)
 
     @staticmethod
     def _program_summary(
