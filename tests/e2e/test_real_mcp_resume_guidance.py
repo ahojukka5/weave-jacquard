@@ -65,21 +65,42 @@ async def _run(tmp_path: Path) -> None:
         initialized = await session.initialize()
         instructions = getattr(initialized, "instructions", None)
         assert isinstance(instructions, str)
+        normalized = " ".join(instructions.split())
         assert "branch_resume_snapshot" in instructions
-        assert "before assembling state through separate reads" in " ".join(
-            instructions.split()
-        )
+        assert "before assembling state through separate reads" in normalized
+        assert "branch_checkpoint_create" in normalized
+        assert "Before transferring work" in normalized
+        assert "branch_checkpoint_get" in normalized
 
         tools = await session.list_tools()
         names = {tool.name for tool in tools.tools}
-        assert {"branch_resume_snapshot", "weave_help"} <= names
+        assert {
+            "branch_resume_snapshot",
+            "branch_checkpoint_create",
+            "branch_checkpoint_get",
+            "weave_help",
+        } <= names
 
         resume = _payload(
             await session.call_tool("weave_help", arguments={"topic": "resume"})
         )
         assert resume["ok"] is True
         assert resume["help"]["revision"].startswith("Omit revision_id")
+        assert "checkpoint_revision_id" in resume["help"]["checkpoint"]
         assert "branch_create_at_revision" in resume["help"]["continue"]
+
+        checkpoint = _payload(
+            await session.call_tool("weave_help", arguments={"topic": "checkpoint"})
+        )
+        assert checkpoint["ok"] is True
+        assert "branch_checkpoint_create" in checkpoint["help"]["publish"]
+        assert checkpoint["help"]["statuses"] == [
+            "in_progress",
+            "blocked",
+            "ready_for_review",
+            "complete",
+        ]
+        assert "branch_resume_snapshot" in checkpoint["help"]["resume"]
 
         workflow = _payload(
             await session.call_tool("weave_help", arguments={"topic": "workflow"})
@@ -87,6 +108,9 @@ async def _run(tmp_path: Path) -> None:
         assert workflow["ok"] is True
         assert workflow["help"]["steps"][0] == (
             "branch_resume_snapshot first when resuming existing work"
+        )
+        assert workflow["help"]["steps"][-1] == (
+            "branch_checkpoint_create before handoff or stopping"
         )
 
 
