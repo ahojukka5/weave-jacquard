@@ -96,6 +96,15 @@ async def _run(tmp_path: Path) -> None:
         assert "source policy is visible but cannot weaken" in normalized
         assert "No compiler or build validation runs" in normalized
         assert "branch_merge_impact" in normalized
+        assert "selected_merge_preflight_batch" in normalized
+        assert "1–5 unique source names" in normalized
+        assert "does not select, rank, or expand" in normalized
+        assert "allow_uncovered_sources" in normalized
+        assert "independently for every selected source" in normalized
+        assert "selected or unselected branch-head change" in normalized
+        assert "never publishes a merge" in normalized
+        assert "ready_for_publication" in normalized
+        assert "publication_arguments" in normalized
 
         tools = await session.list_tools()
         names = {tool.name for tool in tools.tools}
@@ -108,6 +117,7 @@ async def _run(tmp_path: Path) -> None:
             "project_agent_status_page",
             "project_merge_queue_page",
             "project_merge_impact_queue_page",
+            "selected_merge_preflight_batch",
             "weave_help",
         } <= names
 
@@ -205,6 +215,28 @@ async def _run(tmp_path: Path) -> None:
         assert "No compiler" in impact["help"]["compiler"]
         assert "do not prove compiler correctness" in impact["help"]["readiness"]
 
+        selected = _payload(
+            await session.call_tool(
+                "weave_help",
+                arguments={"topic": "selected_preflight_batch"},
+            )
+        )
+        assert selected["ok"] is True
+        assert "selected_merge_preflight_batch" in selected["help"]["selection"]
+        assert "unselected branches" in selected["help"]["catalog"]
+        assert "allow_uncovered_sources" in selected["help"]["overrides"]
+        assert "branch_merge_preflight" in selected["help"]["execution"]
+        assert "At most five sources" in selected["help"]["bounds"]
+        assert selected["help"]["outcomes"] == [
+            "ready",
+            "not_ready",
+            "conflict",
+            "policy_error",
+            "other_error",
+        ]
+        assert "publishes no merge" in selected["help"]["publication"]
+        assert "publication_arguments" in selected["help"]["publication"]
+
         read = _payload(
             await session.call_tool("weave_help", arguments={"topic": "read"})
         )
@@ -212,6 +244,7 @@ async def _run(tmp_path: Path) -> None:
         assert "project_agent_status_page" in read["help"]["tools"]
         assert "project_merge_queue_page" in read["help"]["tools"]
         assert "project_merge_impact_queue_page" in read["help"]["tools"]
+        assert "selected_merge_preflight_batch" in read["help"]["tools"]
 
         workflow = _payload(
             await session.call_tool("weave_help", arguments={"topic": "workflow"})
