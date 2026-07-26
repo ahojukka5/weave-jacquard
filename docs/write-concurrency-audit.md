@@ -3,9 +3,9 @@
 ## Purpose
 
 This audit records the publication boundary for every known Jacquard MCP path
-that advances an existing branch head.
+that creates or advances a branch.
 
-## Compare-and-set safe
+## Compare-and-set safe existing-branch writes
 
 - `program_create`;
 - `program_import`;
@@ -29,25 +29,38 @@ content-addressed `documents` row, dynamic operation payload, inherited and new
 revision-document links, immutable revision, and conditional branch update all
 commit or roll back together.
 
+## Reproducible branch creation
+
+`branch_create` captures one current source-branch head and rechecks it inside the
+branch-insertion transaction. An optional `expected_revision_id` protects a
+prepared fork. A source advance returns `STALE_BRANCH_HEAD` and inserts no branch.
+The compatible successful result is the exact fork revision ID.
+
+`branch_create_at_revision` creates a new branch directly at one project-owned
+immutable revision. It does not depend on another branch's current head and is
+the reproducible path for historical forks.
+
+Both branch-creation modes reject duplicate target names before committing a new
+branch row.
+
 ## Other writes
 
 Project initialization creates the project, initial revision, and main branch as
-one database operation. Branch creation copies one current source head while
-inserting a new branch row; it does not overwrite an existing branch. Explicit
-checkout intentionally moves a branch to a caller-selected project revision and
-is not a prepared state transformation.
+one database operation. Explicit internal checkout intentionally moves a branch
+to a caller-selected project revision, but no public MCP checkout tool currently
+exists.
 
 Native builds and validations are pinned reads of immutable revisions and do not
 advance branches. Read-only tools do not participate in this audit.
 
 ## Ongoing rule
 
-Any new existing-branch mutation must document and test:
+Any new branch mutation must document and test:
 
-1. the exact branch state read;
+1. the exact branch state read or immutable revision selected;
 2. optional prepared-state expectation semantics;
 3. the transaction that publishes all persistent consequences;
-4. the conditional branch-head update;
+4. the conditional branch-head update when an existing branch is advanced;
 5. rollback evidence for stale or mid-publication failure;
 6. response provenance identifying the selected base.
 
