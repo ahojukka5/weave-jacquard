@@ -41,7 +41,11 @@ server for Weave. The central object is a versioned program tree. Textual
     revision.
 13. **Rendering is deterministic.** Identical database state and renderer version
     must produce byte-identical canonical source.
-14. **SQLite is the prototype truth store.** Avoid adding a distributed database
+14. **Discover builds through verification.** A build-directory name is never
+    build evidence. Discovery must remain bounded, verify each scanned manifest
+    and artifact through the `build_get` admission path, and return only compact
+    project-matching summaries.
+15. **SQLite is the prototype truth store.** Avoid adding a distributed database
     until measurements require it.
 
 ## Node identity
@@ -198,6 +202,35 @@ Direct merges without preview or validation remain supported only when the
 effective target policy permits them; they must still capture and atomically
 recheck both current heads.
 
+## Verified build discovery
+
+`build_list_page` is the recovery path when an agent no longer has a build ID.
+It must not become an unverified directory listing or a mutable database catalog.
+
+Catalog membership is limited to direct non-symlink build-ID directories with a
+regular non-symlink manifest. Membership and lexical order are bound into a
+`catalog_id`. Passing that identity on continuation must reject additions or
+removals with `STALE_BUILD_CATALOG`.
+
+Each request may scan at most 200 catalog members. Every scanned member must pass
+the same manifest, path-containment, regular-file, and checksum verification used
+by `build_get` before it can appear in `builds`.
+
+Discovery must:
+
+- return only compact summaries matching the requested project and filters;
+- count but omit valid foreign-project and nonmatching builds;
+- return malformed or corrupt members only as rejected build IDs and error codes;
+- keep absolute artifact paths, raw compiler output, and mapped diagnostics out of
+  the list response;
+- preserve `build_get` as the detailed manifest and artifact-path boundary;
+- allow sparse or empty pages while still advancing the lexical scan cursor.
+
+The build-root catalog is live. A caller that requires stable multi-page
+membership must replay `catalog_id`; a caller that intentionally omits it accepts
+the current catalog on each page. Filesystem modification times must not be used
+as immutable build chronology.
+
 ## Grammar and validation
 
 The generic S-expression layer validates tree integrity:
@@ -226,6 +259,7 @@ inference without changing the public MCP API.
 - `src/weave_frontend/batch_edit.py`: bounded transactional structural edits.
 - `src/weave_frontend/revision_reads.py`: exact-revision render and node search.
 - `src/weave_frontend/revision_diff.py`: bounded stable-node revision diffs.
+- `src/weave_frontend/build_discovery.py`: verified stored-build catalog pages.
 - `src/weave_frontend/merge_preview.py`: deterministic two-phase merge previews.
 - `src/weave_frontend/merge_impact.py`: named-target and coverage impact analysis.
 - `src/weave_frontend/merge_validation.py`: one exact-candidate compiler validation.
@@ -235,6 +269,7 @@ inference without changing the public MCP API.
 - `src/weave_frontend/mcp_preflight.py`: production preflight MCP registration.
 - `src/weave_frontend/mcp_policy.py`: final policy-enforced merge registration.
 - `src/weave_frontend/mcp_revision_reads.py`: final historical read registration.
+- `src/weave_frontend/mcp_build_discovery.py`: verified build-list registration.
 - `src/weave_frontend/grammar_help.py`: guidance derived from compiler examples.
 - `src/weave_frontend/weavec.py`: authoritative frontend validation adapter.
 - `src/weave_frontend/compiler_*.py`: native compiler and artifact boundary.
@@ -244,6 +279,7 @@ inference without changing the public MCP API.
 - `docs/mcp.md`: MCP workflow and public tool contract.
 - `docs/edit-transactions.md`: bounded batch request and publication contract.
 - `docs/revision-reads.md`: historical rendering and search response contract.
+- `docs/build-discovery.md`: verified stored-build recovery and pagination.
 - `docs/merge-policy.md`: revisioned target-authoritative admission rules.
 - `docs/merge-preflight.md`: one-call review evidence and safe replay.
 - `docs/merge-preview.md`: preview identity and atomic merge publication.
