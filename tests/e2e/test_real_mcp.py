@@ -265,80 +265,82 @@ async def _run_stdio_qualification(
         cwd=str(ROOT),
     )
 
-    async with stdio_client(parameters) as (read_stream, write_stream):
-        async with ClientSession(read_stream, write_stream) as session:
-            initialized = await session.initialize()
-            server_info = _attribute(initialized, "server_info", "serverInfo")
-            assert server_info is not None
-            assert server_info.name == "weave-mcp"
+    async with (
+        stdio_client(parameters) as (read_stream, write_stream),
+        ClientSession(read_stream, write_stream) as session,
+    ):
+        initialized = await session.initialize()
+        server_info = _attribute(initialized, "server_info", "serverInfo")
+        assert server_info is not None
+        assert server_info.name == "weave-mcp"
 
-            listed = await session.list_tools()
-            names = {tool.name for tool in listed.tools}
-            assert EXPECTED_TOOLS <= names
+        listed = await session.list_tools()
+        names = {tool.name for tool in listed.tools}
+        assert EXPECTED_TOOLS <= names
 
-            source = await _construct_constant_program(
+        source = await _construct_constant_program(
+            session,
+            trace,
+            project="stdio-qualification",
+            document="main.weave",
+        )
+        history = await _call(
+            session,
+            trace,
+            "branch_history",
+            {"project": "stdio-qualification", "branch": "main"},
+        )
+        assert len(history) >= 10
+
+        if build_native:
+            validated = await _call(
                 session,
                 trace,
-                project="stdio-qualification",
-                document="main.weave",
+                "program_validate",
+                {
+                    "project": "stdio-qualification",
+                    "branch": "main",
+                    "document": "main.weave",
+                },
             )
-            history = await _call(
+            assert validated["available"] is True
+            assert validated["valid"] is True
+            assert isinstance(validated["wir"], str)
+            assert validated["wir"].strip()
+
+            built = await _call(
                 session,
                 trace,
-                "branch_history",
-                {"project": "stdio-qualification", "branch": "main"},
+                "program_build",
+                {
+                    "project": "stdio-qualification",
+                    "branch": "main",
+                    "document": "main.weave",
+                },
             )
-            assert len(history) >= 10
+            assert built["status"] == "succeeded"
+            assert built["compiler_manifest_protocol_valid"] is True
+            assert built["compiler_diagnostics_protocol_valid"] is True
 
-            if build_native:
-                validated = await _call(
-                    session,
-                    trace,
-                    "program_validate",
-                    {
-                        "project": "stdio-qualification",
-                        "branch": "main",
-                        "document": "main.weave",
-                    },
-                )
-                assert validated["available"] is True
-                assert validated["valid"] is True
-                assert isinstance(validated["wir"], str)
-                assert validated["wir"].strip()
+            inspected = await _call(
+                session,
+                trace,
+                "build_get",
+                {"build_id": built["build_id"]},
+            )
+            assert inspected["build_id"] == built["build_id"]
+            materialized = Path(inspected["artifact_paths"]["source"])
+            assert materialized.read_text(encoding="utf-8") == source
 
-                built = await _call(
-                    session,
-                    trace,
-                    "program_build",
-                    {
-                        "project": "stdio-qualification",
-                        "branch": "main",
-                        "document": "main.weave",
-                    },
-                )
-                assert built["status"] == "succeeded"
-                assert built["compiler_manifest_protocol_valid"] is True
-                assert built["compiler_diagnostics_protocol_valid"] is True
-
-                inspected = await _call(
-                    session,
-                    trace,
-                    "build_get",
-                    {"build_id": built["build_id"]},
-                )
-                assert inspected["build_id"] == built["build_id"]
-                materialized = Path(inspected["artifact_paths"]["source"])
-                assert materialized.read_text(encoding="utf-8") == source
-
-                executable = Path(inspected["artifact_paths"]["executable"])
-                completed = subprocess.run(
-                    [str(executable)],
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
-                assert completed.returncode == 42
+            executable = Path(inspected["artifact_paths"]["executable"])
+            completed = subprocess.run(
+                [str(executable)],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            assert completed.returncode == 42
 
     (tmp_path / "qualification-trace.json").write_text(
         json.dumps(trace, indent=2, sort_keys=True) + "\n",
