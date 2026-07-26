@@ -7,6 +7,7 @@ from functools import lru_cache
 from typing import Any
 
 from .batch_edit import EditBatchExecutor
+from .branch_activity import BranchActivityService
 from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
 from .mcp_guidance import install_runtime_guidance
@@ -19,6 +20,11 @@ install_runtime_guidance(mcp)
 @lru_cache(maxsize=1)
 def edit_batches() -> EditBatchExecutor:
     return EditBatchExecutor(workspace())
+
+
+@lru_cache(maxsize=1)
+def branch_activity() -> BranchActivityService:
+    return BranchActivityService(workspace())
 
 
 @lru_cache(maxsize=1)
@@ -64,6 +70,35 @@ def node_apply_batch(
             include_operation_results=include_operation_results,
         )
     )
+
+
+@mcp.tool()
+def branch_history_page(
+    project: str,
+    branch: str = "main",
+    start_revision_id: str | None = None,
+    limit: int = 50,
+) -> dict[str, object]:
+    """Read one bounded first-parent history page with an explicit continuation."""
+
+    return _result(
+        lambda: branch_activity().history_page(
+            project,
+            branch,
+            start_revision_id=start_revision_id,
+            limit=limit,
+        )
+    )
+
+
+@mcp.tool()
+def branch_activity_summary(
+    project: str,
+    branch: str = "main",
+) -> dict[str, object]:
+    """Summarize revisions, operations, merges, authors, and edit grouping."""
+
+    return _result(lambda: branch_activity().summary(project, branch))
 
 
 @mcp.tool()
