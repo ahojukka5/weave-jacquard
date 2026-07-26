@@ -91,11 +91,13 @@ Read `docs/single-node-concurrency.md`,
 `docs/agent-checkpoint-timeline.md`,
 `docs/project-agent-status.md`,
 `docs/project-merge-queue.md`,
-`docs/project-merge-impact-queue.md`, and
-`docs/selected-merge-preflight-batch.md` before changing branch writes, fork
+`docs/project-merge-impact-queue.md`,
+`docs/selected-merge-preflight-batch.md`, and
+`docs/selected-merge-train-preview.md` before changing branch writes, fork
 semantics, one-call orientation reads, handoff protocols, checkpoint
 supervision, project-wide agent status, project merge queues, non-compiling
-merge-impact review, or compiler-backed selected preflight orchestration.
+merge-impact review, compiler-backed selected preflight orchestration, or
+order-aware virtual merge simulation.
 Consult `docs/write-concurrency-audit.md` before adding a new mutating tool.
 
 In particular:
@@ -170,6 +172,28 @@ In particular:
 - selected preflight batches must publish no merge and advance no branch;
   `ready_for_publication` remains exact guarded evidence requiring explicit
   `branch_merge` publication;
+- selected merge-train previews must accept only an explicit bounded unique
+  source list and preserve caller order without selecting, ranking, or expanding
+  it;
+- selected merge-train previews must verify the complete exact project merge
+  catalog before and after simulation, including unselected branches, and reject
+  catalog drift rather than return stale train evidence;
+- every train step must use the source's real common ancestor with the original
+  committed target head, compose against the accumulated in-memory virtual target,
+  and semantically validate each clean result;
+- merge-train evidence must distinguish consistent clean/conflict outcomes from
+  order-introduced and order-removed conflicts, and must expose later redundant
+  sources as `no_changes` rather than inventing a new committed revision;
+- merge-train simulation must stop at the first unresolved conflict because no
+  valid virtual target exists for later steps;
+- selected merge-train previews must run no compiler, preflight, persistent write,
+  or merge publication, and virtual target roots must never be treated as
+  committed revisions;
+- only the first clean train step may reuse the current catalog's normal preview;
+  after every real merge publication, callers must refresh the complete catalog
+  and preflight the next source against the new target head;
+- merge-train source order is structural caller input and must not be interpreted
+  as priority, urgency, quality, business value, or human readiness;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
