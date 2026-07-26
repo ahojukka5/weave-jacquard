@@ -51,7 +51,8 @@ def test_workflow_covers_batch_validation_build_and_inspection() -> None:
     assert "build_target_validate before a named-target build" in steps
     assert "branch_activity_summary when measuring the workflow" in steps
     assert "program_build or build_target_build" in steps
-    assert "build_get to inspect immutable artifacts and diagnostics" in steps
+    assert "build_get to inspect immutable provenance and artifact paths" in steps
+    assert "build_diagnostics_page to read mapped errors after a failed build" in steps
 
 
 def test_batch_help_preserves_transaction_contract() -> None:
@@ -109,3 +110,15 @@ def test_target_help_preserves_source_order_and_revision_contract() -> None:
     ]
     assert "same branch head or explicit revision" in help_value["revision_rule"]
     assert "Source order is authoritative" in help_value["revision_rule"]
+
+
+def test_build_help_preserves_bounded_diagnostic_repair_contract() -> None:
+    help_value = weave_help("builds")["help"]
+
+    assert "build_get" in help_value["inspect"]
+    assert "build_diagnostics_page" in help_value["inspect"]
+    assert "1..200" in help_value["inspect"]
+    assert "stdout or stderr" in help_value["inspect"]
+    assert "stable node_id" in help_value["repair"]
+    assert "structural tool" in help_value["repair"]
+    assert "new revision" in help_value["repair"]
