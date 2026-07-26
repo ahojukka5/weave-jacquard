@@ -59,9 +59,8 @@ sources never include annotations. Each materialized source receives a separate
   payloads for one revision in sequence-number pages.
 - `branch_activity_summary`: measure complete first-parent revision, operation,
   merge, author, and edit-grouping activity.
-- `branch_merge`: perform stable-ID three-way merge.
-
-Incompatible edits produce a conflict and do not advance the target branch.
+- `branch_merge_preview`: preview stable-ID merge conflicts and consequences.
+- `branch_merge`: publish a merge, optionally enforcing a reviewed preview.
 
 `branch_history_page` accepts page sizes from 1 to 200. Begin without a start
 revision; when `has_more` is true, pass `next_revision_id` as the next
@@ -80,6 +79,60 @@ single- and multi-operation revisions and the number of revisions avoided by
 operation grouping. These metrics should guide ergonomics work, not encourage
 agents to maximize batch size. See
 [`branch-activity.md`](branch-activity.md) for exact definitions.
+
+### `branch_merge_preview`
+
+Preview the current source branch head into the current target branch head
+without mutating either branch.
+
+```text
+project
+target_branch
+source_branch
+```
+
+The response format is `weave-merge-preview-v1`. Its deterministic `preview_id`
+binds the project, branch direction, common ancestor, target head, and source
+head.
+
+A clean preview returns:
+
+- `mergeable: true`;
+- base, target-head, and source-head revision IDs;
+- target, source, and prospective merged root hashes;
+- changed document names;
+- compact per-document node-change summaries.
+
+A conflict preview is still a successful read response. It returns
+`mergeable: false`, exact conflict paths, and no merged root. It does not advance
+the target branch.
+
+Per-document summaries report add/remove/modify status, document hashes, node
+counts, changed stable-node count, and aggregate revision-diff change kinds.
+Complete merged trees are never returned.
+
+### `branch_merge`
+
+```text
+project
+target_branch
+source_branch
+preview_id = optional
+author = "merge-agent"
+```
+
+When `preview_id` is supplied, Jacquard recomputes the current preview. A token
+mismatch returns `STALE_MERGE_PREVIEW`; a matching conflict preview returns
+`MERGE_CONFLICT`. Neither publishes a revision.
+
+For a matching clean preview, both reviewed branch heads are checked again in the
+same SQLite `BEGIN IMMEDIATE` transaction that writes the merge revision. The
+target update uses compare-and-set semantics. The merge revision records the
+reviewed common ancestor and both parent heads in its operation payload.
+
+Calls without `preview_id` remain supported. Direct merges still capture and
+atomically recheck both current heads, but preview-first merging is recommended
+for independent agent work. See [`merge-preview.md`](merge-preview.md).
 
 ## Program documents
 
@@ -146,7 +199,8 @@ program_source_list
 → build_target_set
 → structural source edits
 → build_target_validate
-→ branch_merge
+→ branch_merge_preview
+→ branch_merge(preview_id = reviewed preview)
 → build_target_build
 → build_get
 → build_diagnostics_page when the build failed
@@ -332,16 +386,19 @@ Other inspection and context tools:
 - `context_add`: store project-, document-, or symbol-scoped design material.
 - `context_get`: retrieve context visible at the current branch revision.
 
-Reading may return a useful local subtree or a bounded change page. Writing
-remains transactional: one single edit or one bounded coherent batch either
-publishes completely or not at all.
+Reading may return a useful local subtree, bounded change page, or merge preview.
+Writing remains transactional: one single edit, one coherent batch, or one merge
+either publishes completely or not at all.
 
 ## Failure and publication semantics
 
 - Rejected single edits and batches do not advance branches.
 - Validation and build failures do not mutate program revisions.
 - Builds never advance branches.
-- Historical inspection and revision diffs never check out or rewrite revisions.
+- Merge previews, historical inspection, and revision diffs never check out or
+  rewrite revisions.
+- Conflict previews and stale preview tokens publish no merge revision.
+- Merge publication atomically rechecks both captured branch heads.
 - Missing or duplicate sources fail before compilation.
 - A final executable exists only after compiler process, compiler manifest, and
   compiler diagnostics success.
