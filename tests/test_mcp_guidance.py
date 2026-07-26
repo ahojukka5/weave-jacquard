@@ -41,14 +41,35 @@ def test_runtime_guidance_replaces_legacy_registration() -> None:
     assert server.tools["weave_help"] is weave_help
 
 
-def test_workflow_covers_validation_build_and_inspection() -> None:
+def test_workflow_covers_batch_validation_build_and_inspection() -> None:
     result = weave_help("workflow")
     steps = result["help"]["steps"]
 
+    assert "single-node tools while exploring or repairing" in steps
+    assert "node_apply_batch for one coherent known structure" in steps
     assert "program_validate for a coherent single document" in steps
     assert "build_target_validate before a named-target build" in steps
     assert "program_build or build_target_build" in steps
     assert "build_get to inspect immutable artifacts and diagnostics" in steps
+
+
+def test_batch_help_preserves_transaction_contract() -> None:
+    help_value = weave_help("batch")["help"]
+
+    assert "single-node tools" in help_value["when"]
+    assert help_value["operations"] == [
+        "create_form",
+        "add_atom",
+        "set_atom",
+        "move_node",
+        "wrap_node",
+        "delete_node",
+    ]
+    assert "@name" in help_value["aliases"]
+    assert "at most 256 operations" in help_value["safety"]
+    assert "expected_revision_id" in help_value["safety"][2]
+    assert "one immutable revision" in help_value["safety"][4]
+    assert "rolls back" in help_value["safety"][5]
 
 
 def test_validation_distinguishes_single_and_multi_document_paths() -> None:
