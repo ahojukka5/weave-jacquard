@@ -19,7 +19,8 @@ Jacquard owns:
 
 - single-node and bounded transactional edits with stable node identities;
 - immutable revisions, parallel branches, previewed race-safe structural merge,
-  measured branch activity, and bounded stable-node revision diffs;
+  compiler-gated merge publication, measured branch activity, and bounded
+  stable-node revision diffs;
 - project-, document-, and symbol-scoped context;
 - compiler-corpus-backed grammar help;
 - authoritative validation through `weavec --frontend`;
@@ -95,7 +96,9 @@ project_initialize
 → node_inspect
 → program_validate
 → branch_merge_preview
-→ branch_merge(preview_id = reviewed preview)
+→ branch_merge_validate(build_target = application)
+→ branch_merge(preview_id = reviewed preview,
+               validation_target = application)
 → branch_activity_summary when measuring the workflow
 → program_build
 → build_get
@@ -112,7 +115,9 @@ program_source_list
 → structural source edits
 → build_target_validate
 → branch_merge_preview
-→ branch_merge(preview_id = reviewed preview)
+→ branch_merge_validate(build_target = named target)
+→ branch_merge(preview_id = reviewed preview,
+               validation_target = named target)
 → build_target_build
 → build_get
 → build_diagnostics_page when the build failed
@@ -121,8 +126,8 @@ program_source_list
 ```
 
 A target definition and every selected source are resolved from one immutable
-revision. The primary document is first and additional documents retain their
-stored order.
+revision or from one exact in-memory merge candidate. The primary document is
+first and additional documents retain their stored order.
 
 `node_apply_batch` accepts a flat list of up to 256 existing structural
 operations. Temporary `@aliases` refer to nodes created earlier in the same
@@ -132,10 +137,21 @@ single-node tools remain available for uncertain edits and repairs.
 For independent branches, `branch_merge_preview` reports exact conflict paths or
 a prospective merged root with compact per-document stable-node consequences.
 Its deterministic `preview_id` binds the project, merge direction, common
-ancestor, and both reviewed branch heads. Passing that ID to `branch_merge`
-rechecks both heads in the same SQLite write transaction and returns
-`STALE_MERGE_PREVIEW` without publication if either branch advanced. Direct
-merges without a preview remain supported and are also branch-head race-safe.
+ancestor, and both reviewed branch heads.
+
+`branch_merge_validate` then resolves a named target from that prospective state,
+renders its ordered canonical sources, and invokes `weavec --frontend` without
+creating a revision or retaining a build artifact. The result includes source,
+compiler, WIR, and validation hashes plus bounded compiler output.
+
+Passing both `preview_id` and `validation_target` to `branch_merge` repeats the
+compiler check and then rechecks both branch heads in the same SQLite write
+transaction that publishes the merge. Compiler rejection returns
+`MERGE_VALIDATION_FAILED`; missing compiler availability returns
+`MERGE_VALIDATION_UNAVAILABLE`; branch advancement returns
+`STALE_MERGE_PREVIEW`. Every failure leaves the target unchanged. Direct merges
+without preview or validation remain supported and are still branch-head
+race-safe.
 
 For long branches, `branch_history_page` returns bounded first-parent pages with
 an explicit continuation. `revision_operations_page` returns exact immutable
@@ -254,7 +270,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - **Projects and branches:** `project_initialize`, `branch_create`,
   `branch_list`, `branch_history`, `branch_history_page`,
   `revision_operations_page`, `branch_activity_summary`, `branch_merge_preview`,
-  `branch_merge`
+  `branch_merge_validate`, `branch_merge`
 - **Programs:** `program_create`, `program_import`, `program_list`,
   `program_source_list`, `program_render`, `program_validate`, `program_build`
 - **Named targets:** `build_target_set`, `build_target_list`,
@@ -274,6 +290,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - [Transactional structural edits](docs/edit-transactions.md)
 - [Branch activity observability](docs/branch-activity.md)
 - [Two-phase merge previews](docs/merge-preview.md)
+- [Merge candidate validation](docs/merge-validation.md)
 - [Build diagnostic inspection](docs/build-diagnostics.md)
 - [Revision-pinned node inspection](docs/revision-node-inspection.md)
 - [Stable-node revision diffs](docs/revision-diff.md)
