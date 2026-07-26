@@ -84,10 +84,11 @@ Read `AGENTS.md` and `docs/architecture.md` before changing the data model,
 revision semantics, grammar, validation rules, merge behavior, or public API.
 Read `docs/single-node-concurrency.md`,
 `docs/program-target-concurrency.md`,
-`docs/context-policy-concurrency.md`, and
-`docs/reproducible-branch-creation.md` before changing branch-state writes or
-fork semantics. Consult `docs/write-concurrency-audit.md` before adding a new
-mutating tool.
+`docs/context-policy-concurrency.md`,
+`docs/reproducible-branch-creation.md`, and
+`docs/agent-resume-snapshot.md` before changing branch writes, fork semantics, or
+one-call orientation reads. Consult `docs/write-concurrency-audit.md` before
+adding a new mutating tool.
 
 In particular:
 
@@ -100,6 +101,9 @@ In particular:
 - historical forks must select one project-owned immutable revision explicitly;
 - auxiliary persistent rows, operation payloads, revision links, and the branch
   update must commit or roll back together;
+- a revision-pinned composite read must not mix programs, targets, policy,
+  context, operations, or history from a newer branch head;
+- bounded composite reads must expose totals, returned counts, and truncation;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
