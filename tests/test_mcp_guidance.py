@@ -49,11 +49,13 @@ def test_workflow_covers_batch_validation_merge_build_and_inspection() -> None:
     assert "node_apply_batch for one coherent known structure" in steps
     assert "program_validate for a coherent single document" in steps
     assert "build_target_validate before a named-target build" in steps
-    assert "branch_merge_preview after independent agent work" in steps
-    assert "branch_merge with the reviewed preview_id" in steps
-    assert steps.index("branch_merge_preview after independent agent work") < steps.index(
-        "branch_merge with the reviewed preview_id"
-    )
+    preview = "branch_merge_preview after independent agent work"
+    validation = "branch_merge_validate for the reviewed named target"
+    publication = "branch_merge with preview_id and validation_target"
+    assert preview in steps
+    assert validation in steps
+    assert publication in steps
+    assert steps.index(preview) < steps.index(validation) < steps.index(publication)
     assert "branch_activity_summary when measuring the workflow" in steps
     assert "program_build or build_target_build" in steps
     assert "build_get to inspect immutable provenance and artifact paths" in steps
@@ -105,7 +107,7 @@ def test_history_help_preserves_pagination_metric_and_audit_contract() -> None:
     assert "Do not maximize batch size" in help_value["interpretation"]
 
 
-def test_merge_help_preserves_preview_and_stale_head_contract() -> None:
+def test_merge_help_preserves_validation_and_stale_head_contract() -> None:
     help_value = weave_help("merge")["help"]
 
     assert "branch_merge_preview" in help_value["preview"]
@@ -113,33 +115,41 @@ def test_merge_help_preserves_preview_and_stale_head_contract() -> None:
     assert "never advances" in help_value["preview"]
     assert "mergeable=false" in help_value["consequences"]
     assert "conflict paths" in help_value["consequences"]
-    assert "preview_id" in help_value["publish"]
-    assert "same SQLite write transaction" in help_value["publish"]
-    assert "STALE_MERGE_PREVIEW" in help_value["publish"]
-    assert "without preview_id" in help_value["compatibility"]
-    assert "branch-head race-safe" in help_value["compatibility"]
+    assert "branch_merge_validate" in help_value["validation"]
+    assert "weavec --frontend" in help_value["validation"]
+    assert "without retaining artifacts" in help_value["validation"]
+    assert "preview_id and validation_target" in help_value["publish"]
+    assert "revalidated" in help_value["publish"]
+    assert "MERGE_VALIDATION_UNAVAILABLE" in help_value["failures"]
+    assert "MERGE_VALIDATION_FAILED" in help_value["failures"]
+    assert "STALE_MERGE_PREVIEW" in help_value["failures"]
+    assert "without preview_id or validation_target" in help_value["compatibility"]
 
 
-def test_validation_distinguishes_single_and_multi_document_paths() -> None:
+def test_validation_distinguishes_stored_and_merge_candidate_paths() -> None:
     help_value = weave_help("validation")["help"]
 
     assert "program_validate" in help_value["single_document"]
     assert "build_target_validate" in help_value["multi_document"]
     assert "one immutable revision" in help_value["multi_document"]
+    assert "branch_merge_validate" in help_value["merge_candidate"]
+    assert "uncommitted clean merge candidate" in help_value["merge_candidate"]
 
 
-def test_target_help_preserves_source_order_and_revision_contract() -> None:
+def test_target_help_preserves_source_order_and_candidate_contract() -> None:
     help_value = weave_help("targets")["help"]
 
     assert help_value["workflow"] == [
         "program_source_list to choose source documents",
         "build_target_set to store primary source, ordered additional sources, and target",
         "build_target_validate to validate the exact pinned target",
+        "branch_merge_validate to validate the target from a prospective merge",
         "build_target_build to compile the same target through weavec build",
         "build_get to inspect provenance, diagnostics, and artifacts",
     ]
-    assert "same branch head or explicit revision" in help_value["revision_rule"]
+    assert "exact in-memory merge candidate" in help_value["revision_rule"]
     assert "Source order is authoritative" in help_value["revision_rule"]
+    assert "branch_merge_validate" in help_value["tools"]
 
 
 def test_build_help_preserves_bounded_diagnostic_repair_contract() -> None:
