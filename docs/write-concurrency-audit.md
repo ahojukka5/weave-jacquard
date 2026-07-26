@@ -5,32 +5,21 @@
 This audit records which Jacquard branch-mutating paths publish from one captured
 base revision and which paths still need strengthening.
 
-## Already compare-and-set safe
+## Compare-and-set safe
 
+- `program_create`;
+- `program_import`;
 - all six single-node structural mutations;
 - `node_apply_batch`;
+- `build_target_set`;
+- `build_target_delete`;
 - branch merge preview/preflight publication;
 - compiler-gated merge publication.
 
 These paths capture one or more reviewed branch heads and recheck them inside the
-same SQLite transaction that publishes the revision.
-
-## Direct state mutations suitable for the existing primitive
-
-The following paths load branch state and then call `_commit` without an expected
-head:
-
-- `program_create`;
-- `program_import`;
-- `build_target_set`;
-- `build_target_delete`.
-
-They can be hardened without a schema or storage-format change by:
-
-1. accepting optional `expected_revision_id`;
-2. loading state through `_state_for_write`;
-3. publishing with `expected_branch_heads={branch: base_revision_id}`;
-4. returning `base_revision_id` on success.
+same SQLite transaction that publishes the revision. Program, node, batch, and
+target writes accept optional `expected_revision_id`; successful direct writes
+report `base_revision_id`.
 
 ## Context-document mutations requiring a separate design
 
@@ -44,6 +33,13 @@ Adding only a branch compare-and-set would prevent branch clobbering but could
 still leave an unreferenced document row when publication loses a race. They need
 an atomic document-plus-revision publication primitive or an equivalent
 transactional callback inside `_commit`.
+
+The required invariant is stronger than branch safety:
+
+- the context document row must be inserted or reused;
+- its revision link and operation audit row must be published;
+- the branch head must be conditionally advanced;
+- every part must commit or roll back as one SQLite transaction.
 
 ## Non-goals
 
