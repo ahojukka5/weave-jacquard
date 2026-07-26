@@ -11,6 +11,7 @@ from weave_frontend import mcp_concurrent_context as _mcp_concurrent_context
 from weave_frontend import mcp_concurrent_targets as _mcp_concurrent_targets
 from weave_frontend import mcp_policy as _mcp_policy
 from weave_frontend import mcp_preflight as _mcp_preflight
+from weave_frontend import mcp_project_agent_status as _mcp_project_agent_status
 from weave_frontend import mcp_resume_snapshot as _mcp_resume_snapshot
 from weave_frontend import mcp_revision_reads as _mcp_revision_reads
 from weave_frontend.mcp_build import main
@@ -25,6 +26,7 @@ _ = (
     _mcp_preflight,
     _mcp_agent_checkpoint,
     _mcp_agent_checkpoint_timeline,
+    _mcp_project_agent_status,
     _mcp_resume_snapshot,
     _mcp_revision_reads,
 )
