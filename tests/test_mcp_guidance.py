@@ -63,15 +63,16 @@ def test_workflow_defaults_to_one_call_merge_preflight() -> None:
 
 
 def test_instructions_explain_preflight_revalidation_and_target_policy() -> None:
+    normalized = " ".join(INSTRUCTIONS.split())
     assert "merge_policy_set" in INSTRUCTIONS
-    assert "current target branch policy is authoritative" in INSTRUCTIONS
-    assert "cannot weaken admission" in INSTRUCTIONS
+    assert "current target branch policy is authoritative" in normalized
+    assert "cannot weaken admission" in normalized
     assert "branch_merge_preflight" in INSTRUCTIONS
     assert "publication_tool" in INSTRUCTIONS
     assert "publication_arguments" in INSTRUCTIONS
-    assert "publication repeats every gate" in INSTRUCTIONS
-    assert "atomically rechecks both branch heads" in INSTRUCTIONS
-    assert "only when investigating an individual layer" in INSTRUCTIONS
+    assert "publication repeats every gate" in normalized
+    assert "atomically rechecks both branch heads" in normalized
+    assert "only when investigating an individual layer" in normalized
 
 
 def test_batch_help_preserves_transaction_contract() -> None:
