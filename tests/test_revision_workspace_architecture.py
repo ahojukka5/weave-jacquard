@@ -43,8 +43,8 @@ def test_legacy_console_script_is_removed() -> None:
     content = pyproject.read_text(encoding="utf-8")
 
     assert "weave-front =" not in content
-    assert 'weave-mcp = "weave_frontend.mcp_build:main"' in content
-    assert 'weave-build = "weave_frontend.build_cli:main"' in content
+    assert 'weave-mcp = "weave_jacquard.mcp_build:main"' in content
+    assert 'weave-build = "weave_jacquard.build_cli:main"' in content
 
 
 def test_merge_result_remains_stable(sexpr_workspace) -> None:
