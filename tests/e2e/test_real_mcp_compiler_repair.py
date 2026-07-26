@@ -105,12 +105,6 @@ def _invalid_program_operations(root_id: str) -> list[dict[str, Any]]:
     ]
 
 
-def _read_json(path: str | Path) -> dict[str, Any]:
-    value = json.loads(Path(path).read_text(encoding="utf-8"))
-    assert isinstance(value, dict)
-    return value
-
-
 def _replay_compiler(tmp_path: Path, compiler: Path, source: Path) -> dict[str, int]:
     wir = tmp_path / "program.wir"
     llvm = tmp_path / "program.ll"
@@ -159,6 +153,7 @@ async def _run(tmp_path: Path, compiler: Path) -> dict[str, Any]:
             "program_validate",
             "program_build",
             "build_get",
+            "build_diagnostics_page",
             "branch_activity_summary",
         } <= names
 
@@ -239,10 +234,19 @@ async def _run(tmp_path: Path, compiler: Path) -> dict[str, Any]:
             "build_get",
             build_id=failed["build_id"],
         )
-        failed_diagnostics = _read_json(failed_build["artifact_paths"]["diagnostics"])
+        failed_diagnostics = await _call(
+            session,
+            trace,
+            "build_diagnostics_page",
+            build_id=failed["build_id"],
+            limit=1,
+        )
+        assert failed_diagnostics["status"] == "failed"
+        assert failed_diagnostics["revision_id"] == invalid["revision_id"]
         assert failed_diagnostics["protocol_valid"] is True
-        assert len(failed_diagnostics["entries"]) == 1
-        diagnostic = failed_diagnostics["entries"][0]
+        assert failed_diagnostics["total_diagnostic_count"] == 1
+        assert failed_diagnostics["has_more"] is False
+        diagnostic = failed_diagnostics["diagnostics"][0]
         assert diagnostic["code"] == "backend.unknown-expression-operator"
         assert diagnostic["node_id"] == invalid_node_id
         assert diagnostic["document"] == DOCUMENT
@@ -343,9 +347,16 @@ async def _run(tmp_path: Path, compiler: Path) -> dict[str, Any]:
             "build_get",
             build_id=failed["build_id"],
         )
+        diagnostics_again = await _call(
+            session,
+            trace,
+            "build_diagnostics_page",
+            build_id=failed["build_id"],
+            limit=1,
+        )
         assert failed_again["build_id"] == failed_build["build_id"]
         assert failed_again["status"] == "failed"
-        assert _read_json(failed_again["artifact_paths"]["diagnostics"]) == failed_diagnostics
+        assert diagnostics_again == failed_diagnostics
 
         final_activity = await _call(
             session,
@@ -370,6 +381,7 @@ async def _run(tmp_path: Path, compiler: Path) -> dict[str, Any]:
         "repaired_node_id": invalid_node_id,
         "failed_build_retained": True,
         "failed_build_published_executable": False,
+        "diagnostics_read_through_mcp": True,
         "repair_revision_delta": 1,
         "mcp_call_count": len(trace),
         "source_bytes": source.stat().st_size,
@@ -401,3 +413,4 @@ def test_real_mcp_compiler_diagnostic_guides_stable_node_repair(tmp_path: Path) 
     summary = asyncio.run(_run(tmp_path, compiler))
     assert summary["diagnostic_node_id"] == summary["repaired_node_id"]
     assert summary["failed_build_retained"] is True
+    assert summary["diagnostics_read_through_mcp"] is True

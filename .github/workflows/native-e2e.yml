@@ -170,6 +170,7 @@ jobs:
           assert repair["diagnostic_node_id"] == repair["repaired_node_id"]
           assert repair["failed_build_retained"] is True
           assert repair["failed_build_published_executable"] is False
+          assert repair["diagnostics_read_through_mcp"] is True
           assert all(summary["llvm_bytes"] > 0 for summary in summaries)
           assert all(summary["bitcode_bytes"] > 0 for summary in summaries)
 

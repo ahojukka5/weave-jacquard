@@ -24,7 +24,7 @@ Jacquard owns:
 - authoritative validation through `weavec --frontend`;
 - revisioned named build targets and ordered multi-document builds;
 - deterministic canonical sources and per-document node maps;
-- compiler diagnostics mapped back to database nodes;
+- compiler diagnostics mapped back to database nodes and exposed in bounded pages;
 - verified, content-derived native build artifacts.
 
 Jacquard is not another compiler. The user-facing
@@ -97,6 +97,7 @@ project_initialize
 → branch_activity_summary when measuring the workflow
 → program_build
 → build_get
+→ build_diagnostics_page when the build failed
 ```
 
 Multi-document program:
@@ -109,6 +110,7 @@ program_source_list
 → branch_merge
 → build_target_build
 → build_get
+→ build_diagnostics_page when the build failed
 ```
 
 A target definition and every selected source are resolved from one immutable
@@ -125,6 +127,11 @@ an explicit continuation. `revision_operations_page` returns exact immutable
 operation targets and payloads for one revision in sequence-number pages.
 `branch_activity_summary` reports complete revision, operation, merge, author,
 and edit-grouping metrics without changing history.
+
+For failed builds, `build_diagnostics_page` returns exact mapped diagnostics in
+bounded pages after verifying the immutable build and the bytes being read. An
+agent can follow a returned stable `node_id` without opening files on the MCP
+server machine.
 
 ## Compiler boundary
 
@@ -181,6 +188,8 @@ A successful build contains:
 The bridge validates both compiler protocol documents before retaining an
 executable. `build_get` and cache admission verify the frontend manifest, build
 ID, path containment, regular-file status, and every SHA-256 hash.
+`build_diagnostics_page` performs the same verified admission and hashes the
+exact diagnostic bytes it decodes before returning mapped entries.
 
 `weave-build-key-v4` derives the build ID from the immutable revision, ordered
 source hashes, compiler binary hash, and requested target. Concurrent builds use
@@ -227,7 +236,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - **Named targets:** `build_target_set`, `build_target_list`,
   `build_target_get`, `build_target_delete`, `build_target_validate`,
   `build_target_build`
-- **Build inspection:** `build_get`
+- **Build inspection:** `build_get`, `build_diagnostics_page`
 - **Single-node editing:** `node_create_form`, `node_add_atom`, `node_set_atom`,
   `node_move`, `node_wrap`, `node_delete`
 - **Transactional editing:** `node_apply_batch`
@@ -240,6 +249,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - [MCP tool reference](docs/mcp.md)
 - [Transactional structural edits](docs/edit-transactions.md)
 - [Branch activity observability](docs/branch-activity.md)
+- [Build diagnostic inspection](docs/build-diagnostics.md)
 - [Compiler bridge](docs/compiler-bridge.md)
 - [Revisioned build targets](docs/build-targets.md)
 - [Target validation](docs/target-validation.md)
