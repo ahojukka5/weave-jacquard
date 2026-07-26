@@ -124,10 +124,10 @@ class BuildDiscoveryService:
 
         result: list[str] = []
         for entry in entries:
-            if not self._valid_build_id(entry.name) or entry.is_symlink():
-                continue
-            manifest = entry / "manifest.json"
             try:
+                if not self._valid_build_id(entry.name) or entry.is_symlink():
+                    continue
+                manifest = entry / "manifest.json"
                 is_directory = entry.is_dir()
                 is_manifest = manifest.is_file() and not manifest.is_symlink()
             except OSError:
@@ -160,6 +160,7 @@ class BuildDiscoveryService:
         document = manifest.get("document")
         documents = manifest.get("documents")
         target = manifest.get("target")
+        compiler_target = manifest.get("compiler_target")
         compiler_sha256 = manifest.get("compiler_sha256")
         build_key_format = manifest.get("build_key_format")
         artifacts = manifest.get("artifacts")
@@ -185,6 +186,8 @@ class BuildDiscoveryService:
                 "build manifest documents must be non-empty strings led by document",
             )
         cls._require_string(target, "target")
+        if compiler_target is not None:
+            cls._require_string(compiler_target, "compiler_target")
         cls._require_sha256(compiler_sha256, "compiler_sha256")
         cls._require_string(build_key_format, "build_key_format")
         if not isinstance(artifacts, dict):
@@ -203,7 +206,7 @@ class BuildDiscoveryService:
             "document": document,
             "documents": list(documents),
             "target": target,
-            "compiler_target": manifest.get("compiler_target"),
+            "compiler_target": compiler_target,
             "compiler_sha256": compiler_sha256,
             "build_key_format": build_key_format,
             "returncode": manifest.get("returncode"),
@@ -299,7 +302,8 @@ class BuildDiscoveryService:
     @staticmethod
     def _validate_catalog_id(value: str | None) -> None:
         if value is not None and (
-            len(value) != 64
+            not isinstance(value, str)
+            or len(value) != 64
             or any(character not in "0123456789abcdef" for character in value)
         ):
             raise ValidationError(
