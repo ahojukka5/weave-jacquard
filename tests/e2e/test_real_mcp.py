@@ -48,10 +48,13 @@ def _server_environment(tmp_path: Path, compiler: Path | None = None) -> dict[st
     return environment
 
 
+def _attribute(value: Any, snake_case: str, camel_case: str) -> Any:
+    result = getattr(value, snake_case, None)
+    return result if result is not None else getattr(value, camel_case, None)
+
+
 def _payload(result: Any) -> dict[str, Any]:
-    structured = getattr(result, "structured_content", None)
-    if structured is None:
-        structured = getattr(result, "structuredContent", None)
+    structured = _attribute(result, "structured_content", "structuredContent")
     if isinstance(structured, dict):
         return structured
 
@@ -77,9 +80,57 @@ async def _call(
     result = await session.call_tool(name, arguments=arguments)
     payload = _payload(result)
     trace.append({"tool": name, "arguments": arguments, "payload": payload})
-    assert not getattr(result, "is_error", False), payload
+    assert _attribute(result, "is_error", "isError") is not True, payload
     assert payload.get("ok") is True, payload
     return payload.get("result")
+
+
+async def _form(
+    session: ClientSession,
+    trace: list[dict[str, Any]],
+    *,
+    project: str,
+    document: str,
+    parent_id: str,
+    head: str,
+) -> dict[str, Any]:
+    return await _call(
+        session,
+        trace,
+        "node_create_form",
+        {
+            "project": project,
+            "branch": "main",
+            "document": document,
+            "parent_id": parent_id,
+            "head": head,
+        },
+    )
+
+
+async def _atom(
+    session: ClientSession,
+    trace: list[dict[str, Any]],
+    *,
+    project: str,
+    document: str,
+    parent_id: str,
+    kind: str,
+    value: Any,
+) -> dict[str, Any]:
+    return await _call(
+        session,
+        trace,
+        "node_add_atom",
+        {
+            "project": project,
+            "branch": "main",
+            "document": document,
+            "parent_id": parent_id,
+            "kind": kind,
+            "value": value,
+        },
+    )
 
 
 async def _construct_constant_program(
@@ -103,117 +154,81 @@ async def _construct_constant_program(
     )
     root_id = str(created["node_id"])
 
-    entry = await _call(
+    entry = await _form(
         session,
         trace,
-        "node_create_form",
-        {
-            "project": project,
-            "branch": "main",
-            "document": document,
-            "parent_id": root_id,
-            "head": "entry",
-        },
+        project=project,
+        document=document,
+        parent_id=root_id,
+        head="entry",
     )
     entry_id = str(entry["node_id"])
-    await _call(
+    await _atom(
         session,
         trace,
-        "node_add_atom",
-        {
-            "project": project,
-            "branch": "main",
-            "document": document,
-            "parent_id": entry_id,
-            "kind": "symbol",
-            "value": "main",
-        },
+        project=project,
+        document=document,
+        parent_id=entry_id,
+        kind="symbol",
+        value="main",
     )
-    await _call(
+    await _form(
         session,
         trace,
-        "node_create_form",
-        {
-            "project": project,
-            "branch": "main",
-            "document": document,
-            "parent_id": entry_id,
-            "head": "params",
-        },
+        project=project,
+        document=document,
+        parent_id=entry_id,
+        head="params",
     )
-    returns = await _call(
+    returns = await _form(
         session,
         trace,
-        "node_create_form",
-        {
-            "project": project,
-            "branch": "main",
-            "document": document,
-            "parent_id": entry_id,
-            "head": "returns",
-        },
+        project=project,
+        document=document,
+        parent_id=entry_id,
+        head="returns",
     )
-    await _call(
+    await _atom(
         session,
         trace,
-        "node_add_atom",
-        {
-            "project": project,
-            "branch": "main",
-            "document": document,
-            "parent_id": returns["node_id"],
-            "kind": "symbol",
-            "value": "i32",
-        },
+        project=project,
+        document=document,
+        parent_id=str(returns["node_id"]),
+        kind="symbol",
+        value="i32",
     )
-    body = await _call(
+    body = await _form(
         session,
         trace,
-        "node_create_form",
-        {
-            "project": project,
-            "branch": "main",
-            "document": document,
-            "parent_id": entry_id,
-            "head": "do",
-        },
+        project=project,
+        document=document,
+        parent_id=entry_id,
+        head="do",
     )
-    returned = await _call(
+    returned = await _form(
         session,
         trace,
-        "node_create_form",
-        {
-            "project": project,
-            "branch": "main",
-            "document": document,
-            "parent_id": body["node_id"],
-            "head": "return",
-        },
+        project=project,
+        document=document,
+        parent_id=str(body["node_id"]),
+        head="return",
     )
-    constant = await _call(
+    constant = await _form(
         session,
         trace,
-        "node_create_form",
-        {
-            "project": project,
-            "branch": "main",
-            "document": document,
-            "parent_id": returned["node_id"],
-            "head": "const_i32",
-        },
+        project=project,
+        document=document,
+        parent_id=str(returned["node_id"]),
+        head="const_i32",
     )
-    await _call(
+    await _atom(
         session,
         trace,
-        "node_add_atom",
-        {
-            "project": project,
-            "branch": "main",
-            "document": document,
-            "parent_id": constant["node_id"],
-            "kind": "integer",
-            "value": 42,
-        },
+        project=project,
+        document=document,
+        parent_id=str(constant["node_id"]),
+        kind="integer",
+        value=42,
     )
 
     rendered = await _call(
@@ -247,14 +262,15 @@ async def _run_stdio_qualification(
         command=sys.executable,
         args=["-m", "weave_jacquard.mcp_build"],
         env=_server_environment(tmp_path, compiler),
+        cwd=ROOT,
     )
 
     async with stdio_client(parameters) as (read_stream, write_stream):
         async with ClientSession(read_stream, write_stream) as session:
             initialized = await session.initialize()
-            server_info = getattr(initialized, "server_info", None)
-            if server_info is not None:
-                assert server_info.name == "weave-mcp"
+            server_info = _attribute(initialized, "server_info", "serverInfo")
+            assert server_info is not None
+            assert server_info.name == "weave-mcp"
 
             listed = await session.list_tools()
             names = {tool.name for tool in listed.tools}
@@ -287,7 +303,8 @@ async def _run_stdio_qualification(
                 )
                 assert validated["available"] is True
                 assert validated["valid"] is True
-                assert source in validated.get("source", source)
+                assert isinstance(validated["wir"], str)
+                assert validated["wir"].strip()
 
                 built = await _call(
                     session,
@@ -310,6 +327,9 @@ async def _run_stdio_qualification(
                     {"build_id": built["build_id"]},
                 )
                 assert inspected["build_id"] == built["build_id"]
+                materialized = Path(inspected["artifact_paths"]["source"])
+                assert materialized.read_text(encoding="utf-8") == source
+
                 executable = Path(inspected["artifact_paths"]["executable"])
                 completed = subprocess.run(
                     [str(executable)],
