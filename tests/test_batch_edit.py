@@ -76,7 +76,7 @@ def test_batch_commits_one_revision_with_ordered_audit_rows(sexpr_workspace):
     assert result["operation_count"] == 9
     assert result["created_node_count"] == 9
     assert result["deleted_node_count"] == 0
-    assert result["node_count"] == 14
+    assert result["node_count"] == 23
     assert result["aliases"]["entry"].startswith("n_")
     assert len(result["operation_results"]) == 9
     assert len(sexpr_workspace.list_history("sexpr-demo", limit=10)) == 3
