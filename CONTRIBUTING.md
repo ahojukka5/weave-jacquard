@@ -86,10 +86,12 @@ Read `docs/single-node-concurrency.md`,
 `docs/program-target-concurrency.md`,
 `docs/context-policy-concurrency.md`,
 `docs/reproducible-branch-creation.md`,
-`docs/agent-resume-snapshot.md`, and
-`docs/agent-checkpoints.md` before changing branch writes, fork semantics,
-one-call orientation reads, or handoff protocols. Consult
-`docs/write-concurrency-audit.md` before adding a new mutating tool.
+`docs/agent-resume-snapshot.md`,
+`docs/agent-checkpoints.md`, and
+`docs/agent-checkpoint-timeline.md` before changing branch writes, fork
+semantics, one-call orientation reads, handoff protocols, or supervisory
+checkpoint reads. Consult `docs/write-concurrency-audit.md` before adding a new
+mutating tool.
 
 In particular:
 
@@ -110,6 +112,14 @@ In particular:
 - historical checkpoint resolution must follow only the selected revision's
   first-parent history and must never borrow a later handoff;
 - checkpoint resume arguments must remain pinned to the publishing revision;
+- sparse checkpoint paging must bound both returned checkpoints and revisions
+  scanned;
+- checkpoint page continuation must identify the exact first unscanned immutable
+  revision rather than a mutable offset;
+- checkpoint comparison endpoints must be exact revisions that published
+  checkpoints;
+- checkpoint list deltas must remain structural evidence and must not infer
+  completion, resolution, invalidation, ancestry, or chronology;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
