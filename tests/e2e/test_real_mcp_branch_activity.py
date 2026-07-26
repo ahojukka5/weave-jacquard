@@ -103,7 +103,11 @@ async def _run(tmp_path: Path) -> None:
         await session.initialize()
         listed = await session.list_tools()
         names = {tool.name for tool in listed.tools}
-        assert {"branch_history_page", "branch_activity_summary"} <= names
+        assert {
+            "branch_history_page",
+            "branch_activity_summary",
+            "revision_operations_page",
+        } <= names
 
         initialized = await _call(session, "project_initialize", project="activity-e2e")
         assert isinstance(initialized, list) and len(initialized) == 2
@@ -150,6 +154,47 @@ async def _run(tmp_path: Path) -> None:
         assert second["returned_count"] == 1
         assert second["has_more"] is False
         assert second["revisions"][0]["id"] == initial_revision_id
+
+        audit_first = await _call(
+            session,
+            "revision_operations_page",
+            project="activity-e2e",
+            revision_id=batched["revision_id"],
+            limit=4,
+        )
+        assert audit_first["total_operation_count"] == 9
+        assert audit_first["next_sequence_number"] == 4
+        assert [operation["sequence_number"] for operation in audit_first["operations"]] == [
+            0,
+            1,
+            2,
+            3,
+        ]
+        assert audit_first["operations"][0]["payload"]["head"] == "entry"
+        assert audit_first["operations"][0]["target"].startswith("n_")
+
+        audit_second = await _call(
+            session,
+            "revision_operations_page",
+            project="activity-e2e",
+            revision_id=batched["revision_id"],
+            start_sequence_number=audit_first["next_sequence_number"],
+            limit=4,
+        )
+        assert audit_second["next_sequence_number"] == 8
+
+        audit_third = await _call(
+            session,
+            "revision_operations_page",
+            project="activity-e2e",
+            revision_id=batched["revision_id"],
+            start_sequence_number=audit_second["next_sequence_number"],
+            limit=4,
+        )
+        assert audit_third["returned_count"] == 1
+        assert audit_third["has_more"] is False
+        assert audit_third["operations"][0]["sequence_number"] == 8
+        assert audit_third["operations"][0]["payload"]["batch_index"] == 8
 
         summary = await _call(
             session,
