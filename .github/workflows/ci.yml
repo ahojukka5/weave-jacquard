@@ -59,14 +59,20 @@ jobs:
           mapfile -t program_target_traces < <(
             find "$base" -name program-target-concurrency-trace.json -print
           )
+          mapfile -t context_policy_traces < <(
+            find "$base" -name context-policy-concurrency-trace.json -print
+          )
           test "${#revision_traces[@]}" -eq 1
           test "${#node_concurrency_traces[@]}" -eq 1
           test "${#program_target_traces[@]}" -eq 1
+          test "${#context_policy_traces[@]}" -eq 1
           cp "${revision_traces[0]}" qualification/revision-reads-trace.json
           cp "${node_concurrency_traces[0]}" \
             qualification/single-node-concurrency-trace.json
           cp "${program_target_traces[0]}" \
             qualification/program-target-concurrency-trace.json
+          cp "${context_policy_traces[0]}" \
+            qualification/context-policy-concurrency-trace.json
 
       - name: Upload CI qualification evidence
         uses: actions/upload-artifact@v4
