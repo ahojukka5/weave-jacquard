@@ -62,8 +62,8 @@ _RESUME_TOPIC: dict[str, Any] = {
     ),
     "checkpoint": (
         "agent_checkpoint resolves the newest verified first-parent handoff reachable "
-        "from the selected revision. Its resume arguments remain pinned to the checkpoint "
-        "revision even when later program revisions inherit that checkpoint."
+        "from the selected revision. Its resume arguments remain pinned to "
+        "checkpoint_revision_id even when later program revisions inherit that checkpoint."
     ),
     "bounds": (
         "Every collection is bounded and reports total, returned, and truncation "
