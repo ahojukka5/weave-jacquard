@@ -119,6 +119,7 @@ jobs:
             tests/e2e/test_real_mcp_program_matrix.py \
             tests/e2e/test_real_mcp_algorithmic_stress.py \
             tests/e2e/test_real_mcp_batch_edit.py \
+            tests/e2e/test_real_mcp_workflow_equivalence.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
@@ -144,6 +145,7 @@ jobs:
               "memory-flow",
               "binary-search-batch16",
               "batched-sum80",
+              "atomic-batch-equivalence-sum32",
           }, by_name
           assert by_name["while-accumulator"]["actual_exit"] == 42
           assert by_name["multi-function-chain"]["actual_exit"] == 35
@@ -152,6 +154,14 @@ jobs:
           assert by_name["batched-sum80"]["actual_exit"] == 80
           assert by_name["batched-sum80"]["write_call_reduction_ratio"] > 0.99
           assert by_name["batched-sum80"]["revision_reduction_ratio"] > 0.98
+          equivalence = by_name["atomic-batch-equivalence-sum32"]
+          assert equivalence["actual_exit"] == 32
+          assert equivalence["write_call_reduction_ratio"] > 0.99
+          assert equivalence["revision_reduction_ratio"] > 0.95
+          assert equivalence["source_identical"] is True
+          assert equivalence["wir_identical"] is True
+          assert equivalence["llvm_identical"] is True
+          assert equivalence["bitcode_identical"] is True
           assert all(summary["llvm_bytes"] > 0 for summary in summaries)
           assert all(summary["bitcode_bytes"] > 0 for summary in summaries)
 
