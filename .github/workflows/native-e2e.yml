@@ -128,6 +128,7 @@ jobs:
             tests/e2e/test_real_mcp_merge_impact.py \
             tests/e2e/test_real_mcp_validate_affected.py \
             tests/e2e/test_real_mcp_merge_preflight.py \
+            tests/e2e/test_real_mcp_merge_policy.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
@@ -364,6 +365,46 @@ jobs:
           assert preflight_merges[2]["payload"]["result"][
               "allow_uncovered_documents"
           ] is True
+
+          policy_traces = list(base.rglob("merge-policy-trace.json"))
+          assert len(policy_traces) == 1, policy_traces
+          policy_trace = json.loads(policy_traces[0].read_text(encoding="utf-8"))
+          policy_sets = [
+              entry for entry in policy_trace if entry["tool"] == "merge_policy_set"
+          ]
+          policy_preflights = [
+              entry
+              for entry in policy_trace
+              if entry["tool"] == "branch_merge_preflight"
+          ]
+          policy_merges = [
+              entry for entry in policy_trace if entry["tool"] == "branch_merge"
+          ]
+          assert len(policy_sets) == 4
+          assert len(policy_preflights) == 5
+          assert policy_preflights[0]["payload"]["result"][
+              "ready_for_publication"
+          ] is True
+          assert policy_preflights[1]["payload"]["error"]["code"] == (
+              "MERGE_POLICY_VIOLATION"
+          )
+          assert policy_preflights[2]["payload"]["result"][
+              "source_policy_ignored"
+          ] is True
+          assert policy_preflights[3]["payload"]["error"]["code"] == (
+              "TOO_MANY_AFFECTED_TARGETS"
+          )
+          assert policy_preflights[4]["payload"]["result"][
+              "ready_for_publication"
+          ] is True
+          assert policy_merges[0]["payload"]["error"]["code"] == (
+              "MERGE_POLICY_PREFLIGHT_REQUIRED"
+          )
+          assert policy_merges[1]["payload"]["result"]["preflight_enforced"] is True
+          assert policy_merges[2]["payload"]["result"][
+              "source_policy_ignored"
+          ] is True
+          assert policy_merges[3]["payload"]["result"]["preflight_enforced"] is True
 
           output = Path("qualification/program-matrix-summary.json")
           output.write_text(
