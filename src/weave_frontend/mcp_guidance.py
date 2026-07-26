@@ -87,9 +87,15 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "node_inspect": "Return an ID-bearing local subtree and grammar hint.",
             "node_find": "Find stable IDs by form head, atom kind, or value.",
             "program_render": "Render canonical source or an annotated agent view.",
-            "program_source_list": "List compiler source documents at a branch head or revision.",
-            "branch_history_page": "Read bounded first-parent pages with an explicit continuation.",
-            "branch_activity_summary": "Measure revisions, operations, merges, authors, and grouping.",
+            "program_source_list": (
+                "List compiler source documents at a branch head or revision."
+            ),
+            "branch_history_page": (
+                "Read bounded first-parent pages with an explicit continuation."
+            ),
+            "branch_activity_summary": (
+                "Measure revisions, operations, merges, authors, and grouping."
+            ),
             "grammar_help": "Search the weavec surface corpus for exact examples.",
             "build_get": "Inspect one stored build and its immutable artifact paths.",
         }
@@ -99,7 +105,10 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "Call branch_history_page without start_revision_id for the first page. "
             "When has_more is true, pass next_revision_id as the next start."
         ),
-        "bounds": "Page limits are 1..200 and each continuation must be reachable from the selected branch head.",
+        "bounds": (
+            "Page limits are 1..200 and each continuation must be reachable from "
+            "the selected branch head."
+        ),
         "stability": (
             "Compare branch_head_revision_id across pages when a stable multi-page "
             "read is required; restart if the branch advanced."
