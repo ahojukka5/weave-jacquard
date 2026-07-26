@@ -19,8 +19,8 @@ Jacquard owns:
 
 - single-node and bounded transactional edits with stable node identities;
 - immutable revisions, parallel branches, previewed race-safe structural merge,
-  compiler-gated merge publication, measured branch activity, and bounded
-  stable-node revision diffs;
+  named-target impact analysis, compiler-gated merge publication, measured branch
+  activity, and bounded stable-node revision diffs;
 - project-, document-, and symbol-scoped context;
 - compiler-corpus-backed grammar help;
 - authoritative validation through `weavec --frontend`;
@@ -96,6 +96,7 @@ project_initialize
 → node_inspect
 → program_validate
 → branch_merge_preview
+→ branch_merge_impact
 → branch_merge_validate(build_target = application)
 → branch_merge(preview_id = reviewed preview,
                validation_target = application)
@@ -115,7 +116,8 @@ program_source_list
 → structural source edits
 → build_target_validate
 → branch_merge_preview
-→ branch_merge_validate(build_target = named target)
+→ branch_merge_impact
+→ branch_merge_validate(build_target = each affected target)
 → branch_merge(preview_id = reviewed preview,
                validation_target = named target)
 → build_target_build
@@ -139,7 +141,18 @@ a prospective merged root with compact per-document stable-node consequences.
 Its deterministic `preview_id` binds the project, merge direction, common
 ancestor, and both reviewed branch heads.
 
-`branch_merge_validate` then resolves a named target from that prospective state,
+`branch_merge_impact` maps only the changes introduced by merging the source into
+the current target. It reports named targets that are added, removed, modified,
+or affected through primary/additional source changes. It also lists changed
+program documents that no surviving candidate target covers. Target entries are
+sorted and paginated in pages of at most 200.
+
+Coverage is calculated from targets that exist after the prospective merge. A
+removed target therefore cannot hide a changed source from the uncovered set.
+Uncovered documents are explicit review signals: automatic target validation
+cannot prove them through a named target.
+
+`branch_merge_validate` resolves a named target from the prospective state,
 renders its ordered canonical sources, and invokes `weavec --frontend` without
 creating a revision or retaining a build artifact. The result includes source,
 compiler, WIR, and validation hashes plus bounded compiler output.
@@ -270,7 +283,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - **Projects and branches:** `project_initialize`, `branch_create`,
   `branch_list`, `branch_history`, `branch_history_page`,
   `revision_operations_page`, `branch_activity_summary`, `branch_merge_preview`,
-  `branch_merge_validate`, `branch_merge`
+  `branch_merge_impact`, `branch_merge_validate`, `branch_merge`
 - **Programs:** `program_create`, `program_import`, `program_list`,
   `program_source_list`, `program_render`, `program_validate`, `program_build`
 - **Named targets:** `build_target_set`, `build_target_list`,
@@ -290,6 +303,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - [Transactional structural edits](docs/edit-transactions.md)
 - [Branch activity observability](docs/branch-activity.md)
 - [Two-phase merge previews](docs/merge-preview.md)
+- [Merge target impact analysis](docs/merge-impact.md)
 - [Merge candidate validation](docs/merge-validation.md)
 - [Build diagnostic inspection](docs/build-diagnostics.md)
 - [Revision-pinned node inspection](docs/revision-node-inspection.md)
