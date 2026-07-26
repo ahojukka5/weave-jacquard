@@ -83,9 +83,11 @@ Every pull request should include:
 Read `AGENTS.md` and `docs/architecture.md` before changing the data model,
 revision semantics, grammar, validation rules, merge behavior, or public API.
 Read `docs/single-node-concurrency.md`,
-`docs/program-target-concurrency.md`, and
-`docs/context-policy-concurrency.md` before changing direct branch-state writes.
-Consult `docs/write-concurrency-audit.md` before adding a new mutating tool.
+`docs/program-target-concurrency.md`,
+`docs/context-policy-concurrency.md`, and
+`docs/reproducible-branch-creation.md` before changing branch-state writes or
+fork semantics. Consult `docs/write-concurrency-audit.md` before adding a new
+mutating tool.
 
 In particular:
 
@@ -94,7 +96,8 @@ In particular:
 - branch heads must advance only after successful validation;
 - every existing-branch mutation must publish from one captured base through a
   transactional compare-and-set branch update;
-- prepared direct writes must reject stale `expected_revision_id` state;
+- prepared direct writes and current-head forks must reject stale reviewed state;
+- historical forks must select one project-owned immutable revision explicitly;
 - auxiliary persistent rows, operation payloads, revision links, and the branch
   update must commit or roll back together;
 - merge must use a common base revision;
