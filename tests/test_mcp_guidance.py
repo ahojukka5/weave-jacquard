@@ -53,6 +53,7 @@ def test_workflow_covers_batch_validation_build_and_inspection() -> None:
     assert "program_build or build_target_build" in steps
     assert "build_get to inspect immutable provenance and artifact paths" in steps
     assert "build_diagnostics_page to read mapped errors after a failed build" in steps
+    assert "node_inspect with the failed revision_id" in steps[-1]
 
 
 def test_batch_help_preserves_transaction_contract() -> None:
@@ -85,6 +86,9 @@ def test_history_help_preserves_pagination_metric_and_audit_contract() -> None:
     assert "next_sequence_number" in help_value["audit"]
     assert "immutable" in help_value["audit"]
     assert "project-scoped" in help_value["audit"]
+    assert "node_inspect" in help_value["inspection"]
+    assert "revision_id" in help_value["inspection"]
+    assert "branch_head_revision_id" in help_value["inspection"]
     assert "branch_activity_summary" in help_value["summary"]
     assert "revisions avoided by grouping" in help_value["summary"]
     assert "Do not maximize batch size" in help_value["interpretation"]
@@ -119,6 +123,8 @@ def test_build_help_preserves_bounded_diagnostic_repair_contract() -> None:
     assert "build_diagnostics_page" in help_value["inspect"]
     assert "1..200" in help_value["inspect"]
     assert "stdout or stderr" in help_value["inspect"]
+    assert "revision_id" in help_value["repair"]
+    assert "node_inspect" in help_value["repair"]
     assert "stable node_id" in help_value["repair"]
     assert "structural tool" in help_value["repair"]
     assert "new revision" in help_value["repair"]
