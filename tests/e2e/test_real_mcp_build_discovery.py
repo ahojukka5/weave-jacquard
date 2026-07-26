@@ -235,6 +235,10 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             succeeded_41["build_id"],
             failed["build_id"],
         }
+        assert all(
+            build["revision_provenance_verified"] is True for build in discovered
+        )
+        assert all(build["build_key_verified"] is True for build in discovered)
         assert sum(page["filtered_count"] for page in pages) == 1
         assert rejected == [
             {"build_id": corrupt_id, "code": "INVALID_BUILD_MANIFEST"}
@@ -255,6 +259,8 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         )
         assert failed_page["returned_count"] == 1
         assert failed_page["builds"][0]["build_id"] == failed["build_id"]
+        assert failed_page["builds"][0]["revision_provenance_verified"] is True
+        assert failed_page["builds"][0]["build_key_verified"] is True
         assert failed_page["builds"][0]["executable_available"] is False
 
         recovered = await _call(
