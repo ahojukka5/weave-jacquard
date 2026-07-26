@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from typing import Any
 
+from .batch_edit import EditBatchExecutor
 from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
 from .mcp_guidance import install_runtime_guidance
@@ -12,6 +14,11 @@ from .mcp_server import _result, mcp, workspace
 from .target_validation import BuildTargetValidator
 
 install_runtime_guidance(mcp)
+
+
+@lru_cache(maxsize=1)
+def edit_batches() -> EditBatchExecutor:
+    return EditBatchExecutor(workspace())
 
 
 @lru_cache(maxsize=1)
@@ -30,6 +37,33 @@ def build_targets() -> BuildTargetRegistry:
 @lru_cache(maxsize=1)
 def build_target_validator() -> BuildTargetValidator:
     return BuildTargetValidator(build_targets())
+
+
+@mcp.tool()
+def node_apply_batch(
+    project: str,
+    document: str,
+    operations: list[dict[str, Any]],
+    branch: str = "main",
+    expected_revision_id: str | None = None,
+    message: str | None = None,
+    author: str = "agent",
+    include_operation_results: bool = False,
+) -> dict[str, object]:
+    """Apply up to 256 flat structural edits as one immutable revision."""
+
+    return _result(
+        lambda: edit_batches().apply(
+            project,
+            branch,
+            document,
+            operations,
+            expected_revision_id=expected_revision_id,
+            message=message,
+            author=author,
+            include_operation_results=include_operation_results,
+        )
+    )
 
 
 @mcp.tool()

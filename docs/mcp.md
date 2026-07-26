@@ -2,9 +2,9 @@
 
 ## Purpose
 
-`weave-mcp` is the primary agent interface to `weave_frontend`. It lets coding
-agents construct, inspect, validate, merge, and build Weave programs without
-replacing complete source files or balancing large S-expressions in one call.
+`weave-mcp` is Jacquard's primary agent interface. It lets coding agents
+construct, inspect, validate, merge, and build Weave programs without replacing
+complete source files or balancing large S-expressions in one call.
 
 The database owns node identity, immutable revisions, branches, context, and
 build provenance. `weavec` remains the authoritative language frontend and
@@ -29,8 +29,8 @@ canonical ordered source set
 → weavec build source0.weave source1.weave ... -o program
 ```
 
-`weave_frontend` does not invoke LLVM tools, choose runtime archives, or link
-programs itself.
+Jacquard does not invoke LLVM tools, choose runtime archives, or link programs
+itself.
 
 ## Stable node identities
 
@@ -65,7 +65,7 @@ Create a `(program ...)` document with name and version forms.
 ### `program_import`
 
 Import a complete source document. This is intended for migration and tests;
-agents should prefer atomic writes for normal work.
+agents should prefer structural writes for normal work.
 
 ### `program_list`
 
@@ -119,7 +119,7 @@ Recommended flow:
 ```text
 program_source_list
 → build_target_set
-→ atomic source edits
+→ structural source edits
 → build_target_validate
 → branch_merge
 → build_target_build
@@ -151,7 +151,9 @@ ordered materialized sources, requested output, and compiler status. Invalid or
 missing compiler provenance produces `bridge.invalid-compiler-manifest` and
 withholds the executable.
 
-## Atomic writes
+## Structural writes
+
+### Single-node tools
 
 - `node_create_form(parent_id, head, position)`
 - `node_add_atom(parent_id, kind, value, position)`
@@ -160,11 +162,38 @@ withholds the executable.
 - `node_wrap(node_id, head)`
 - `node_delete(node_id)`
 
+Use these while exploring unfamiliar code, repairing one uncertain location, or
+when an inspection is useful after every decision. Each successful single-node
+write creates one immutable revision.
+
+### `node_apply_batch`
+
+Use a batch after one coherent local structure is known. It accepts 1–256 flat,
+ordered operations using the same six operation kinds listed above. It never
+accepts a nested replacement tree.
+
+A created form, atom, or wrapper may set `as="alias"`; later operations in the
+same batch refer to it as `@alias`. The response maps surviving aliases to stable
+node IDs for use in later calls.
+
+`expected_revision_id` provides optimistic concurrency. A stale branch head is
+rejected before publication. All operations are applied in memory, the complete
+tree is validated once, and one SQLite transaction writes:
+
+- one immutable revision and snapshot;
+- one ordered audit row per sub-operation;
+- one compare-and-set branch-head update.
+
+Any invalid operation, alias, reference, position, final tree, or stale-head
+check rejects the complete batch. No partial revision or audit rows remain.
+
+The default response reports aggregate counts and aliases. Set
+`include_operation_results=true` only when the caller needs compact results for
+every sub-operation. See [`edit-transactions.md`](edit-transactions.md) for the
+full request and operation contract.
+
 Atom kinds are `symbol`, `string`, `integer`, `float`, and `boolean`. Positions
 are zero-based and default to append.
-
-Each successful write creates one immutable revision. A rejected write does not
-advance the branch.
 
 ## Inspection and shared context
 
@@ -173,10 +202,13 @@ advance the branch.
 - `context_add`: store project-, document-, or symbol-scoped design material.
 - `context_get`: retrieve context visible at the current branch revision.
 
-Reading may return a useful local subtree. Writing remains atomic.
+Reading may return a useful local subtree. Writing remains transactional: one
+single edit or one bounded coherent batch either publishes completely or not at
+all.
 
 ## Failure and publication semantics
 
+- Rejected single edits and batches do not advance branches.
 - Validation and build failures do not mutate program revisions.
 - Builds never advance branches.
 - Missing or duplicate sources fail before compilation.
