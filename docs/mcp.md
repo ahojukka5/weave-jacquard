@@ -148,6 +148,7 @@ program_source_list
 → branch_merge
 → build_target_build
 → build_get
+→ build_diagnostics_page when the build failed
 ```
 
 ## Build inspection
@@ -174,6 +175,33 @@ The raw `weavec-build-manifest-v1` is validated against the requested target,
 ordered materialized sources, requested output, and compiler status. Invalid or
 missing compiler provenance produces `bridge.invalid-compiler-manifest` and
 withholds the executable.
+
+### `build_diagnostics_page`
+
+Read mapped retained diagnostic entries by build ID without opening files on the
+server machine.
+
+```text
+build_id
+start_index = 0
+limit = 50
+```
+
+`start_index` must be a non-negative integer and `limit` must be between 1 and
+200. The build first passes the same manifest, path-containment, regular-file,
+and SHA-256 verification used by `build_get`. The retained
+`weave-build-diagnostics-v1` document is then validated before entries are
+returned.
+
+The response includes compact build and compiler summaries, the total diagnostic
+count, page fields, and exact mapped entries. When `has_more` is true, pass
+`next_index` as the next `start_index`. Builds are immutable, so no branch-head
+stability check is needed while paging.
+
+Raw compiler stdout, stderr, malformed protocol documents, and protocol-error
+details remain in the verified build artifacts and are not copied into the
+bounded MCP response. See [`build-diagnostics.md`](build-diagnostics.md) for the
+complete contract and repair workflow.
 
 ## Structural writes
 
@@ -223,6 +251,8 @@ are zero-based and default to append.
 
 - `node_inspect`: return a bounded annotated subtree and grammar hint.
 - `node_find`: find stable IDs by form head, atom kind, or exact value.
+- `build_diagnostics_page`: return bounded mapped diagnostics for a verified
+  immutable build.
 - `context_add`: store project-, document-, or symbol-scoped design material.
 - `context_get`: retrieve context visible at the current branch revision.
 
