@@ -6,13 +6,33 @@ Python client. They do not import and call MCP tool functions directly.
 ## Protocol qualification
 
 ```bash
+python -m pytest -m real_mcp tests/e2e
+```
+
+The always-runnable qualification suite verifies:
+
+- MCP session initialization and production tool discovery;
+- construction of a complete constant-returning program through atomic tools;
+- canonical source rendering and immutable branch history;
+- rejected cyclic mutations without branch advancement, followed by valid repair;
+- independent agent branches merged with stable node identities preserved;
+- revision-pinned multi-document targets and exact additional-source order;
+- historical target and source reads after later branch revisions.
+
+Each qualification module writes a complete JSON tool-call trace to the pytest
+temporary directory.
+
+Run only the minimal construction flow:
+
+```bash
 python -m pytest -m real_mcp tests/e2e/test_real_mcp.py
 ```
 
-The always-runnable test initializes a real MCP session, lists the registered
-tools, constructs a complete constant-returning program through atomic tool
-calls, renders canonical source, reads branch history, and writes the complete
-tool trace to the pytest temporary directory.
+Run only branch, repair, merge, and target workflows:
+
+```bash
+python -m pytest -m real_mcp tests/e2e/test_real_mcp_workflows.py
+```
 
 ## Compiler-backed native qualification
 
