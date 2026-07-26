@@ -167,9 +167,19 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             "node_set_atom",
             project=PROJECT,
             branch="target",
+            document="spare.weave",
+            node_id=documents["spare.weave"]["atom_id"],
+            value="target-spare",
+        )
+        await _call(
+            session,
+            trace,
+            "node_set_atom",
+            project=PROJECT,
+            branch="source",
             document="main.weave",
             node_id=documents["main.weave"]["atom_id"],
-            value="target-main",
+            value="source-main",
         )
         await _call(
             session,
@@ -228,6 +238,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             "main.weave",
             "orphan.weave",
         ]
+        assert "spare.weave" not in first["changed_program_documents"]
         assert first["candidate_covered_changed_documents"] == [
             "lib.weave",
             "main.weave",
