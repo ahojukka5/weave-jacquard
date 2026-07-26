@@ -137,10 +137,11 @@ def test_checkpoint_timeline_pages_first_parent_history_deterministically(
         assert first_page["start_revision_id"] == state["third"]["revision_id"]
         assert first_page["start_is_branch_head"] is True
         assert first_page["returned_checkpoint_count"] == 2
+        assert first_page["scanned_revision_count"] == 3
         assert first_page["checkpoint_limit_reached"] is True
         assert first_page["scan_limit_reached"] is False
         assert first_page["has_more"] is True
-        assert first_page["next_revision_id"] == state["edit_one"]["revision_id"]
+        assert first_page["next_revision_id"] == state["edit_two"]["revision_id"]
         assert [item["checkpoint_revision_id"] for item in first_page["checkpoints"]] == [
             state["third"]["revision_id"],
             state["second"]["revision_id"],
