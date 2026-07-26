@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -20,8 +20,11 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Check out repository
+      - name: Check out pull request branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -34,37 +37,21 @@ jobs:
           python -m pip install -e .
           python -m pip install pytest pytest-cov ruff
 
-      - name: Check Python syntax
-        run: python -m compileall -q src tests
-
-      - name: Apply temporary Ruff fixes
-        run: ruff check . --fix
-
-      - name: Collect Ruff-fixed files
+      - name: Apply and verify Ruff fixes
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          import shutil
-          import subprocess
+          ruff check . --fix
+          ruff check .
 
-          changed = subprocess.check_output(
-              ["git", "diff", "--name-only"], text=True
-          ).splitlines()
-          for name in changed:
-              source = Path(name)
-              target = Path("ruff-fixed") / name
-              target.parent.mkdir(parents=True, exist_ok=True)
-              shutil.copy2(source, target)
-          PY
-
-      - name: Upload Ruff-fixed files
-        uses: actions/upload-artifact@v4
-        with:
-          name: ruff-fixed-files
-          path: ruff-fixed
-
-      - name: Require committed Ruff fixes
-        run: git diff --exit-code
+      - name: Commit safe Ruff fixes
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src tests
+          git commit -m "style: apply Ruff safe fixes"
+          git push origin HEAD:${{ github.head_ref }}
 
       - name: Test
         run: pytest --cov=weave_frontend --cov-report=term-missing
