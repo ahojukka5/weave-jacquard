@@ -51,13 +51,14 @@ def test_resume_guidance_replaces_help_without_mutating_base_topics() -> None:
     assert server.removed == ["weave_help"]
     assert server.tools["weave_help"] is weave_help
     assert "checkpoint" in server.descriptions["weave_help"]
+    assert "supervision" in server.descriptions["weave_help"]
     assert "resume" in server.descriptions["weave_help"]
     assert mcp_guidance.weave_help("workflow") == base_workflow
     assert mcp_guidance.weave_help("read") == base_read
     assert mcp_guidance.weave_help("write") == base_write
 
 
-def test_resume_instructions_explain_exact_revision_orientation_and_handoff() -> None:
+def test_resume_instructions_explain_orientation_handoff_and_supervision() -> None:
     normalized = " ".join(INSTRUCTIONS.split())
 
     assert "branch_resume_snapshot" in normalized
@@ -71,6 +72,12 @@ def test_resume_instructions_explain_exact_revision_orientation_and_handoff() ->
     assert "Before transferring work" in normalized
     assert "expected_revision_id" in normalized
     assert "branch_checkpoint_get" in normalized
+    assert "branch_checkpoint_history_page" in normalized
+    assert "revision_scan_limit" in normalized
+    assert "next_revision_id" in normalized
+    assert "branch_checkpoint_compare" in normalized
+    assert "does not itself prove completion" in normalized
+    assert "does not imply first-parent ancestry" in normalized
 
 
 def test_resume_help_exposes_restart_consistency_and_checkpoint_contract() -> None:
@@ -90,7 +97,7 @@ def test_resume_help_exposes_restart_consistency_and_checkpoint_contract() -> No
     assert "not chronology" in help_value["continue"]
 
 
-def test_checkpoint_help_exposes_atomic_handoff_protocol() -> None:
+def test_checkpoint_help_exposes_atomic_handoff_and_supervision() -> None:
     help_value = weave_help("checkpoint")["help"]
 
     assert "branch_checkpoint_create" in help_value["publish"]
@@ -107,9 +114,30 @@ def test_checkpoint_help_exposes_atomic_handoff_protocol() -> None:
     assert "root hash are unchanged" in help_value["atomicity"]
     assert "branch_checkpoint_get" in help_value["read"]
     assert "Historical reads never borrow" in help_value["read"]
+    assert "branch_checkpoint_history_page" in help_value["history"]
+    assert "revision_scan_limit" not in help_value["history"]
+    assert "next_revision_id" in help_value["history"]
+    assert "branch_checkpoint_compare" in help_value["compare"]
+    assert "without semantic inference" in help_value["compare"]
     assert "branch_resume_snapshot" in help_value["resume"]
     assert "STALE_BRANCH_HEAD" in help_value["errors"]
     assert "INVALID_AGENT_CHECKPOINT" in help_value["errors"]
+    assert "CHECKPOINT_REVISION_REQUIRED" in help_value["errors"]
+
+
+def test_checkpoint_timeline_help_exposes_bounds_continuation_and_deltas() -> None:
+    help_value = weave_help("checkpoint_timeline")["help"]
+
+    assert "branch_checkpoint_history_page" in help_value["page"]
+    assert "revision_scan_limit" in help_value["page"]
+    assert "next_revision_id" in help_value["continuation"]
+    assert "first unscanned revision" in help_value["continuation"]
+    assert "branch_resume_snapshot" in help_value["entries"]
+    assert "branch_checkpoint_compare" in help_value["compare"]
+    assert "next_steps" in help_value["compare"]
+    assert "does not prove completion" in help_value["interpretation"]
+    assert "page_id" in help_value["identity"]
+    assert "comparison_id" in help_value["identity"]
 
 
 def test_workflow_read_and_write_help_add_handoff_without_changing_other_topics() -> None:
@@ -128,6 +156,10 @@ def test_workflow_read_and_write_help_add_handoff_without_changing_other_topics(
     assert "one immutable revision" in read_tools["branch_resume_snapshot"]
     assert "branch_checkpoint_get" in read_tools
     assert "first-parent" in read_tools["branch_checkpoint_get"]
+    assert "branch_checkpoint_history_page" in read_tools
+    assert "revision-scan" in read_tools["branch_checkpoint_history_page"]
+    assert "branch_checkpoint_compare" in read_tools
+    assert "without inferring" in read_tools["branch_checkpoint_compare"]
     assert "branch_checkpoint_create" in write_tools
     assert "structured objective" in write_tools["branch_checkpoint_create"]
     assert merge == mcp_guidance.weave_help("merge")
