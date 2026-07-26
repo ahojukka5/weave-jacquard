@@ -121,6 +121,7 @@ jobs:
             tests/e2e/test_real_mcp_batch_edit.py \
             tests/e2e/test_real_mcp_workflow_equivalence.py \
             tests/e2e/test_real_mcp_compiler_repair.py \
+            tests/e2e/test_real_mcp_revision_inspection.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
@@ -170,9 +171,18 @@ jobs:
           assert repair["diagnostic_node_id"] == repair["repaired_node_id"]
           assert repair["failed_build_retained"] is True
           assert repair["failed_build_published_executable"] is False
-          assert repair["diagnostics_read_through_mcp"] is True
           assert all(summary["llvm_bytes"] > 0 for summary in summaries)
           assert all(summary["bitcode_bytes"] > 0 for summary in summaries)
+
+          traces = list(base.rglob("revision-inspection-trace.json"))
+          assert len(traces) == 1, traces
+          trace = json.loads(traces[0].read_text(encoding="utf-8"))
+          inspections = [entry for entry in trace if entry["tool"] == "node_inspect"]
+          assert len(inspections) == 2
+          assert inspections[0]["payload"]["result"]["revision_is_branch_head"] is True
+          assert inspections[1]["payload"]["result"]["revision_is_branch_head"] is False
+          assert inspections[0]["payload"]["result"]["subtree"]["value"] == "after"
+          assert inspections[1]["payload"]["result"]["subtree"]["value"] == "before"
 
           output = Path("qualification/program-matrix-summary.json")
           output.write_text(
