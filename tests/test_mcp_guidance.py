@@ -49,6 +49,7 @@ def test_workflow_covers_batch_validation_build_and_inspection() -> None:
     assert "node_apply_batch for one coherent known structure" in steps
     assert "program_validate for a coherent single document" in steps
     assert "build_target_validate before a named-target build" in steps
+    assert "branch_activity_summary when measuring the workflow" in steps
     assert "program_build or build_target_build" in steps
     assert "build_get to inspect immutable artifacts and diagnostics" in steps
 
@@ -70,6 +71,18 @@ def test_batch_help_preserves_transaction_contract() -> None:
     assert "expected_revision_id" in help_value["safety"][2]
     assert "one immutable revision" in help_value["safety"][4]
     assert "rolls back" in help_value["safety"][5]
+
+
+def test_history_help_preserves_pagination_and_metric_contract() -> None:
+    help_value = weave_help("history")["help"]
+
+    assert "next_revision_id" in help_value["page"]
+    assert "1..200" in help_value["bounds"]
+    assert "reachable" in help_value["bounds"]
+    assert "branch_head_revision_id" in help_value["stability"]
+    assert "branch_activity_summary" in help_value["summary"]
+    assert "revisions avoided by grouping" in help_value["summary"]
+    assert "Do not maximize batch size" in help_value["interpretation"]
 
 
 def test_validation_distinguishes_single_and_multi_document_paths() -> None:
