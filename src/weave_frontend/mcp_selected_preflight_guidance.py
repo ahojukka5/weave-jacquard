@@ -17,14 +17,14 @@ Use selected_merge_preflight_batch only after explicitly choosing source branche
 from an exact project merge catalog. Pass 1–5 unique source names in the desired
 caller order and the unchanged catalog_id; the tool does not select, rank, or
 expand the set. Use allow_uncovered_sources only as an explicit subset and only
-when the target policy permits it. Compiler-backed branch_merge_preflight runs
-independently for every selected source, so ready, failed-validation, conflict,
-and policy-error entries may coexist. The complete project catalog is checked
-before and after compiler work; any selected or unselected branch-head change
-invalidates the entire batch. The tool never publishes a merge. A
-ready_for_publication result is exact guarded preflight evidence only: invoke
-branch_merge with the returned publication_arguments, which rechecks preview,
-preflight, policy, validation, and branch heads.
+when the exact target merge policy permits it. Compiler-backed
+branch_merge_preflight runs independently for every selected source, so ready,
+failed-validation, conflict, and policy-error entries may coexist. The complete
+project catalog is checked before and after compiler work; any selected or
+unselected branch-head change invalidates the entire batch. The tool never
+publishes a merge. A ready_for_publication result is exact guarded preflight
+evidence only: invoke branch_merge with the returned publication_arguments,
+which rechecks preview, preflight, policy, validation, and branch heads.
 """.strip()
 
 INSTRUCTIONS = f"{_base.INSTRUCTIONS}\n{_SELECTED_PREFLIGHT_INSTRUCTION}"
