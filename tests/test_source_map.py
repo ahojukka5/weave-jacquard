@@ -51,7 +51,7 @@ def test_smallest_node_is_selected_for_compiler_span() -> None:
       (entry main
         (@n_params (params))
         (@n_returns (returns i32))
-        (@n_body (do (@n_return (return (const_i32 42))))))))
+        (@n_body (do (@n_return (return (const_i32 42)))))))))
 """
     )
     _, node_map = render_with_node_map(

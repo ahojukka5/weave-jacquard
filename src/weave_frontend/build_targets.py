@@ -376,7 +376,7 @@ class BuildTargetRegistry:
 
     @staticmethod
     def _stable_node_id(seed: str, role: str) -> str:
-        digest = hashlib.sha256(f"{seed}\0{role}".encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(f"{seed}\0{role}".encode()).hexdigest()
         return f"n_{digest[:16]}"
 
     @staticmethod

@@ -7,7 +7,6 @@ from weave_frontend.build_targets import BuildTargetRegistry
 from weave_frontend.target_validation import BuildTargetValidator
 from weave_frontend.weavec import WeavecValidator
 
-
 MAIN_SOURCE = """(program
   (name "main")
   (version "0.1")

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from weave_frontend.database import Database, SCHEMA_VERSION
+from weave_frontend.database import SCHEMA_VERSION, Database
 
 
 def test_future_schema_is_rejected_without_downgrading(tmp_path: Path) -> None:

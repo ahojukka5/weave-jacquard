@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 COMPILER_MANIFEST_FORMAT = "weavec-build-manifest-v1"
 
 

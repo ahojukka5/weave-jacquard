@@ -10,7 +10,6 @@ from weave_frontend.compiler_bridge import CompilerBridge
 from weave_frontend.errors import NotFoundError, ValidationError
 from weave_frontend.sexpr_service import SExpressionWorkspace
 
-
 MAIN = """(program
   (name "main")
   (version "0.1")

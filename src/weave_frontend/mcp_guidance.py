@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-
 INSTRUCTIONS = """
 Build Weave programs atomically. Read larger annotated subtrees when useful, but
 write one form, atom, edge, or move at a time. Call grammar_help before using an
