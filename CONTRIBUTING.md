@@ -89,11 +89,13 @@ Read `docs/single-node-concurrency.md`,
 `docs/agent-resume-snapshot.md`,
 `docs/agent-checkpoints.md`,
 `docs/agent-checkpoint-timeline.md`,
-`docs/project-agent-status.md`, and
-`docs/project-merge-queue.md` before changing branch writes, fork semantics,
-one-call orientation reads, handoff protocols, checkpoint supervision,
-project-wide agent status, or project merge-queue reads. Consult
-`docs/write-concurrency-audit.md` before adding a new mutating tool.
+`docs/project-agent-status.md`,
+`docs/project-merge-queue.md`, and
+`docs/project-merge-impact-queue.md` before changing branch writes, fork
+semantics, one-call orientation reads, handoff protocols, checkpoint
+supervision, project-wide agent status, project merge queues, or non-compiling
+merge-impact review. Consult `docs/write-concurrency-audit.md` before adding a
+new mutating tool.
 
 In particular:
 
@@ -140,6 +142,18 @@ In particular:
 - merge-queue lexical ordering must remain deterministic pagination and must not
   be interpreted as priority, urgency, age, quality, checkpoint freshness, or
   readiness;
+- merge-impact queues must resolve target and source policy at their exact
+  catalog revisions; target policy is authoritative and source policy cannot
+  weaken it;
+- structurally conflicted sources must stop before target-impact analysis;
+- merge-impact pages must independently bound affected targets and every returned
+  coverage-document collection while preserving totals and continuation;
+- named-target coverage classes and uncovered-document override evidence must
+  remain structural policy inputs and must not imply compiler correctness,
+  preflight identity, publication-head stability, human approval, or readiness;
+- non-compiling merge-impact review must never silently run builds or affected-
+  target validation; compiler-backed admission remains an explicit preflight
+  stage;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
