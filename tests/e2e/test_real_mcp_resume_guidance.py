@@ -81,6 +81,13 @@ async def _run(tmp_path: Path) -> None:
         assert "checkpoint_scan_limit" in normalized
         assert "do not prove inactivity" in normalized
         assert "review readiness" in normalized
+        assert "project_merge_queue_page" in normalized
+        assert "next_after_source" in normalized
+        assert "conflict_limit" in normalized
+        assert "changed_document_limit" in normalized
+        assert "structural preview success only" in normalized
+        assert "branch_merge_preflight" in normalized
+        assert "does not represent priority" in normalized
 
         tools = await session.list_tools()
         names = {tool.name for tool in tools.tools}
@@ -91,6 +98,7 @@ async def _run(tmp_path: Path) -> None:
             "branch_checkpoint_history_page",
             "branch_checkpoint_compare",
             "project_agent_status_page",
+            "project_merge_queue_page",
             "weave_help",
         } <= names
 
@@ -147,11 +155,31 @@ async def _run(tmp_path: Path) -> None:
         ]
         assert "do not prove inactivity" in status["help"]["interpretation"]
 
+        queue = _payload(
+            await session.call_tool(
+                "weave_help",
+                arguments={"topic": "merge_queue"},
+            )
+        )
+        assert queue["ok"] is True
+        assert "project_merge_queue_page" in queue["help"]["page"]
+        assert "next_after_source" in queue["help"]["catalog"]
+        assert "checkpoint_scan_limit" in queue["help"]["bounds"]
+        assert queue["help"]["classifications"] == [
+            "clean_changes",
+            "clean_no_changes",
+            "conflicted",
+        ]
+        assert "structural preview succeeded only" in queue["help"]["readiness"]
+        assert "preflight" in queue["help"]["follow_up"]
+        assert "does not express priority" in queue["help"]["ordering"]
+
         read = _payload(
             await session.call_tool("weave_help", arguments={"topic": "read"})
         )
         assert read["ok"] is True
         assert "project_agent_status_page" in read["help"]["tools"]
+        assert "project_merge_queue_page" in read["help"]["tools"]
 
         workflow = _payload(
             await session.call_tool("weave_help", arguments={"topic": "workflow"})
