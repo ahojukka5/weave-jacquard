@@ -126,6 +126,7 @@ jobs:
             tests/e2e/test_real_mcp_merge_preview.py \
             tests/e2e/test_real_mcp_merge_validation.py \
             tests/e2e/test_real_mcp_merge_impact.py \
+            tests/e2e/test_real_mcp_validate_affected.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
@@ -273,6 +274,51 @@ jobs:
           assert impact_pages[1]["payload"]["result"]["affected_targets"][0][
               "name"
           ] == "main-only"
+
+          affected_traces = list(base.rglob("validate-affected-trace.json"))
+          assert len(affected_traces) == 1, affected_traces
+          affected_trace = json.loads(
+              affected_traces[0].read_text(encoding="utf-8")
+          )
+          validation_sets = [
+              entry
+              for entry in affected_trace
+              if entry["tool"] == "branch_merge_validate_affected"
+          ]
+          affected_merges = [
+              entry for entry in affected_trace if entry["tool"] == "branch_merge"
+          ]
+          assert len(validation_sets) == 4
+          assert validation_sets[0]["payload"]["result"]["passed_targets"] == [
+              "application",
+              "mirror",
+          ]
+          assert validation_sets[0]["payload"]["result"][
+              "ready_for_publication"
+          ] is True
+          assert validation_sets[1]["payload"]["result"]["failed_targets"] == [
+              "application",
+              "mirror",
+          ]
+          assert validation_sets[2]["payload"]["result"]["coverage_passed"] is False
+          assert validation_sets[2]["payload"]["result"][
+              "validated_target_count"
+          ] == 0
+          assert validation_sets[3]["payload"]["result"][
+              "allow_uncovered_documents"
+          ] is True
+          assert affected_merges[0]["payload"]["result"][
+              "affected_validation_enforced"
+          ] is True
+          assert affected_merges[1]["payload"]["error"]["code"] == (
+              "MERGE_VALIDATION_FAILED"
+          )
+          assert affected_merges[2]["payload"]["error"]["code"] == (
+              "MERGE_UNCOVERED_DOCUMENTS"
+          )
+          assert affected_merges[3]["payload"]["result"][
+              "allow_uncovered_documents"
+          ] is True
 
           output = Path("qualification/program-matrix-summary.json")
           output.write_text(
