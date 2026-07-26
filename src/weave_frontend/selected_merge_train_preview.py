@@ -8,7 +8,6 @@ from .errors import ConflictError, ValidationError
 from .project_merge_queue import (
     MAX_PROJECT_MERGE_QUEUE_CONFLICTS,
     MAX_PROJECT_MERGE_QUEUE_DOCUMENTS,
-    PROJECT_MERGE_QUEUE_CATALOG_FORMAT,
     ProjectMergeQueueService,
 )
 
@@ -21,6 +20,7 @@ class SelectedMergeTrainPreviewService:
 
     def __init__(self, queues: ProjectMergeQueueService) -> None:
         self.queues = queues
+        self.catalogs = queues.catalogs
         self.previews = queues.previews
         self.workspace = queues.workspace
 
@@ -262,27 +262,12 @@ class SelectedMergeTrainPreviewService:
         project: str,
         target_branch: str,
     ) -> tuple[dict[str, str], list[dict[str, str]], str]:
-        project_id = self.workspace.project_id(project)
-        members = self.queues._catalog_members(project_id)
-        target = next(
-            (member for member in members if member["branch"] == target_branch),
-            None,
+        catalog = self.catalogs.capture(
+            project,
+            target_branch,
+            invalid_target_code="INVALID_SELECTED_MERGE_TRAIN_TARGET",
         )
-        if target is None:
-            raise ValidationError(
-                "INVALID_SELECTED_MERGE_TRAIN_TARGET",
-                f"target branch {target_branch!r} is not in the project catalog",
-            )
-        sources = [member for member in members if member["branch"] != target_branch]
-        catalog_id = self.workspace.db.hash_value(
-            {
-                "format": PROJECT_MERGE_QUEUE_CATALOG_FORMAT,
-                "project": project,
-                "target": target,
-                "sources": sources,
-            }
-        )
-        return target, sources, catalog_id
+        return catalog["target"], catalog["sources"], catalog["catalog_id"]
 
     @staticmethod
     def _validate_sources(value: Any) -> list[str]:
