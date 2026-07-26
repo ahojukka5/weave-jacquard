@@ -197,8 +197,37 @@ class RevisionWorkspace:
                 f"branch {branch!r} advanced from {expected!r} to {actual!r}",
             )
 
+    @staticmethod
+    def _validate_expected_revision_id(expected_revision_id: str | None) -> None:
+        if expected_revision_id is not None and (
+            not isinstance(expected_revision_id, str) or not expected_revision_id
+        ):
+            raise ValidationError(
+                "INVALID_EXPECTED_REVISION_ID",
+                "expected_revision_id must be a non-empty string or null",
+            )
+
     def _state(self, project: str, branch: str) -> dict[str, JsonObject]:
         return self._state_at_revision(self.branch_head(project, branch))
+
+    def _state_for_write(
+        self,
+        project: str,
+        branch: str,
+        *,
+        expected_revision_id: str | None = None,
+    ) -> tuple[str, dict[str, JsonObject]]:
+        """Capture one branch head for a compare-and-set publication attempt."""
+
+        self._validate_expected_revision_id(expected_revision_id)
+        base_revision_id = self.branch_head(project, branch)
+        self._require_expected_head(
+            branch,
+            base_revision_id,
+            expected_revision_id,
+            code="STALE_BRANCH_HEAD",
+        )
+        return base_revision_id, self._state_at_revision(base_revision_id)
 
     def _state_at_revision(self, revision_id: str) -> dict[str, JsonObject]:
         rows = self.db.connection.execute(
