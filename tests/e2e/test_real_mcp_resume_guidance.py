@@ -71,6 +71,10 @@ async def _run(tmp_path: Path) -> None:
         assert "branch_checkpoint_create" in normalized
         assert "Before transferring work" in normalized
         assert "branch_checkpoint_get" in normalized
+        assert "branch_checkpoint_history_page" in normalized
+        assert "revision_scan_limit" in normalized
+        assert "branch_checkpoint_compare" in normalized
+        assert "does not itself prove completion" in normalized
 
         tools = await session.list_tools()
         names = {tool.name for tool in tools.tools}
@@ -78,6 +82,8 @@ async def _run(tmp_path: Path) -> None:
             "branch_resume_snapshot",
             "branch_checkpoint_create",
             "branch_checkpoint_get",
+            "branch_checkpoint_history_page",
+            "branch_checkpoint_compare",
             "weave_help",
         } <= names
 
@@ -100,7 +106,21 @@ async def _run(tmp_path: Path) -> None:
             "ready_for_review",
             "complete",
         ]
+        assert "branch_checkpoint_history_page" in checkpoint["help"]["history"]
+        assert "branch_checkpoint_compare" in checkpoint["help"]["compare"]
         assert "branch_resume_snapshot" in checkpoint["help"]["resume"]
+
+        timeline = _payload(
+            await session.call_tool(
+                "weave_help",
+                arguments={"topic": "checkpoint_timeline"},
+            )
+        )
+        assert timeline["ok"] is True
+        assert "revision_scan_limit" in timeline["help"]["page"]
+        assert "next_revision_id" in timeline["help"]["continuation"]
+        assert "branch_checkpoint_compare" in timeline["help"]["compare"]
+        assert "does not prove completion" in timeline["help"]["interpretation"]
 
         workflow = _payload(
             await session.call_tool("weave_help", arguments={"topic": "workflow"})
