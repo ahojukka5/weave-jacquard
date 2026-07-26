@@ -25,6 +25,10 @@ _CHECKPOINT_COMPARE_DESCRIPTION = (
     "Compare two exact checkpoint revisions as structural progress deltas without "
     "inferring completion, resolution, or ancestry."
 )
+_PROJECT_AGENT_STATUS_DESCRIPTION = (
+    "Page one exact catalog of project branch heads with bounded verified checkpoint lag, "
+    "program-root drift, and revision-pinned resume calls."
+)
 _CHECKPOINT_WRITE_DESCRIPTION = (
     "Publish a bounded structured objective, progress, next-step, question, and "
     "validation handoff as one immutable revision."
@@ -58,6 +62,13 @@ branch_checkpoint_compare only with exact revisions that published checkpoints.
 Treat added and removed items as structural differences: a removed next step or
 question does not itself prove completion or resolution, and the comparison does
 not imply first-parent ancestry.
+
+For a project-wide view, use project_agent_status_page. Carry catalog_id and
+next_after_branch across pages so branch additions, removals, or head advances
+cannot be mixed silently. Choose checkpoint_scan_limit deliberately for bounded
+per-branch first-parent work. Treat checkpoint lag, timestamps, statuses, and
+root-hash drift as structural evidence only: they do not prove inactivity,
+correctness, completion, blockage, or review readiness.
 """.strip()
 
 INSTRUCTIONS = f"{_base.INSTRUCTIONS}\n{_RESUME_INSTRUCTION}"
@@ -164,6 +175,41 @@ _CHECKPOINT_TIMELINE_TOPIC: dict[str, Any] = {
     ),
 }
 
+_AGENT_STATUS_TOPIC: dict[str, Any] = {
+    "page": (
+        "Use project_agent_status_page for one bounded project-wide view of exact branch "
+        "heads and their latest verified checkpoint evidence."
+    ),
+    "catalog": (
+        "Carry catalog_id and next_after_branch across pages. Any branch addition, removal, "
+        "or head advance rejects the old catalog with STALE_AGENT_STATUS_CATALOG."
+    ),
+    "bounds": (
+        "limit bounds returned branches and checkpoint_scan_limit independently bounds the "
+        "first-parent checkpoint search performed for each returned branch."
+    ),
+    "states": [
+        "head",
+        "behind_head",
+        "not_found_within_scan",
+        "none_in_first_parent_history",
+    ],
+    "evidence": (
+        "Entries report exact branch-head metadata, checkpoint identity/status/objective, "
+        "revisions since a found checkpoint, scan-limit evidence, root-hash drift, and "
+        "complete head/checkpoint resume calls."
+    ),
+    "interpretation": (
+        "Checkpoint lag, timestamps, statuses, and root-hash drift are structural evidence "
+        "only. They do not prove inactivity, correctness, completion, blockage, or review "
+        "readiness."
+    ),
+    "follow_up": (
+        "Open resume_head or checkpoint.resume for exact state. Use checkpoint history, "
+        "comparison, validation, builds, and merge preflight for deeper review."
+    ),
+}
+
 
 def weave_help(topic: str = "workflow") -> dict[str, Any]:
     """Extend the base structural help with resume and checkpoint guidance."""
@@ -178,6 +224,8 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
             "topic": topic,
             "help": deepcopy(_CHECKPOINT_TIMELINE_TOPIC),
         }
+    if topic == "agent_status":
+        return {"ok": True, "topic": topic, "help": deepcopy(_AGENT_STATUS_TOPIC)}
 
     response = _base.weave_help(topic)
     help_value = deepcopy(response["help"])
@@ -194,6 +242,7 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
             "branch_checkpoint_history_page"
         ] = _CHECKPOINT_HISTORY_DESCRIPTION
         help_value["tools"]["branch_checkpoint_compare"] = _CHECKPOINT_COMPARE_DESCRIPTION
+        help_value["tools"]["project_agent_status_page"] = _PROJECT_AGENT_STATUS_DESCRIPTION
     elif topic == "write":
         help_value["tools"]["branch_checkpoint_create"] = _CHECKPOINT_WRITE_DESCRIPTION
     return {**response, "help": help_value}
@@ -221,7 +270,7 @@ def install_resume_guidance(server: _FastMCPServer) -> None:
         weave_help,
         name="weave_help",
         description=(
-            "Explain structural, revision, checkpoint, supervision, resume, validation, "
-            "and build workflows."
+            "Explain structural, revision, checkpoint, project supervision, resume, "
+            "validation, and build workflows."
         ),
     )
