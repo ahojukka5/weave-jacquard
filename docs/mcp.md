@@ -149,6 +149,7 @@ program_source_list
 → build_target_build
 → build_get
 → build_diagnostics_page when the build failed
+→ node_inspect(revision_id = failed revision) before repair
 ```
 
 ## Build inspection
@@ -249,7 +250,36 @@ are zero-based and default to append.
 
 ## Inspection and shared context
 
-- `node_inspect`: return a bounded annotated subtree and grammar hint.
+### `node_inspect`
+
+Read a bounded annotated subtree and grammar hint by stable node ID.
+
+```text
+project
+branch
+document
+node_id
+depth = 3
+revision_id = optional exact immutable revision
+```
+
+When `revision_id` is omitted, the tool reads the current branch head, preserving
+its original behavior. When supplied, the revision must belong to `project`, but
+it does not need to remain the selected branch head or be first-parent reachable
+from it.
+
+The response reports both `revision_id`, which identifies the state actually
+inspected, and `branch_head_revision_id`, which identifies the current selected
+branch head. `revision_is_branch_head` states whether they are equal. The node,
+parent, position, subtree, rendering, and grammar hint all come from the exact
+inspected revision.
+
+This is the preferred way to inspect a mapped diagnostic after a branch has
+advanced: pass the failed build's `revision_id` and the diagnostic `node_id`.
+See [`revision-node-inspection.md`](revision-node-inspection.md).
+
+Other inspection and context tools:
+
 - `node_find`: find stable IDs by form head, atom kind, or exact value.
 - `build_diagnostics_page`: return bounded mapped diagnostics for a verified
   immutable build.
@@ -265,6 +295,7 @@ all.
 - Rejected single edits and batches do not advance branches.
 - Validation and build failures do not mutate program revisions.
 - Builds never advance branches.
+- Historical inspection never checks out or rewrites a revision.
 - Missing or duplicate sources fail before compilation.
 - A final executable exists only after compiler process, compiler manifest, and
   compiler diagnostics success.
