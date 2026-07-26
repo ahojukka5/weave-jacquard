@@ -125,6 +125,7 @@ jobs:
             tests/e2e/test_real_mcp_revision_diff.py \
             tests/e2e/test_real_mcp_merge_preview.py \
             tests/e2e/test_real_mcp_merge_validation.py \
+            tests/e2e/test_real_mcp_merge_impact.py \
             --basetemp "$base" \
             --junitxml qualification-pytest.xml
 
@@ -248,6 +249,30 @@ jobs:
           assert validated_merges[1]["payload"]["error"]["code"] == (
               "MERGE_VALIDATION_FAILED"
           )
+
+          impact_traces = list(base.rglob("merge-impact-trace.json"))
+          assert len(impact_traces) == 1, impact_traces
+          impact_trace = json.loads(impact_traces[0].read_text(encoding="utf-8"))
+          impact_pages = [
+              entry for entry in impact_trace if entry["tool"] == "branch_merge_impact"
+          ]
+          assert len(impact_pages) == 2
+          assert [
+              entry["payload"]["result"]["returned_count"] for entry in impact_pages
+          ] == [1, 1]
+          assert impact_pages[0]["payload"]["result"][
+              "total_affected_target_count"
+          ] == 2
+          assert impact_pages[0]["payload"]["result"]["unaffected_target_count"] == 1
+          assert impact_pages[0]["payload"]["result"][
+              "uncovered_changed_documents"
+          ] == ["orphan.weave"]
+          assert impact_pages[0]["payload"]["result"]["affected_targets"][0][
+              "name"
+          ] == "application"
+          assert impact_pages[1]["payload"]["result"]["affected_targets"][0][
+              "name"
+          ] == "main-only"
 
           output = Path("qualification/program-matrix-summary.json")
           output.write_text(
