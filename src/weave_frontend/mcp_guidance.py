@@ -14,7 +14,8 @@ optimistic concurrency. Use program_validate for a coherent single document. For
 a multi-document program, define a named target and use build_target_validate so
 the target metadata and ordered sources are validated from one pinned revision.
 Build through program_build or build_target_build and inspect the immutable result
-with build_get. Use branch_history_page for complete bounded history reads and
+with build_get. Use branch_history_page for complete bounded history reads,
+revision_operations_page for exact grouped-edit audit rows, and
 branch_activity_summary to measure revision and operation grouping.
 """.strip()
 
@@ -93,6 +94,9 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "branch_history_page": (
                 "Read bounded first-parent pages with an explicit continuation."
             ),
+            "revision_operations_page": (
+                "Read immutable operation targets and payloads in sequence order."
+            ),
             "branch_activity_summary": (
                 "Measure revisions, operations, merges, authors, and grouping."
             ),
@@ -112,6 +116,11 @@ _TOPICS: dict[str, dict[str, Any]] = {
         "stability": (
             "Compare branch_head_revision_id across pages when a stable multi-page "
             "read is required; restart if the branch advanced."
+        ),
+        "audit": (
+            "Call revision_operations_page with a revision ID. When has_more is true, "
+            "pass next_sequence_number as the next start_sequence_number. Revision "
+            "operations are immutable and project-scoped."
         ),
         "summary": (
             "branch_activity_summary traverses complete first-parent history and "
