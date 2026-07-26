@@ -133,6 +133,10 @@ node_count
 aliases
 ```
 
+`created_node_count` counts explicit operation targets. `node_count` counts the
+complete stored tree, including the stable head-symbol atom automatically owned
+by every form.
+
 Set `include_operation_results=true` when the caller needs the position and node
 result for every sub-operation. Avoid enabling it for large generated batches
 unless that detail is useful.
@@ -141,8 +145,8 @@ unless that detail is useful.
 
 The real-MCP qualification constructs a balanced sum of 80 constants:
 
-- 246 structural operations;
-- 251 final nodes;
+- 246 explicit structural operations and edit targets;
+- 418 stored nodes after including each form's stable head-symbol atom;
 - one `node_apply_batch` write call instead of 246 atomic write calls;
 - three reachable revisions in total instead of the 248-revision atomic
   equivalent;
