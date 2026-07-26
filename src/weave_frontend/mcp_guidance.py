@@ -13,14 +13,17 @@ grammar_help before using an unfamiliar Weave form. Use expected_revision_id for
 optimistic concurrency. Use program_validate for a coherent single document. For
 a multi-document program, define a named target and use build_target_validate so
 the target metadata and ordered sources are validated from one pinned revision.
-Build through program_build or build_target_build and inspect the immutable result
-with build_get. When a build fails, read mapped errors through
-build_diagnostics_page instead of assuming access to server-local artifact paths.
-Pass the failed build revision_id to node_inspect when the branch may have advanced,
-then use revision_diff_page to compare that failing state with the current branch
-head before repairing. Use branch_history_page for complete bounded history reads,
-revision_operations_page for exact grouped-edit audit rows, and
-branch_activity_summary to measure revision and operation grouping.
+Before combining independent branches, call branch_merge_preview, review its
+conflicts and document consequences, then pass preview_id to branch_merge so both
+reviewed heads are rechecked atomically. Build through program_build or
+build_target_build and inspect the immutable result with build_get. When a build
+fails, read mapped errors through build_diagnostics_page instead of assuming
+access to server-local artifact paths. Pass the failed build revision_id to
+node_inspect when the branch may have advanced, then use revision_diff_page to
+compare that failing state with the current branch head before repairing. Use
+branch_history_page for complete bounded history reads, revision_operations_page
+for exact grouped-edit audit rows, and branch_activity_summary to measure revision
+and operation grouping.
 """.strip()
 
 
@@ -36,7 +39,8 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "program_validate for a coherent single document",
             "build_target_set for a reusable multi-document program",
             "build_target_validate before a named-target build",
-            "branch_merge after independent agent work",
+            "branch_merge_preview after independent agent work",
+            "branch_merge with the reviewed preview_id",
             "branch_activity_summary when measuring the workflow",
             "program_build or build_target_build",
             "build_get to inspect immutable provenance and artifact paths",
@@ -60,6 +64,10 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "node_apply_batch": (
                 "Apply up to 256 flat ordinary node operations as one revision. "
                 "Use @aliases for nodes created earlier in the same batch."
+            ),
+            "branch_merge": (
+                "Publish a stable-ID three-way merge. Pass a reviewed preview_id to "
+                "reject if either branch advanced."
             ),
         },
         "positions": "Child positions are zero-based; omit position to append.",
@@ -98,6 +106,10 @@ _TOPICS: dict[str, dict[str, Any]] = {
             ),
             "revision_diff_page": (
                 "Compare stable nodes between two immutable revisions in bounded pages."
+            ),
+            "branch_merge_preview": (
+                "Preview conflicts and compact document consequences for two current "
+                "branch heads without mutating either branch."
             ),
             "node_find": "Find stable IDs by form head, atom kind, or value.",
             "program_render": "Render canonical source or an annotated agent view.",
@@ -157,6 +169,26 @@ _TOPICS: dict[str, dict[str, Any]] = {
         "interpretation": (
             "Metrics are descriptive. Do not maximize batch size merely to reduce "
             "revision count."
+        ),
+    },
+    "merge": {
+        "preview": (
+            "branch_merge_preview binds project, branch direction, common ancestor, and "
+            "both current heads into a deterministic preview_id. It never advances a branch."
+        ),
+        "consequences": (
+            "A clean preview reports the merged root hash, changed documents, and compact "
+            "stable-node change counts. A conflicting preview returns mergeable=false and "
+            "the exact conflict paths."
+        ),
+        "publish": (
+            "Pass preview_id to branch_merge. The target and source heads are rechecked in "
+            "the same SQLite write transaction; either change returns STALE_MERGE_PREVIEW "
+            "and publishes no revision."
+        ),
+        "compatibility": (
+            "branch_merge still accepts calls without preview_id, but reviewed parallel work "
+            "should use the two-phase flow. All merge publication is branch-head race-safe."
         ),
     },
     "ids": {
