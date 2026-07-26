@@ -6,7 +6,7 @@ A coding agent should not have to emit and maintain a complete source file.
 Instead, it operates on a versioned program tree through a compact tool surface:
 
 ```text
-DISCOVER → INSPECT → MUTATE → VALIDATE → PREVIEW → MERGE → BUILD → TEST
+DISCOVER → INSPECT → MUTATE → PREVIEW → VALIDATE CANDIDATE → MERGE → BUILD → TEST
 ```
 
 Jacquard owns syntax-tree identity, immutable revisions, transactional safety,
@@ -32,7 +32,8 @@ workspace
 ```
 
 Surface Weave, WIR, LLVM IR, bitcode, objects, and native executables are
-derivatives of a pinned program revision.
+derivatives of a pinned program revision. A prospective merge candidate is a
+validated in-memory state, not a temporary revision or persisted artifact.
 
 ## 3. Agent API
 
@@ -47,6 +48,7 @@ derivatives of a pinned program revision.
 - `node_inspect`
 - `revision_diff_page`
 - `branch_merge_preview`
+- `branch_merge_validate`
 - `context_get`
 - `build_get`
 - `build_diagnostics_page`
@@ -82,8 +84,9 @@ derivatives of a pinned program revision.
 - `branch_activity_summary`
 - `branch_merge`
 
-The MCP server is a transport layer over the same workspace, merge-preview, and
-compiler-bridge services used by the Python implementation.
+The MCP server is a transport layer over the same workspace, merge-preview,
+merge-validation, and compiler-bridge services used by the Python
+implementation.
 
 ## 4. Structural write modes
 
@@ -117,8 +120,9 @@ The batch interface must never become an unbounded nested AST replacement. See
 
 ## 5. Validation and incomplete programs
 
-Every persisted write must preserve structural validity. A failed operation or
-batch returns a structured error and does not advance the branch head.
+Every persisted write must preserve structural validity. A failed operation,
+batch, or compiler-gated merge returns a structured error and does not advance
+the branch head.
 
 The generic S-expression layer guarantees:
 
@@ -135,6 +139,10 @@ normative completed-program check through:
 ```text
 weavec --frontend output.wir input.weave
 ```
+
+`build_target_validate` applies the same authority to one ordered source set
+from an immutable revision. `branch_merge_validate` applies it to a named target
+resolved from an exact clean in-memory merge candidate before publication.
 
 Jacquard does not maintain a handwritten copy of the full surface grammar.
 Until `weavec` exposes a machine-readable registry, grammar guidance is inferred
@@ -164,10 +172,15 @@ produced.
 Single-node publication uses one transaction per edit. Batched publication uses
 one transaction for the complete operation list and a compare-and-set branch
 update. Merge publication uses one transaction that rechecks both captured
-branch heads, writes the validated merged snapshot, records both parents, and
-compare-and-set advances only the target branch.
+branch heads, writes the structurally and optionally compiler-validated merged
+snapshot, records both parents, and compare-and-set advances only the target
+branch.
 
-All three modes preserve the same revision DAG and audit model; no schema
+Candidate validation is deliberately outside persistence. It uses private
+temporary files owned by the compiler adapter and retains only bounded response
+evidence. No schema row is created for a preview or validation attempt.
+
+All publication modes preserve the same revision DAG and audit model; no schema
 migration is required.
 
 A production implementation may later deduplicate immutable nodes or modules by
@@ -185,6 +198,19 @@ SQLite revision
 → validated manifest and diagnostics
 → verified content-derived artifact store
 ```
+
+Prospective merge validation uses the narrower frontend boundary:
+
+```text
+in-memory clean merge candidate
+→ named target + ordered canonical sources
+→ weavec --frontend
+→ bounded source/compiler/WIR hash evidence
+```
+
+The second path creates no revision, executable, build manifest, diagnostics
+artifact, or retained WIR. It proves that the exact combined candidate is
+accepted by the authoritative frontend before branch publication.
 
 `weavec` owns surface lowering, WIR, LLVM generation, runtime selection, object
 generation, linking, and native output. Jacquard owns revision pinning, source
@@ -211,7 +237,7 @@ Internal history is not a physical backup. Production operation also requires
 consistent database backups, integrity checks, artifact retention, and orphan
 cleanup.
 
-## 9. Parallel agents, preview, and merge
+## 9. Parallel agents, preview, validation, and merge
 
 Every agent receives:
 
@@ -229,9 +255,9 @@ Three-way merge compares a common base revision with both branch heads.
 - independent node changes: merge automatically.
 
 `branch_merge_preview` performs that stable-ID merge without publishing. It
-returns either exact conflict paths or a validated prospective merged root with
-compact per-document node consequences. Complete merged trees are not sent over
-MCP.
+returns either exact conflict paths or a structurally validated prospective
+merged root with compact per-document node consequences. Complete merged trees
+are not sent over MCP.
 
 The deterministic `weave-merge-preview-v1` identity binds:
 
@@ -243,23 +269,35 @@ project
 + source head revision
 ```
 
-Passing the preview ID to `branch_merge` forms a two-phase publication protocol.
-The service recomputes the preview, rejects a different token, and checks both
-reviewed heads again inside the same `BEGIN IMMEDIATE` transaction that writes
-the merge revision. A changed target or source head returns
-`STALE_MERGE_PREVIEW` and publishes nothing.
+`branch_merge_validate` reuses the exact clean candidate internally, resolves a
+named build target and its ordered sources from that state, and invokes
+`weavec --frontend`. Its `weave-merge-validation-v1` identity additionally binds
+the merged root, target configuration, ordered source hashes, and compiler
+binary hash. It stores no preview, revision, or build artifact.
 
-Calls without a preview token remain compatible. The core merge path still
+Passing `preview_id` and `validation_target` to `branch_merge` forms a reviewed,
+compiler-gated publication protocol:
+
+1. recompute the current candidate;
+2. reject a stale supplied preview;
+3. repeat authoritative target validation;
+4. reject unavailable or failed compiler validation;
+5. use the validated candidate's preview ID;
+6. check both heads inside the `BEGIN IMMEDIATE` publication transaction;
+7. write the immutable two-parent merge revision.
+
+A branch change before validation changes the preview ID. A change during or
+after validation fails the transactional head check. A changed target or source
+head returns `STALE_MERGE_PREVIEW` and publishes nothing.
+
+Calls without preview or validation remain compatible. The core merge path still
 captures and atomically rechecks both current heads, so direct publication is
-race-safe. Preview-first merging remains the recommended agent workflow because
-it retains explicit evidence of what was reviewed.
+race-safe. The complete preview-validation-publication sequence remains the
+recommended agent workflow because it retains explicit evidence and rejects
+semantically invalid combined programs before the target moves.
 
-A structurally clean merge is not enough. The merged program must subsequently
-pass compiler validation and relevant tests. Future preview extensions may add
-validation and affected-test consequences, but they must not make preview mutate
-branches or publish build artifacts.
-
-See [`merge-preview.md`](merge-preview.md).
+See [`merge-preview.md`](merge-preview.md) and
+[`merge-validation.md`](merge-validation.md).
 
 ## 10. Versioned design context
 
@@ -286,7 +324,9 @@ The same validated program, language version, compiler identity, target, and
 options must produce byte-identical canonical inputs and the same build key.
 
 The same project, merge direction, common ancestor, and two branch heads must
-produce the same merge preview ID and consequences.
+produce the same merge preview ID and consequences. The same preview, merged
+root, named target, ordered source hashes, and compiler binary must produce the
+same merge validation ID.
 
 Only final user-facing `weavec` is part of the public compiler contract. Bootstrap
 stages must not leak into Jacquard's API.
@@ -347,7 +387,7 @@ This should wait for real multi-module workloads and explicit interface objects.
 Current major omissions include:
 
 - a formal machine-readable grammar and capability registry from `weavec`;
-- merge-preview validation and affected-test consequences;
+- merge-preview affected-test consequences;
 - revisioned module-interface objects and dependency hashes;
 - affected-test selection;
 - sandboxed program execution tools;
@@ -372,10 +412,10 @@ Current major omissions include:
 
 ### M3 — robust parallel development
 
-- extend merge previews with validation and affected-test consequences;
+- retain compiler-gated exact-candidate publication as the merge boundary;
 - add explicit interface objects and versions;
 - add edit scopes and affected-test selection;
-- retain deterministic stale-preview protection as the publication boundary.
+- attach affected-test consequences to previews and validation evidence.
 
 ### M4 — execution and scale
 
