@@ -38,7 +38,9 @@ jobs:
         run: python -m compileall -q src tests
 
       - name: Lint
-        run: ruff check .
+        run: |
+          set -o pipefail
+          ruff check . 2>&1 | tee ruff.log
 
       - name: Test
         run: |
@@ -46,11 +48,13 @@ jobs:
           pytest -q --tb=short --cov=weave_frontend --cov-report=term-missing \
             2>&1 | tee pytest.log
 
-      - name: Upload unit failure evidence
+      - name: Upload CI failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: jacquard-unit-test-failure
-          path: pytest.log
-          if-no-files-found: error
+          name: jacquard-ci-failure
+          path: |
+            ruff.log
+            pytest.log
+          if-no-files-found: ignore
           retention-days: 7
