@@ -14,6 +14,7 @@ from .compiler_bridge import CompilerBridge
 from .mcp_guidance import install_runtime_guidance
 from .mcp_server import _result, mcp, workspace
 from .merge_preview import MergePreviewService
+from .merge_validation import MergeValidationService
 from .revision_diff import RevisionNodeDiffService
 from .revision_inspection import RevisionNodeInspectionService
 from .target_validation import BuildTargetValidator
@@ -67,6 +68,11 @@ def build_targets() -> BuildTargetRegistry:
 
 
 @lru_cache(maxsize=1)
+def merge_validations() -> MergeValidationService:
+    return MergeValidationService(workspace(), merge_previews(), build_targets())
+
+
+@lru_cache(maxsize=1)
 def build_target_validator() -> BuildTargetValidator:
     return BuildTargetValidator(build_targets())
 
@@ -85,21 +91,83 @@ def branch_merge_preview(
 
 
 @mcp.tool()
+def branch_merge_validate(
+    project: str,
+    target_branch: str,
+    source_branch: str,
+    build_target: str,
+    preview_id: str | None = None,
+) -> dict[str, object]:
+    """Validate one named target from the exact prospective merge candidate."""
+
+    return _result(
+        lambda: merge_validations().validate(
+            project,
+            target_branch,
+            source_branch,
+            build_target,
+            preview_id=preview_id,
+        )
+    )
+
+
+def _publish_merge(
+    project: str,
+    target_branch: str,
+    source_branch: str,
+    *,
+    preview_id: str | None,
+    validation_target: str | None,
+    author: str,
+) -> dict[str, Any]:
+    validation: dict[str, Any] | None = None
+    enforced_preview_id = preview_id
+    if validation_target is not None:
+        validation = merge_validations().validate(
+            project,
+            target_branch,
+            source_branch,
+            validation_target,
+            preview_id=preview_id,
+        )
+        merge_validations().require_valid(validation)
+        enforced_preview_id = str(validation["preview_id"])
+
+    result = merge_previews().merge(
+        project,
+        target_branch,
+        source_branch,
+        preview_id=enforced_preview_id,
+        author=author,
+    )
+    result.update(
+        {
+            "validation_target": validation_target,
+            "validation_enforced": validation is not None,
+            "merge_validation": validation,
+        }
+    )
+    return result
+
+
+@mcp.tool()
 def branch_merge(
     project: str,
     target_branch: str,
     source_branch: str,
     preview_id: str | None = None,
+    validation_target: str | None = None,
     author: str = "merge-agent",
 ) -> dict[str, object]:
-    """Merge branch heads, optionally enforcing an unchanged reviewed preview."""
+    """Publish a reviewed merge, optionally requiring compiler validation."""
 
     return _result(
-        lambda: merge_previews().merge(
+        lambda: _publish_merge(
             project,
             target_branch,
             source_branch,
             preview_id=preview_id,
+            validation_target=validation_target,
             author=author,
         )
     )
