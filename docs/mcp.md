@@ -54,6 +54,8 @@ sources never include annotations. Each materialized source receives a separate
 - `branch_history`: compact first-parent history read retained for compatibility.
 - `branch_history_page`: read bounded first-parent pages with an explicit
   continuation and ordered operation metadata.
+- `revision_operations_page`: inspect exact immutable operation targets and JSON
+  payloads for one revision in sequence-number pages.
 - `branch_activity_summary`: measure complete first-parent revision, operation,
   merge, author, and edit-grouping activity.
 - `branch_merge`: perform stable-ID three-way merge.
@@ -65,6 +67,12 @@ revision; when `has_more` is true, pass `next_revision_id` as the next
 `start_revision_id`. A continuation must be reachable from the selected branch
 head. Compare `branch_head_revision_id` between pages when a stable multi-page
 read is required.
+
+`revision_operations_page` is project-scoped and accepts sequence-number pages
+of 1 to 200 rows. When `has_more` is true, pass `next_sequence_number` as the
+next `start_sequence_number`. Revisions and operation rows are immutable, so no
+branch-head stability check is needed while paging one revision. Each row
+preserves its stored ID, kind, target, and parsed JSON payload.
 
 `branch_activity_summary` reports descriptive workflow metrics, including
 single- and multi-operation revisions and the number of revisions avoided by

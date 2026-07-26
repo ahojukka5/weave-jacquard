@@ -4,7 +4,7 @@ import pytest
 
 from weave_frontend.batch_edit import EditBatchExecutor
 from weave_frontend.branch_activity import BranchActivityService
-from weave_frontend.errors import ValidationError
+from weave_frontend.errors import NotFoundError, ValidationError
 
 
 def _constant_operations(root_id: str) -> list[dict[str, object]]:
@@ -102,6 +102,81 @@ def test_history_page_has_explicit_continuation_and_operation_metadata(
     assert second["revisions"][0]["operation_count"] == 0
 
 
+def test_revision_operations_page_preserves_sequence_targets_and_payloads(
+    sexpr_workspace,
+):
+    _, _, batched = _build_history(sexpr_workspace)
+    activity = BranchActivityService(sexpr_workspace)
+
+    first = activity.revision_operations_page(
+        "sexpr-demo",
+        batched["revision_id"],
+        limit=4,
+    )
+
+    assert first["revision"]["id"] == batched["revision_id"]
+    assert first["revision"]["message"] == "construct main"
+    assert first["total_operation_count"] == 9
+    assert first["returned_count"] == 4
+    assert first["has_more"] is True
+    assert first["next_sequence_number"] == 4
+    assert [operation["sequence_number"] for operation in first["operations"]] == [
+        0,
+        1,
+        2,
+        3,
+    ]
+    assert [operation["payload"]["batch_index"] for operation in first["operations"]] == [
+        0,
+        1,
+        2,
+        3,
+    ]
+    assert first["operations"][0]["operation_kind"] == "create_form"
+    assert first["operations"][0]["target"].startswith("n_")
+    assert first["operations"][0]["payload"]["head"] == "entry"
+
+    second = activity.revision_operations_page(
+        "sexpr-demo",
+        batched["revision_id"],
+        start_sequence_number=first["next_sequence_number"],
+        limit=4,
+    )
+    assert [operation["sequence_number"] for operation in second["operations"]] == [
+        4,
+        5,
+        6,
+        7,
+    ]
+    assert second["next_sequence_number"] == 8
+
+    third = activity.revision_operations_page(
+        "sexpr-demo",
+        batched["revision_id"],
+        start_sequence_number=second["next_sequence_number"],
+        limit=4,
+    )
+    assert third["returned_count"] == 1
+    assert third["has_more"] is False
+    assert third["next_sequence_number"] is None
+    assert third["operations"][0]["sequence_number"] == 8
+    assert third["operations"][0]["payload"]["batch_index"] == 8
+
+
+def test_revision_operations_page_returns_empty_initial_revision(sexpr_workspace):
+    initial = sexpr_workspace.branch_head("sexpr-demo", "main")
+
+    page = BranchActivityService(sexpr_workspace).revision_operations_page(
+        "sexpr-demo",
+        initial,
+    )
+
+    assert page["total_operation_count"] == 0
+    assert page["returned_count"] == 0
+    assert page["has_more"] is False
+    assert page["operations"] == []
+
+
 def test_activity_summary_measures_grouping_and_operation_kinds(sexpr_workspace):
     _, _, batched = _build_history(sexpr_workspace)
 
@@ -134,6 +209,40 @@ def test_history_page_rejects_invalid_limits(sexpr_workspace):
         with pytest.raises(ValidationError) as captured:
             activity.history_page("sexpr-demo", limit=limit)
         assert captured.value.code == "INVALID_HISTORY_LIMIT"
+
+
+def test_revision_operations_page_rejects_invalid_cursor_and_limit(sexpr_workspace):
+    revision_id = sexpr_workspace.branch_head("sexpr-demo", "main")
+    activity = BranchActivityService(sexpr_workspace)
+
+    for limit in (0, 201, True):
+        with pytest.raises(ValidationError) as captured:
+            activity.revision_operations_page(
+                "sexpr-demo",
+                revision_id,
+                limit=limit,
+            )
+        assert captured.value.code == "INVALID_OPERATION_LIMIT"
+
+    for sequence in (-1, True):
+        with pytest.raises(ValidationError) as captured:
+            activity.revision_operations_page(
+                "sexpr-demo",
+                revision_id,
+                start_sequence_number=sequence,
+            )
+        assert captured.value.code == "INVALID_OPERATION_SEQUENCE"
+
+
+def test_revision_operations_page_enforces_project_isolation(sexpr_workspace):
+    _, _, batched = _build_history(sexpr_workspace)
+    sexpr_workspace.initialize("other-project")
+
+    with pytest.raises(NotFoundError):
+        BranchActivityService(sexpr_workspace).revision_operations_page(
+            "other-project",
+            batched["revision_id"],
+        )
 
 
 def test_history_page_rejects_revision_from_another_branch(sexpr_workspace):

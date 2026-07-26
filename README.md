@@ -121,8 +121,10 @@ request. The complete batch publishes as one revision or rolls back; existing
 single-node tools remain available for uncertain edits and repairs.
 
 For long branches, `branch_history_page` returns bounded first-parent pages with
-an explicit continuation. `branch_activity_summary` reports complete revision,
-operation, merge, author, and edit-grouping metrics without changing history.
+an explicit continuation. `revision_operations_page` returns exact immutable
+operation targets and payloads for one revision in sequence-number pages.
+`branch_activity_summary` reports complete revision, operation, merge, author,
+and edit-grouping metrics without changing history.
 
 ## Compiler boundary
 
@@ -219,7 +221,7 @@ Failures are emitted as structured JSON on stderr with exit status 2.
 - **Help:** `weave_help`, `grammar_help`
 - **Projects and branches:** `project_initialize`, `branch_create`,
   `branch_list`, `branch_history`, `branch_history_page`,
-  `branch_activity_summary`, `branch_merge`
+  `revision_operations_page`, `branch_activity_summary`, `branch_merge`
 - **Programs:** `program_create`, `program_import`, `program_list`,
   `program_source_list`, `program_render`, `program_validate`, `program_build`
 - **Named targets:** `build_target_set`, `build_target_list`,

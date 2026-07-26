@@ -73,13 +73,17 @@ def test_batch_help_preserves_transaction_contract() -> None:
     assert "rolls back" in help_value["safety"][5]
 
 
-def test_history_help_preserves_pagination_and_metric_contract() -> None:
+def test_history_help_preserves_pagination_metric_and_audit_contract() -> None:
     help_value = weave_help("history")["help"]
 
     assert "next_revision_id" in help_value["page"]
     assert "1..200" in help_value["bounds"]
     assert "reachable" in help_value["bounds"]
     assert "branch_head_revision_id" in help_value["stability"]
+    assert "revision_operations_page" in help_value["audit"]
+    assert "next_sequence_number" in help_value["audit"]
+    assert "immutable" in help_value["audit"]
+    assert "project-scoped" in help_value["audit"]
     assert "branch_activity_summary" in help_value["summary"]
     assert "revisions avoided by grouping" in help_value["summary"]
     assert "Do not maximize batch size" in help_value["interpretation"]

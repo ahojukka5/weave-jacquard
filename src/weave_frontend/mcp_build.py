@@ -102,6 +102,25 @@ def branch_activity_summary(
 
 
 @mcp.tool()
+def revision_operations_page(
+    project: str,
+    revision_id: str,
+    start_sequence_number: int = 0,
+    limit: int = 50,
+) -> dict[str, object]:
+    """Read immutable operation audit rows in bounded sequence-number pages."""
+
+    return _result(
+        lambda: branch_activity().revision_operations_page(
+            project,
+            revision_id,
+            start_sequence_number=start_sequence_number,
+            limit=limit,
+        )
+    )
+
+
+@mcp.tool()
 def program_build(
     project: str,
     document: str,

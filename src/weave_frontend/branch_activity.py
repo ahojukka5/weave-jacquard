@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections import Counter, defaultdict
 from typing import Any
 
@@ -9,6 +10,7 @@ from .errors import NotFoundError, ValidationError
 from .service import RevisionWorkspace
 
 MAX_HISTORY_PAGE_SIZE = 200
+MAX_OPERATION_PAGE_SIZE = 200
 
 
 class BranchActivityService:
@@ -25,7 +27,7 @@ class BranchActivityService:
         start_revision_id: str | None = None,
         limit: int = 50,
     ) -> dict[str, Any]:
-        self._validate_limit(limit)
+        self._validate_history_limit(limit)
         project_id = self.workspace.project_id(project)
         branch_head = self.workspace.branch_head(project, branch)
         start = start_revision_id or branch_head
@@ -95,6 +97,88 @@ class BranchActivityService:
             "has_more": next_revision_id is not None,
             "next_revision_id": next_revision_id,
             "revisions": revisions,
+        }
+
+    def revision_operations_page(
+        self,
+        project: str,
+        revision_id: str,
+        *,
+        start_sequence_number: int = 0,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Read immutable operation audit rows in sequence-number order."""
+
+        self._validate_operation_limit(limit)
+        if (
+            isinstance(start_sequence_number, bool)
+            or not isinstance(start_sequence_number, int)
+            or start_sequence_number < 0
+        ):
+            raise ValidationError(
+                "INVALID_OPERATION_SEQUENCE",
+                "start_sequence_number must be a non-negative integer",
+            )
+
+        project_id = self.workspace.project_id(project)
+        revision = self.workspace.db.connection.execute(
+            """SELECT id, parent1_id, parent2_id, message, author, root_hash,
+                      created_at
+               FROM revisions
+               WHERE id = ? AND project_id = ?""",
+            (revision_id, project_id),
+        ).fetchone()
+        if revision is None:
+            raise NotFoundError(
+                f"revision {revision_id!r} not found in project {project!r}"
+            )
+
+        total_row = self.workspace.db.connection.execute(
+            "SELECT COUNT(*) AS count FROM operations WHERE revision_id = ?",
+            (revision_id,),
+        ).fetchone()
+        total_count = int(total_row["count"])
+        rows = self.workspace.db.connection.execute(
+            """SELECT id, sequence_number, operation_kind, target, payload_json
+               FROM operations
+               WHERE revision_id = ? AND sequence_number >= ?
+               ORDER BY sequence_number
+               LIMIT ?""",
+            (revision_id, start_sequence_number, limit + 1),
+        ).fetchall()
+
+        page_rows = rows[:limit]
+        operations = [
+            {
+                "id": str(row["id"]),
+                "sequence_number": int(row["sequence_number"]),
+                "operation_kind": str(row["operation_kind"]),
+                "target": row["target"],
+                "payload": json.loads(str(row["payload_json"])),
+            }
+            for row in page_rows
+        ]
+        next_sequence_number = (
+            int(rows[limit]["sequence_number"]) if len(rows) > limit else None
+        )
+        return {
+            "project": project,
+            "revision": {
+                "id": str(revision["id"]),
+                "parent1_id": revision["parent1_id"],
+                "parent2_id": revision["parent2_id"],
+                "message": revision["message"],
+                "author": revision["author"],
+                "root_hash": revision["root_hash"],
+                "created_at": revision["created_at"],
+            },
+            "start_sequence_number": start_sequence_number,
+            "limit": limit,
+            "total_operation_count": total_count,
+            "returned_count": len(operations),
+            "has_more": next_sequence_number is not None,
+            "next_sequence_number": next_sequence_number,
+            "operations": operations,
         }
 
     def summary(self, project: str, branch: str = "main") -> dict[str, Any]:
@@ -229,7 +313,7 @@ class BranchActivityService:
         return dict(result)
 
     @staticmethod
-    def _validate_limit(limit: int) -> None:
+    def _validate_history_limit(limit: int) -> None:
         if isinstance(limit, bool) or not isinstance(limit, int):
             raise ValidationError(
                 "INVALID_HISTORY_LIMIT",
@@ -239,4 +323,17 @@ class BranchActivityService:
             raise ValidationError(
                 "INVALID_HISTORY_LIMIT",
                 f"limit must be between 1 and {MAX_HISTORY_PAGE_SIZE}",
+            )
+
+    @staticmethod
+    def _validate_operation_limit(limit: int) -> None:
+        if isinstance(limit, bool) or not isinstance(limit, int):
+            raise ValidationError(
+                "INVALID_OPERATION_LIMIT",
+                "limit must be an integer",
+            )
+        if limit < 1 or limit > MAX_OPERATION_PAGE_SIZE:
+            raise ValidationError(
+                "INVALID_OPERATION_LIMIT",
+                f"limit must be between 1 and {MAX_OPERATION_PAGE_SIZE}",
             )

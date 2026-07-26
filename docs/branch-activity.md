@@ -1,15 +1,16 @@
 # Branch activity observability
 
 Long-lived agent branches can contain hundreds or thousands of immutable
-revisions. `branch_history` remains available for compact compatibility reads,
-but its `limit` parameter does not provide an explicit continuation contract.
-
-Jacquard therefore exposes two additional read-only tools:
+revisions, and one grouped revision may contain hundreds of ordered operation
+rows. Jacquard exposes three read-only tools for bounded review:
 
 - `branch_history_page`
+- `revision_operations_page`
 - `branch_activity_summary`
 
-Neither tool changes revisions, branches, or the database schema.
+The existing `branch_history` tool remains available for compact compatibility
+reads. None of the observability tools changes revisions, branches, operation
+rows, or the database schema.
 
 ## Paginated first-parent history
 
@@ -54,6 +55,59 @@ following first parents. A revision from another branch is rejected with
 The branch head is returned on every page. A caller that requires a stable
 multi-page snapshot can compare it with the first page and restart if the branch
 advanced between calls.
+
+## Paginated revision operation audit
+
+```text
+revision_operations_page(
+  project,
+  revision_id,
+  start_sequence_number = 0,
+  limit = 50
+)
+```
+
+Operation pages are project-scoped and immutable. The revision must belong to the
+named project. `start_sequence_number` must be a non-negative integer, and
+`limit` must be between 1 and 200.
+
+The response contains revision metadata, total operation count, page bounds,
+continuation fields, and ordered operation rows:
+
+```text
+revision
+start_sequence_number
+limit
+total_operation_count
+returned_count
+has_more
+next_sequence_number
+operations
+```
+
+Each operation contains:
+
+```text
+id
+sequence_number
+operation_kind
+target
+payload
+```
+
+`payload` is the exact stored JSON object. For a transactional edit it includes
+`batch_index`, so reviewers can compare the public audit page with the original
+ordered batch. Targets and payloads are returned without rewriting stable node
+IDs.
+
+When `has_more` is true, call the tool again with
+`start_sequence_number=next_sequence_number`. The next sequence is included as
+the first operation on the next page. Unlike branch history, no branch-head
+stability check is needed while paging one revision because revisions and their
+operation rows are immutable.
+
+A revision with no operation rows returns an empty page with
+`total_operation_count=0` and `has_more=false`.
 
 ## Activity summary
 
@@ -101,14 +155,17 @@ average_operations_per_mutation     5.0
 revision_count_avoided_by_grouping   8
 ```
 
-The same history pages as two revisions followed by one revision, using the
-returned continuation cursor.
+The branch history pages as two revisions followed by one revision. The grouped
+revision's nine audit rows page as four, four, and one operation using the
+returned sequence continuation.
 
 ## Operational intent
 
-Use the page tool when reviewing exact revision and operation order. Use the
-summary when comparing agent workflows, evaluating transaction grouping, or
-checking whether a branch is accumulating excessive revisions.
+Use `branch_history_page` when reviewing exact revision order. Use
+`revision_operations_page` when reviewing the target and payload of every edit
+inside one revision. Use `branch_activity_summary` when comparing agent
+workflows, evaluating transaction grouping, or checking whether a branch is
+accumulating excessive revisions.
 
 These metrics are descriptive. They should guide further ergonomics work, not
 automatically reward large batches. A low revision count is not useful if it
