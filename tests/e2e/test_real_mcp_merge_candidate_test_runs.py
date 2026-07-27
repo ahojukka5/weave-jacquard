@@ -21,6 +21,7 @@ PROGRAM_V2 = """(program
 REQUIRED_TOOLS = {
     "branch_create_at_revision",
     "branch_list",
+    "branch_merge",
     "branch_merge_preview",
     "branch_merge_test_impact",
     "branch_merge_test_batch_run",
@@ -34,6 +35,8 @@ REQUIRED_TOOLS = {
     "project_initialize",
     "sandbox_capabilities",
     "test_target_set",
+    "tested_merge_attest",
+    "tested_merge_attestation_get",
 }
 
 
@@ -175,6 +178,7 @@ def _environment(tmp_path: Path, compiler: Path) -> dict[str, str]:
             "WEAVE_TEST_RUN_ROOT": str(tmp_path / "runs"),
             "WEAVE_MERGE_BUILD_ROOT": str(tmp_path / "merge-builds"),
             "WEAVE_MERGE_TEST_RUN_ROOT": str(tmp_path / "merge-runs"),
+            "WEAVE_MERGE_ATTESTATION_ROOT": str(tmp_path / "attestations"),
             "WEAVEC_BIN": str(compiler),
         }
     )
@@ -202,11 +206,11 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             session,
             trace,
             "weave_help",
-            topic="merge_candidate_tests",
+            topic="tested_merge_attestations",
         )
         assert help_payload["ok"] is True
-        assert "one to 64" in help_payload["help"]["selection"]
-        assert "publishes no merge" in help_payload["help"]["publication"]
+        assert "branch_merge" in help_payload["help"]["workflow"]
+        assert "does not prove" in help_payload["help"]["boundary"]
 
         capabilities = await _call(session, trace, "sandbox_capabilities")
         assert capabilities["available"] is True
@@ -392,10 +396,58 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert diagnostics["total_diagnostic_count"] == 0
         assert diagnostics["returned_count"] == 0
 
-        heads_after = _branch_heads(
+        heads_after_tests = _branch_heads(
             await _call(session, trace, "branch_list", project=PROJECT)
         )
-        assert heads_after == heads_before
+        assert heads_after_tests == heads_before
+
+        merged = await _call(
+            session,
+            trace,
+            "branch_merge",
+            project=PROJECT,
+            target_branch="main",
+            source_branch="feature",
+            preview_id=preview["preview_id"],
+        )
+        heads_after_merge = _branch_heads(
+            await _call(session, trace, "branch_list", project=PROJECT)
+        )
+        assert heads_after_merge == {
+            "feature": feature["revision_id"],
+            "main": merged["revision_id"],
+        }
+
+        attestation = await _call(
+            session,
+            trace,
+            "tested_merge_attest",
+            qualification_id=qualification["qualification_id"],
+            merged_revision_id=merged["revision_id"],
+        )
+        assert attestation["state_identity_verified"] is True
+        assert attestation["qualification_status"] == "failed"
+        assert attestation["all_selected_tests_passed"] is False
+        assert attestation["subject"] == qualification["subject"]
+        assert attestation["merged_revision"] == {
+            "revision_id": merged["revision_id"],
+            "project": PROJECT,
+            "parent1_revision_id": base_revision,
+            "parent2_revision_id": feature["revision_id"],
+            "root_hash": preview["merged_root_hash"],
+        }
+        assert attestation["interpretation"]["qualified_state_was_committed_exactly"] is True
+        assert attestation["interpretation"]["all_selected_tests_passed"] is False
+        assert attestation["interpretation"]["claims_policy_admission"] is False
+
+        reread_attestation = await _call(
+            session,
+            trace,
+            "tested_merge_attestation_get",
+            attestation_id=attestation["attestation_id"],
+        )
+        assert reread_attestation["manifest_sha256"] == attestation["manifest_sha256"]
+        assert reread_attestation["merged_revision"] == attestation["merged_revision"]
 
     return trace
 
@@ -409,6 +461,24 @@ def test_real_mcp_executes_virtual_merge_candidate_tests(tmp_path: Path) -> None
         json.dumps(trace, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    attestation_trace = [
+        entry
+        for entry in trace
+        if entry["tool"]
+        in {
+            "branch_merge",
+            "tested_merge_attest",
+            "tested_merge_attestation_get",
+        }
+        or (
+            entry["tool"] == "weave_help"
+            and entry["arguments"].get("topic") == "tested_merge_attestations"
+        )
+    ]
+    (tmp_path / "tested-merge-attestation-trace.json").write_text(
+        json.dumps(attestation_trace, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     execution_calls = [
         entry for entry in trace if entry["tool"] == "branch_merge_test_batch_run"
     ]
@@ -416,3 +486,7 @@ def test_real_mcp_executes_virtual_merge_candidate_tests(tmp_path: Path) -> None
     result = execution_calls[0]["payload"]["result"]
     assert result["status"] == "failed"
     assert result["heads_unchanged_at_completion"] is True
+    attestations = [entry for entry in trace if entry["tool"] == "tested_merge_attest"]
+    assert len(attestations) == 1
+    assert attestations[0]["payload"]["result"]["state_identity_verified"] is True
+    assert attestations[0]["payload"]["result"]["all_selected_tests_passed"] is False
