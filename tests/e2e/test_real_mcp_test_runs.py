@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -19,7 +20,10 @@ RUN_TOOLS = {
     "test_run",
     "test_run_get",
     "test_run_output_page",
+    "test_batch_run",
+    "test_batch_get",
 }
+RUN_ID = re.compile(r"^[0-9a-f]{32}$")
 
 
 def _attribute(value: Any, snake: str, camel: str) -> Any:
@@ -191,6 +195,14 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         )
         assert help_payload["ok"] is True
         assert "never silently substitutes" in help_payload["help"]["probe"]
+        batch_help = await _call_payload(
+            session,
+            trace,
+            "weave_help",
+            topic="test_batches",
+        )
+        assert batch_help["ok"] is True
+        assert "never expands tags" in batch_help["help"]["selection"]
 
         capabilities = await _call(session, trace, "sandbox_capabilities")
         assert capabilities["available"] is True, capabilities
@@ -313,21 +325,77 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert failed["assertions"]["exit_code"] is True
         assert "artifact_paths" not in failed
 
+        head_before_batch = _main_head(
+            await _call(session, trace, "branch_list", project=PROJECT)
+        )
+        assert head_before_batch == failing_definition["revision_id"]
+        batch = await _call(
+            session,
+            trace,
+            "test_batch_run",
+            project=PROJECT,
+            test_targets=["failing", "passing"],
+            branch="main",
+            revision_id=failing_definition["revision_id"],
+        )
+        assert batch["status"] == "failed"
+        assert batch["all_passed"] is False
+        assert batch["revision_id"] == failing_definition["revision_id"]
+        assert batch["test_targets"] == ["failing", "passing"]
+        assert [item["outcome"] for item in batch["results"]] == [
+            "failed",
+            "passed",
+        ]
+        assert batch["passed_test_count"] == 1
+        assert batch["failed_test_count"] == 1
+        assert batch["error_test_count"] == 0
+        assert batch["sandbox"]["policy_hash"] == capabilities["policy_hash"]
+        assert _main_head(
+            await _call(session, trace, "branch_list", project=PROJECT)
+        ) == head_before_batch
+
+        resolved_batch = await _call(
+            session,
+            trace,
+            "test_batch_get",
+            batch_id=batch["batch_id"],
+        )
+        assert resolved_batch["manifest_sha256"] == batch["manifest_sha256"]
+        assert resolved_batch["results"] == batch["results"]
+
     return trace
 
 
-def _verify_retained_runs(tmp_path: Path) -> None:
-    run_directories = sorted(path for path in (tmp_path / "runs").iterdir() if path.is_dir())
-    assert len(run_directories) == 2
+def _verify_retained_evidence(tmp_path: Path) -> None:
+    run_root = tmp_path / "runs"
+    run_directories = sorted(
+        path
+        for path in run_root.iterdir()
+        if path.is_dir() and RUN_ID.fullmatch(path.name)
+    )
+    assert len(run_directories) == 4
     statuses: list[str] = []
+    run_ids: set[str] = set()
     for directory in run_directories:
-        manifest = json.loads((directory / "run-manifest.json").read_text(encoding="utf-8"))
+        manifest = json.loads(
+            (directory / "run-manifest.json").read_text(encoding="utf-8")
+        )
         assert manifest["run_id"] == directory.name
         assert manifest["format"] == "weave-test-run-manifest-v1"
         assert (directory / "stdout.bin").read_bytes() == b"done\n"
         assert (directory / "stderr.bin").read_bytes() == b"warning\n"
         statuses.append(manifest["status"])
-    assert sorted(statuses) == ["failed", "passed"]
+        run_ids.add(manifest["run_id"])
+    assert sorted(statuses) == ["failed", "failed", "passed", "passed"]
+
+    manifests = sorted((run_root / "batches").glob("*/batch-manifest.json"))
+    assert len(manifests) == 1
+    batch = json.loads(manifests[0].read_text(encoding="utf-8"))
+    assert batch["format"] == "weave-test-batch-manifest-v1"
+    assert batch["status"] == "failed"
+    assert batch["test_targets"] == ["failing", "passing"]
+    assert [item["run_id"] for item in batch["results"]] <= list(run_ids)
+    assert {item["run_id"] for item in batch["results"]}.issubset(run_ids)
 
 
 @pytest.mark.real_mcp
@@ -335,9 +403,22 @@ def _verify_retained_runs(tmp_path: Path) -> None:
 def test_real_mcp_runs_behavioral_tests_in_strict_sandbox(tmp_path: Path) -> None:
     compiler = _fake_compiler(tmp_path / "weavec")
     trace = asyncio.run(_run(tmp_path, compiler))
-    _verify_retained_runs(tmp_path)
+    _verify_retained_evidence(tmp_path)
     (tmp_path / "test-runs-trace.json").write_text(
         json.dumps(trace, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    batch_trace = [
+        entry
+        for entry in trace
+        if entry["tool"] in {"test_batch_run", "test_batch_get"}
+        or (
+            entry["tool"] == "weave_help"
+            and entry["arguments"].get("topic") == "test_batches"
+        )
+    ]
+    (tmp_path / "test-batches-trace.json").write_text(
+        json.dumps(batch_trace, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     run_calls = [entry for entry in trace if entry["tool"] == "test_run"]
@@ -345,3 +426,6 @@ def test_real_mcp_runs_behavioral_tests_in_strict_sandbox(tmp_path: Path) -> Non
         True,
         False,
     ]
+    batch_calls = [entry for entry in trace if entry["tool"] == "test_batch_run"]
+    assert len(batch_calls) == 1
+    assert batch_calls[0]["payload"]["result"]["status"] == "failed"
