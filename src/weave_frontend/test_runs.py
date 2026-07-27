@@ -12,8 +12,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from .compiler_artifacts import ArtifactIntegrityError, CompilerArtifactMixin
-from .errors import NotFoundError, ValidationError
+from .compiler_artifacts import CompilerArtifactMixin
+from .errors import ArtifactIntegrityError, NotFoundError, ValidationError
 from .sandbox import BubblewrapSandbox, SandboxBackend, SandboxLimits
 from .test_target_views import VerifiedTestTargetRegistry
 
@@ -43,7 +43,8 @@ class TestRunService(CompilerArtifactMixin):
         self.compiler = compiler
         self.sandbox = sandbox or BubblewrapSandbox()
         configured_root = run_root or os.environ.get("WEAVE_TEST_RUN_ROOT")
-        self.run_root = Path(configured_root or ".weave-test-runs").resolve()
+        default_root = workspace.db.path.parent / ".weave-test-runs"
+        self.run_root = Path(configured_root or default_root).resolve()
         self.run_root.mkdir(parents=True, exist_ok=True)
 
     def capabilities(self) -> dict[str, Any]:
@@ -93,7 +94,7 @@ class TestRunService(CompilerArtifactMixin):
             )
         executable = Path(executable_value).resolve()
         executable_hash = self._sha256_file(executable)
-        expected_executable_hash = build.get("artifact_sha256", {}).get("executable")
+        expected_executable_hash = self._expected_executable_hash(build)
         if executable_hash != expected_executable_hash:
             raise ArtifactIntegrityError(
                 "build executable hash does not match retained build evidence"
@@ -244,10 +245,11 @@ class TestRunService(CompilerArtifactMixin):
         run = self.get(run_id)
         path = Path(run["artifact_paths"][stream])
         total_bytes = path.stat().st_size
+        effective_start = min(start_byte, total_bytes)
         with path.open("rb") as handle:
-            handle.seek(min(start_byte, total_bytes))
+            handle.seek(effective_start)
             content = handle.read(max_bytes)
-        next_byte = start_byte + len(content)
+        next_byte = effective_start + len(content)
         try:
             utf8_text: str | None = content.decode("utf-8")
         except UnicodeDecodeError:
@@ -256,7 +258,7 @@ class TestRunService(CompilerArtifactMixin):
             "format": TEST_RUN_OUTPUT_PAGE_FORMAT,
             "run_id": run_id,
             "stream": stream,
-            "start_byte": start_byte,
+            "start_byte": effective_start,
             "max_bytes": max_bytes,
             "returned_bytes": len(content),
             "total_bytes": total_bytes,
@@ -276,17 +278,35 @@ class TestRunService(CompilerArtifactMixin):
         stderr: bytes,
     ) -> None:
         final_directory = self._run_directory(run_id, require_exists=False)
-        if final_directory.exists():
-            raise ArtifactIntegrityError(f"test run {run_id!r} already exists")
         with tempfile.TemporaryDirectory(
             prefix=f".{run_id}-",
             dir=self.run_root,
         ) as temporary:
             temporary_directory = Path(temporary)
-            self._atomic_write_bytes(temporary_directory / "stdout.bin", stdout)
-            self._atomic_write_bytes(temporary_directory / "stderr.bin", stderr)
-            self._atomic_write_json(temporary_directory / "run-manifest.json", manifest)
-            self._publish_directory(temporary_directory, final_directory)
+            (temporary_directory / "stdout.bin").write_bytes(stdout)
+            (temporary_directory / "stderr.bin").write_bytes(stderr)
+            self._write_json(temporary_directory / "run-manifest.json", manifest)
+            self._verify_staged_run(temporary_directory, run_id)
+            with self._publication_lock(final_directory):
+                if os.path.lexists(final_directory):
+                    raise ArtifactIntegrityError(f"test run {run_id!r} already exists")
+                os.replace(temporary_directory, final_directory)
+
+    def _verify_staged_run(self, directory: Path, run_id: str) -> None:
+        manifest = self._read_json(directory / "run-manifest.json")
+        if manifest.get("format") != TEST_RUN_MANIFEST_FORMAT:
+            raise ArtifactIntegrityError("staged test run manifest format is invalid")
+        if manifest.get("run_id") != run_id:
+            raise ArtifactIntegrityError("staged test run identity is invalid")
+        for name in ("stdout", "stderr"):
+            path = directory / f"{name}.bin"
+            if not path.is_file():
+                raise ArtifactIntegrityError(f"staged test run {name} artifact is missing")
+            expected = manifest.get("artifact_sha256", {}).get(name)
+            if self._sha256_file(path) != expected:
+                raise ArtifactIntegrityError(
+                    f"staged test run {name} artifact hash is invalid"
+                )
 
     def _run_directory(self, run_id: str, *, require_exists: bool = True) -> Path:
         if not isinstance(run_id, str) or not TEST_RUN_ID.fullmatch(run_id):
@@ -302,10 +322,28 @@ class TestRunService(CompilerArtifactMixin):
         return directory
 
     @staticmethod
+    def _expected_executable_hash(build: dict[str, Any]) -> Any:
+        artifact_hashes = build.get("artifact_sha256", {})
+        relative = build.get("artifacts", {}).get("executable")
+        if isinstance(relative, str):
+            return artifact_hashes.get(relative)
+        return artifact_hashes.get("executable")
+
+    @staticmethod
     def _hash_json(value: dict[str, Any]) -> str:
         return hashlib.sha256(
             json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
+
+    @staticmethod
+    def _read_json(path: Path) -> dict[str, Any]:
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise ArtifactIntegrityError(f"cannot read test run manifest: {exc}") from exc
+        if not isinstance(value, dict):
+            raise ArtifactIntegrityError("test run manifest root must be an object")
+        return value
 
     @staticmethod
     def _validate_page_number(
