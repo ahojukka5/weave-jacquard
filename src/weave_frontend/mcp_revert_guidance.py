@@ -12,7 +12,8 @@ Use branch_revert_preview before branch_revert. A revert applies the inverse of 
 selected first-parent revision onto the current branch through the stable-ID
 three-way merge engine. Independent later edits survive; overlapping later edits
 become conflicts. Publication always requires the exact preview_id and creates a
-new revision. It never resets a branch or rewrites history. Revert preview does not
+new revision. It never resets a branch or rewrites history. Revert preview validates
+structural, build-target, test-target, and task-contract integrity, but it does not
 run compiler validation, behavioral tests, merge policy admission, or human review.
 """.strip()
 
@@ -30,7 +31,12 @@ _TOPIC: dict[str, Any] = {
     ),
     "history": (
         "A successful revert creates one new single-parent revision whose parent is the "
-        "current branch head. Existing revisions and branch history remain immutable."
+        "current branch head. It never resets a branch, deletes revisions, or rewrites "
+        "existing history."
+    ),
+    "integrity": (
+        "Preview rejects prospective states with dangling build-target source documents, "
+        "test-target bindings, task document scopes, task dependencies, or required tests."
     ),
     "boundary": (
         "Revert preview verifies structural and project-metadata integrity only. It does not "
