@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from .concurrent_build_targets import BuildTargetRegistry as _BaseBuildTargetRegistry
 from .errors import NotFoundError, ValidationError
 from .project_metadata import is_project_metadata_document
