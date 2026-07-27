@@ -8,15 +8,15 @@ from typing import Any
 from . import mcp_merge_train_guidance as _base
 
 _TEST_INSTRUCTION = """
-Use test_target_set to define expected behavior against one revisioned named
-build target. Test definitions are immutable project metadata: they include
-arguments, controlled stdin, exact expected exit/stdout/stderr values, bounded
-resource limits, an isolated filesystem policy, and denied network access.
-Writes and exact reads return a deterministic definition_hash. Use bounded
-lexical test_target_list summaries for discovery and test_target_get for full
-content at the exact reviewed revision. They do not execute programs. A later
-sandbox runner must bind its evidence to that same revision and definition hash;
-do not treat the existence of a test target as proof that it passed.
+Use test_target_set to define expected behavior against one existing named build
+target at an exact revision. Test definitions are immutable project metadata:
+they include arguments, controlled stdin, exact expected exit/stdout/stderr
+values, bounded resource limits, an isolated filesystem policy, and denied
+network access. Writes and exact reads return a deterministic definition_hash.
+Use bounded lexical test_target_list summaries for discovery and test_target_get
+for full content at the exact reviewed revision. They do not execute programs. A
+later sandbox runner must bind its evidence to that same revision and definition
+hash; do not treat the existence of a test target as proof that it passed.
 """.strip()
 
 INSTRUCTIONS = f"{_base.INSTRUCTIONS}\n{_TEST_INSTRUCTION}"
