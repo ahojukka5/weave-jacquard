@@ -12,10 +12,7 @@ from .errors import (
 )
 from .merge_preflight import MergePreflightService
 from .merge_validation_set import MAX_AFFECTED_TARGET_VALIDATIONS
-from .project_merge_queue import (
-    PROJECT_MERGE_QUEUE_CATALOG_FORMAT,
-    ProjectMergeQueueService,
-)
+from .project_merge_queue import ProjectMergeQueueService
 
 SELECTED_MERGE_PREFLIGHT_BATCH_FORMAT = "weave-selected-merge-preflight-batch-v1"
 MAX_SELECTED_MERGE_PREFLIGHT_SOURCES = 5
@@ -31,6 +28,7 @@ class SelectedMergePreflightBatchService:
         preflights: MergePreflightService,
     ) -> None:
         self.queues = queues
+        self.catalogs = queues.catalogs
         self.preflights = preflights
         self.workspace = queues.workspace
 
@@ -320,27 +318,12 @@ class SelectedMergePreflightBatchService:
         project: str,
         target_branch: str,
     ) -> tuple[dict[str, str], list[dict[str, str]], str]:
-        project_id = self.workspace.project_id(project)
-        members = self.queues._catalog_members(project_id)
-        target = next(
-            (member for member in members if member["branch"] == target_branch),
-            None,
+        catalog = self.catalogs.capture(
+            project,
+            target_branch,
+            invalid_target_code="INVALID_SELECTED_PREFLIGHT_TARGET",
         )
-        if target is None:
-            raise ValidationError(
-                "INVALID_SELECTED_PREFLIGHT_TARGET",
-                f"target branch {target_branch!r} is not in the project catalog",
-            )
-        sources = [member for member in members if member["branch"] != target_branch]
-        catalog_id = self.workspace.db.hash_value(
-            {
-                "format": PROJECT_MERGE_QUEUE_CATALOG_FORMAT,
-                "project": project,
-                "target": target,
-                "sources": sources,
-            }
-        )
-        return target, sources, catalog_id
+        return catalog["target"], catalog["sources"], catalog["catalog_id"]
 
     @staticmethod
     def _require_exact_preview(
