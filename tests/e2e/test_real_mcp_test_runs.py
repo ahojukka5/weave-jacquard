@@ -394,7 +394,6 @@ def _verify_retained_evidence(tmp_path: Path) -> None:
     assert batch["format"] == "weave-test-batch-manifest-v1"
     assert batch["status"] == "failed"
     assert batch["test_targets"] == ["failing", "passing"]
-    assert [item["run_id"] for item in batch["results"]] <= list(run_ids)
     assert {item["run_id"] for item in batch["results"]}.issubset(run_ids)
 
 
