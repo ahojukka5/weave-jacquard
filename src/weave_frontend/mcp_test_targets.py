@@ -24,22 +24,30 @@ from .test_targets import (
     DEFAULT_TIMEOUT_MS,
 )
 
+
+def install_metadata_aware_merge_services() -> None:
+    """Install the final metadata-aware service classes and clear stale compositions."""
+
+    _build.BuildTargetRegistry = BuildTargetRegistry
+    _build.MergePreviewService = MergePreviewService
+    _build.MergeTargetImpactService = MergeTargetImpactService
+    _train.SelectedMergeTrainPreviewService = SelectedMergeTrainPreviewService
+    for service in (
+        _build.build_targets,
+        _build.merge_previews,
+        _build.merge_impacts,
+        _build.merge_validations,
+        _build.merge_validation_sets,
+        _build.build_target_validator,
+    ):
+        service.cache_clear()
+
+
 # All later build, preview, impact, validation, policy, preflight, and train
-# services must share the metadata-aware implementations. Clear any
-# test-populated compositions before later capability modules register tools.
-_build.BuildTargetRegistry = BuildTargetRegistry
-_build.MergePreviewService = MergePreviewService
-_build.MergeTargetImpactService = MergeTargetImpactService
-_train.SelectedMergeTrainPreviewService = SelectedMergeTrainPreviewService
-for _service in (
-    _build.build_targets,
-    _build.merge_previews,
-    _build.merge_impacts,
-    _build.merge_validations,
-    _build.merge_validation_sets,
-    _build.build_target_validator,
-):
-    _service.cache_clear()
+# services must share the metadata-aware implementations. This helper is
+# intentionally idempotent because capability modules can already be cached
+# when a later installer needs to restore the final composition.
+install_metadata_aware_merge_services()
 
 
 @lru_cache(maxsize=1)
