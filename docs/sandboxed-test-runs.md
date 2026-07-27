@@ -59,13 +59,17 @@ The backend currently enforces:
 - ephemeral writable tmpfs mounts at `/tmp` and `/work`;
 - wall-clock timeout;
 - address-space and CPU-time limits;
-- generated-file-size, open-file, process-count, and core-dump limits;
+- generated-file-size, open-file, and core-dump limits;
 - a combined bounded stdout and stderr capture limit;
 - process-group termination on timeout or excess output.
 
-The current backend reports `seccomp = false`. Callers must not infer syscall
-filtering, stronger kernel hardening, or any protection not explicitly present
-in the capability response.
+The current backend reports both `seccomp = false` and
+`resource_limits.process_count = false`. It has no valid per-sandbox process
+controller yet; applying `RLIMIT_NPROC` before namespace creation would count
+unrelated host processes for the same user and is therefore not claimed as an
+enforced boundary. Callers must not infer syscall filtering, process-count
+control, stronger kernel hardening, or any protection not explicitly present in
+the capability response.
 
 ## Refusal versus behavioral failure
 
