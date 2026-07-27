@@ -38,7 +38,8 @@ _RUN_TOPIC: dict[str, Any] = {
     ),
     "limits": (
         "The stored test definition controls wall timeout, address space, CPU time, captured "
-        "output, generated-file size, open files, process count, and core dumps."
+        "output, generated-file size, open files, and core dumps. The current backend reports "
+        "process_count=false because it has no valid per-sandbox process-count controller."
     ),
     "evidence": (
         "A run manifest binds revision_id, definition_hash, build_id, executable hash, "
@@ -53,8 +54,8 @@ _RUN_TOPIC: dict[str, Any] = {
         "UTF-8 text when valid, continuation, total bytes, and stream/manifest hashes."
     ),
     "boundary": (
-        "The current backend reports seccomp=false. Namespace and resource isolation are "
-        "explicitly reported; do not infer protections absent from sandbox_capabilities."
+        "The current backend reports seccomp=false and process_count=false. Namespace and "
+        "resource isolation are explicit; do not infer absent protections."
     ),
 }
 
