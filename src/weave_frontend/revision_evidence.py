@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import bisect
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .errors import ArtifactIntegrityError, NotFoundError, ValidationError
 from .revision_evidence_graph import (
@@ -127,7 +128,8 @@ class RevisionEvidenceService:
         matched_evidence_count = 0
         consumed_count = 0
 
-        for consumed_count, evidence_id in enumerate(scanned_ids, start=1):
+        for index, evidence_id in enumerate(scanned_ids, start=1):
+            consumed_count = index
             try:
                 evidence = store.getter(evidence_id)
                 if not evidence_matches_revision(kind, evidence, project, revision_id):
