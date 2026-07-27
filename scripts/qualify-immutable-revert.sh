@@ -19,6 +19,15 @@ if [[ -z "$out_dir" || "$out_dir" == "/" || "$out_dir" == "." ]]; then
   exit 2
 fi
 
+if python -m ruff --version >/dev/null 2>&1; then
+  ruff_cmd=(python -m ruff)
+elif command -v ruff >/dev/null 2>&1; then
+  ruff_cmd=(ruff)
+else
+  echo "ruff is unavailable: install the dev dependencies or add ruff to PATH" >&2
+  exit 2
+fi
+
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
 
@@ -27,12 +36,16 @@ mkdir -p "$out_dir"
   printf 'git_sha=%s\n' "$(git rev-parse HEAD)"
   printf 'git_branch=%s\n' "$(git branch --show-current)"
   printf 'python=%s\n' "$(python --version 2>&1)"
+  printf 'ruff=%s\n' "$("${ruff_cmd[@]}" --version 2>&1)"
+  printf 'ruff_command='
+  printf '%q ' "${ruff_cmd[@]}"
+  printf '\n'
   printf 'platform=%s\n' "$(uname -a)"
 } | tee "$out_dir/environment.txt"
 
 set -o pipefail
 python -m compileall -q src tests 2>&1 | tee "$out_dir/compileall.log"
-python -m ruff check . 2>&1 | tee "$out_dir/ruff.log"
+"${ruff_cmd[@]}" check . 2>&1 | tee "$out_dir/ruff.log"
 
 if [[ "$mode" == "focused" ]]; then
   python -m pytest -q --tb=short \
