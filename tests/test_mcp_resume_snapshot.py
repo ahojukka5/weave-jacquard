@@ -30,6 +30,7 @@ def test_resume_snapshot_tool_forwards_revision_and_bounds(monkeypatch) -> None:
         document_limit=20,
         target_limit=10,
         target_source_limit=9,
+        test_target_limit=4,
         context_limit=8,
         branch_limit=7,
         history_limit=6,
@@ -46,6 +47,7 @@ def test_resume_snapshot_tool_forwards_revision_and_bounds(monkeypatch) -> None:
                 "document_limit": 20,
                 "target_limit": 10,
                 "target_source_limit": 9,
+                "test_target_limit": 4,
                 "context_limit": 8,
                 "branch_limit": 7,
                 "history_limit": 6,
@@ -60,6 +62,7 @@ def test_resume_snapshot_factory_composes_shared_services(tmp_path, monkeypatch)
     mcp_resume_snapshot.workspace.cache_clear()
     mcp_resume_snapshot.build_targets.cache_clear()
     mcp_resume_snapshot.merge_policies.cache_clear()
+    mcp_resume_snapshot.test_targets.cache_clear()
     monkeypatch.setenv("WEAVE_DB_PATH", str(tmp_path / "resume-factory.db"))
 
     service = mcp_resume_snapshot.resume_snapshots()
@@ -68,9 +71,11 @@ def test_resume_snapshot_factory_composes_shared_services(tmp_path, monkeypatch)
         assert service.workspace is mcp_resume_snapshot.workspace()
         assert service.targets is mcp_resume_snapshot.build_targets()
         assert service.policies is mcp_resume_snapshot.merge_policies()
+        assert service.tests is mcp_resume_snapshot.test_targets()
     finally:
         service.workspace.close()
         mcp_resume_snapshot.resume_snapshots.cache_clear()
         mcp_resume_snapshot.build_targets.cache_clear()
         mcp_resume_snapshot.merge_policies.cache_clear()
+        mcp_resume_snapshot.test_targets.cache_clear()
         mcp_resume_snapshot.workspace.cache_clear()
