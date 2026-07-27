@@ -55,15 +55,23 @@ class MergeCandidateTestImpactService:
             self.tests._validate_name(start_after_name)
 
         candidate = self.previews.candidate(project, target_branch, source_branch)
-        if candidate["conflicts"]:
+        if preview_id is not None and preview_id != candidate["preview_id"]:
+            raise ValidationError(
+                "STALE_MERGE_PREVIEW",
+                "one or both branch heads changed after the merge preview",
+            )
+        if not candidate["mergeable"]:
             raise ConflictError(list(candidate["conflicts"]))
-        if preview_id is not None:
-            self.previews.require_preview(candidate, preview_id)
 
         target_state = self.workspace._state_at_revision(
             candidate["target_head_revision_id"]
         )
-        merged_state = candidate["merged_state"]
+        merged_state = candidate.get("_merged_state")
+        if not isinstance(merged_state, dict):
+            raise ValidationError(
+                "INVALID_MERGE_CANDIDATE",
+                "clean merge preview did not retain an in-memory candidate state",
+            )
         changed_documents = self._changed_documents(target_state, merged_state)
         changed_program_documents = sorted(
             document
