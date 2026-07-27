@@ -1,72 +1,11 @@
 """Public Jacquard entry point for the Weave MCP server."""
 
-import weave_frontend.mcp_concurrent_nodes as _mcp_concurrent_nodes
-from weave_frontend import mcp_agent_checkpoint as _mcp_agent_checkpoint
-from weave_frontend import (
-    mcp_agent_checkpoint_timeline as _mcp_agent_checkpoint_timeline,
-)
-from weave_frontend import mcp_build_discovery as _mcp_build_discovery
-from weave_frontend import mcp_concurrent_branches as _mcp_concurrent_branches
-from weave_frontend import mcp_concurrent_context as _mcp_concurrent_context
-from weave_frontend import mcp_concurrent_targets as _mcp_concurrent_targets
-from weave_frontend import (
-    mcp_merge_impact_queue_guidance as _mcp_merge_impact_queue_guidance,
-)
-from weave_frontend import mcp_merge_queue_guidance as _mcp_merge_queue_guidance
-from weave_frontend import mcp_merge_train_guidance as _mcp_merge_train_guidance
-from weave_frontend import mcp_policy as _mcp_policy
-from weave_frontend import mcp_preflight as _mcp_preflight
-from weave_frontend import mcp_project_agent_status as _mcp_project_agent_status
-from weave_frontend import (
-    mcp_project_merge_impact_queue as _mcp_project_merge_impact_queue,
-)
-from weave_frontend import mcp_project_merge_queue as _mcp_project_merge_queue
-from weave_frontend import mcp_resume_snapshot as _mcp_resume_snapshot
-from weave_frontend import mcp_revision_reads as _mcp_revision_reads
-from weave_frontend import (
-    mcp_selected_merge_preflight_batch as _mcp_selected_merge_preflight_batch,
-)
-from weave_frontend import (
-    mcp_selected_merge_train_preview as _mcp_selected_merge_train_preview,
-)
-from weave_frontend import (
-    mcp_selected_preflight_guidance as _mcp_selected_preflight_guidance,
-)
-from weave_frontend.mcp_build import main
+from weave_frontend.mcp_build import main, mcp
+from weave_frontend.mcp_capabilities import install_public_capabilities
 
-_ = (
-    _mcp_concurrent_nodes,
-    _mcp_concurrent_branches,
-    _mcp_build_discovery,
-    _mcp_concurrent_targets,
-    _mcp_policy,
-    _mcp_concurrent_context,
-    _mcp_preflight,
-    _mcp_agent_checkpoint,
-    _mcp_agent_checkpoint_timeline,
-    _mcp_project_agent_status,
-    _mcp_project_merge_queue,
-    _mcp_project_merge_impact_queue,
-    _mcp_selected_merge_preflight_batch,
-    _mcp_selected_merge_train_preview,
-    _mcp_resume_snapshot,
-    _mcp_merge_queue_guidance,
-    _mcp_merge_impact_queue_guidance,
-    _mcp_selected_preflight_guidance,
-    _mcp_merge_train_guidance,
-    _mcp_revision_reads,
-)
+PUBLIC_CAPABILITY_MANIFEST = install_public_capabilities(mcp)
 
-_mcp_merge_queue_guidance.install_merge_queue_guidance(_mcp_resume_snapshot.mcp)
-_mcp_merge_impact_queue_guidance.install_merge_impact_queue_guidance(
-    _mcp_resume_snapshot.mcp
-)
-_mcp_selected_preflight_guidance.install_selected_preflight_guidance(
-    _mcp_resume_snapshot.mcp
-)
-_mcp_merge_train_guidance.install_merge_train_guidance(_mcp_resume_snapshot.mcp)
-
-__all__ = ["main"]
+__all__ = ["PUBLIC_CAPABILITY_MANIFEST", "main"]
 
 
 if __name__ == "__main__":
