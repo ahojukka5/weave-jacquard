@@ -4,8 +4,8 @@ Jacquard can explain which revisioned behavioral tests are structurally affected
 by one exact clean branch-merge preview before publishing the merge.
 
 The plan compares the committed target head with the preview's in-memory merged
-state. It runs no compiler or test, creates no project revision, and advances
-neither branch.
+state. Planning runs no compiler or test, creates no project revision, and
+advances neither branch.
 
 ## Workflow
 
@@ -18,7 +18,7 @@ preview = branch_merge_preview(
   source_branch = "feature"
 )
 
-branch_merge_test_impact(
+plan = branch_merge_test_impact(
   project = "demo",
   target_branch = "main",
   source_branch = "feature",
@@ -103,22 +103,36 @@ Every page for the same exact preview and evidence graph returns the same
 Lexical order is deterministic continuation only. It is not priority, urgency,
 expected failure probability, cost, or recommended repair order.
 
-## Execution boundary
+## Execution handoff
 
-The response intentionally contains:
+Planning itself never executes tests. A complete non-empty first page may expose:
 
 ```text
-candidate_execution = null
+candidate_execution = {
+  tool = branch_merge_test_batch_run
+  arguments = {
+    project = <project>
+    target_branch = <target>
+    source_branch = <source>
+    test_targets = <complete lexical candidate list>
+    preview_id = <exact-preview-id>
+  }
+}
 ```
 
-Existing `test_batch_run` accepts an immutable committed revision ID. A virtual
-merged state has no such revision, so emitting ordinary batch arguments would
-falsely claim that the preview can be executed through the revision-bound path.
+Partial pages, continuation pages, and empty plans return
+`candidate_execution = null`. A page must never present a partial selection as a
+complete qualification request.
 
-This capability therefore provides planning evidence only. A future candidate
-execution service must retain its own evidence identity bound to the preview ID,
-merged root hash, compiler, executable, sandbox policy, definitions, and observed
-behavior. It must still publish no merge.
+Ordinary `test_batch_run` remains incompatible because it requires an immutable
+committed revision ID. `branch_merge_test_batch_run` uses a separate virtual-
+candidate build and evidence model bound to the preview and merged root hash.
+
+The handoff is replayable input, not automatic execution. The caller still makes
+an explicit execution call and may choose a different explicit ordered subset.
+
+See `merge-candidate-test-execution.md` for the build, sandbox, and evidence
+contract.
 
 ## Interpretation limits
 
