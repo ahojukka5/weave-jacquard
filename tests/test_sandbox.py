@@ -109,6 +109,9 @@ def test_bubblewrap_denies_host_files_and_host_network(tmp_path: Path) -> None:
     if not capabilities["available"]:
         pytest.skip(str(capabilities["probe_error"]))
 
+    # Use a native host executable. A temporary script would add an unrelated
+    # dependency on its shebang interpreter being present at the same path inside
+    # the minimal namespace.
     bash = shutil.which("bash")
     assert bash is not None
     secret = tmp_path / "host-secret"
