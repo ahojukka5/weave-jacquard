@@ -74,6 +74,12 @@ Names, argument counts, tags, text sizes, and resource values are bounded before
 publication. Updates preserve the stable root identity when the same test name
 is replaced. Stale compare-and-set writes publish no revision or operation.
 
+A referenced build target cannot be deleted until its tests are deleted or
+retargeted. Ordinary merge previews, direct merge publication, and ordered
+virtual merge trains all validate the combined candidate state. A candidate that
+would leave a test bound to a missing build target is rejected before any branch
+advances.
+
 ## Metadata boundary
 
 Test definitions use reserved structural document names under
