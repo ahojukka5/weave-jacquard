@@ -12,12 +12,16 @@ from .metadata_build_targets import BuildTargetRegistry
 from .metadata_merge_impact import MergeTargetImpactService
 from .metadata_merge_preview import MergePreviewService
 from .metadata_selected_merge_train_preview import SelectedMergeTrainPreviewService
+from .test_target_views import (
+    DEFAULT_TEST_TARGET_PAGE_SIZE,
+    TestTargetPageService,
+    VerifiedTestTargetRegistry,
+)
 from .test_targets import (
     DEFAULT_FILE_BYTES,
     DEFAULT_MEMORY_BYTES,
     DEFAULT_OUTPUT_BYTES,
     DEFAULT_TIMEOUT_MS,
-    TestTargetRegistry,
 )
 
 # All later build, preview, impact, validation, policy, preflight, and train
@@ -39,10 +43,17 @@ for _service in (
 
 
 @lru_cache(maxsize=1)
-def test_targets() -> TestTargetRegistry:
-    """Return the shared revisioned test-target registry."""
+def test_targets() -> VerifiedTestTargetRegistry:
+    """Return the shared verified revisioned test-target registry."""
 
-    return TestTargetRegistry(workspace())
+    return VerifiedTestTargetRegistry(workspace())
+
+
+@lru_cache(maxsize=1)
+def test_target_pages() -> TestTargetPageService:
+    """Return the shared bounded test-target summary service."""
+
+    return TestTargetPageService(test_targets())
 
 
 @mcp.tool()
@@ -64,7 +75,7 @@ def test_target_set(
     expected_revision_id: str | None = None,
     author: str = "test-agent",
 ) -> dict[str, Any]:
-    """Create or update one sandbox-ready behavioral test definition."""
+    """Create or update one hashed sandbox-ready behavioral test definition."""
 
     return _result(
         lambda: test_targets().set(
@@ -95,7 +106,7 @@ def test_target_get(
     branch: str = "main",
     revision_id: str | None = None,
 ) -> dict[str, Any]:
-    """Read one test definition from a branch head or exact revision."""
+    """Read one full hashed test definition from a branch head or exact revision."""
 
     return _result(
         lambda: test_targets().get(
@@ -112,14 +123,18 @@ def test_target_list(
     project: str,
     branch: str = "main",
     revision_id: str | None = None,
+    start_after_name: str | None = None,
+    limit: int = DEFAULT_TEST_TARGET_PAGE_SIZE,
 ) -> dict[str, Any]:
-    """List test definitions from a branch head or exact revision."""
+    """List bounded lexical test summaries from a branch head or exact revision."""
 
     return _result(
-        lambda: test_targets().list(
+        lambda: test_target_pages().page(
             project,
             branch=branch,
             revision_id=revision_id,
+            start_after_name=start_after_name,
+            limit=limit,
         )
     )
 
