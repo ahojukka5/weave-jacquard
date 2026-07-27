@@ -10,7 +10,7 @@ import pytest
 from weave_frontend import ValidationError
 from weave_frontend.errors import ArtifactIntegrityError
 from weave_frontend.sandbox import SandboxLimits, SandboxResult
-from weave_frontend.test_runs import TestRunService
+from weave_frontend.test_runs import TestRunService as _TestRunService
 
 
 class _Workspace:
@@ -134,6 +134,7 @@ class _Sandbox:
 
 
 def _executable(tmp_path: Path) -> Path:
+    tmp_path.mkdir(parents=True, exist_ok=True)
     path = tmp_path / "program"
     path.write_bytes(b"fake executable")
     path.chmod(0o755)
@@ -175,12 +176,12 @@ def _service(
     tests: _Tests | None = None,
     compiler_status: str = "succeeded",
     sandbox: _Sandbox | None = None,
-) -> tuple[TestRunService, _Compiler, _Sandbox]:
+) -> tuple[_TestRunService, _Compiler, _Sandbox]:
     executable = _executable(tmp_path)
     compiler = _Compiler(executable, status=compiler_status)
     resolved_sandbox = sandbox or _Sandbox(_result())
     return (
-        TestRunService(
+        _TestRunService(
             _Workspace(),
             _Targets(),
             tests or _Tests(),
