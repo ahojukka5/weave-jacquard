@@ -17,11 +17,6 @@ from .test_impact import (
     DEFAULT_TEST_IMPACT_PAGE_SIZE,
 )
 
-# Capability modules may already be cached when the declarative installer runs.
-# Reapply the final service composition explicitly before constructing this
-# preview-dependent capability.
-install_metadata_aware_merge_services()
-
 
 @lru_cache(maxsize=1)
 def merge_test_impact_plans() -> MergeCandidateTestImpactService:
@@ -32,6 +27,19 @@ def merge_test_impact_plans() -> MergeCandidateTestImpactService:
         build_targets(),
         test_targets(),
     )
+
+
+def install_capability() -> None:
+    """Restore preview composition and discard any stale cached plan service."""
+
+    install_metadata_aware_merge_services()
+    merge_test_impact_plans.cache_clear()
+
+
+# Capability modules may already be cached when the declarative installer runs.
+# Reapply the final service composition explicitly before constructing this
+# preview-dependent capability.
+install_capability()
 
 
 @mcp.tool()
