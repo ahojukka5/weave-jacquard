@@ -8,7 +8,7 @@ from typing import Any
 from .mcp_build import build_targets, compiler_bridge
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_targets import test_targets
-from .sandbox import BubblewrapSandbox
+from .portable_sandbox import PortableBubblewrapSandbox
 from .test_runs import DEFAULT_TEST_RUN_OUTPUT_PAGE_BYTES, TestRunService
 
 
@@ -21,7 +21,7 @@ def test_runs() -> TestRunService:
         build_targets(),
         test_targets(),
         compiler_bridge(),
-        BubblewrapSandbox(),
+        PortableBubblewrapSandbox(),
     )
 
 

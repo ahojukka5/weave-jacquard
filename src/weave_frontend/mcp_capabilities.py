@@ -96,6 +96,11 @@ PUBLIC_CAPABILITIES: tuple[Capability, ...] = (
         ("test_targets",),
     ),
     Capability(
+        "revert",
+        "weave_frontend.mcp_revert",
+        ("task_contracts",),
+    ),
+    Capability(
         "policy",
         "weave_frontend.mcp_policy",
         ("tested_merge_attestations", "task_contracts"),
@@ -208,7 +213,7 @@ def install_public_capabilities(
         if callable(installer):
             installer()
 
-    guidance = module_loader("weave_frontend.mcp_evidence_guidance")
+    guidance = module_loader("weave_frontend.mcp_revert_guidance")
     server._mcp_server.instructions = guidance.INSTRUCTIONS
     server.remove_tool("weave_help")
     server.add_tool(
@@ -218,8 +223,8 @@ def install_public_capabilities(
             "Explain structural, revision, checkpoint, project supervision, merge queues, "
             "merge trains, test definitions, strict test runs, explicit test batches, test "
             "impact plans, virtual candidate qualification, tested-merge attestations, "
-            "revision evidence graphs, revisioned task contracts, scoped edits, selected "
-            "preflight, resume, validation, and build workflows."
+            "revision evidence graphs, revisioned task contracts, scoped edits, immutable "
+            "reverts, selected preflight, resume, validation, and build workflows."
         ),
     )
     return capability_manifest(ordered)

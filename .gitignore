@@ -8,6 +8,7 @@ __pycache__/
 htmlcov/
 dist/
 build/
+local-qualification/
 *.db
 *.db-shm
 *.db-wal
