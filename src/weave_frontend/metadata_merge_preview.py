@@ -1,4 +1,4 @@
-"""Merge previews that enforce cross-document test-target integrity."""
+"""Merge previews that enforce cross-document project-metadata integrity."""
 
 from __future__ import annotations
 
@@ -6,11 +6,12 @@ from typing import Any
 
 from .errors import ConflictError, ValidationError
 from .merge_preview import MergePreviewService as _BaseMergePreviewService
+from .task_contracts import validate_task_contract_references
 from .test_target_validation import validate_test_target_references
 
 
 class MergePreviewService(_BaseMergePreviewService):
-    """Reject previews and publications that leave dangling test definitions."""
+    """Reject previews and publications with dangling test or task definitions."""
 
     def _snapshot(
         self,
@@ -22,6 +23,7 @@ class MergePreviewService(_BaseMergePreviewService):
         merged_state = snapshot.get("_merged_state")
         if snapshot["mergeable"] and isinstance(merged_state, dict):
             validate_test_target_references(merged_state)
+            validate_task_contract_references(merged_state)
         return snapshot
 
     def merge(

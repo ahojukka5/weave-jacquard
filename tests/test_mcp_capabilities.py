@@ -58,6 +58,7 @@ def test_public_capabilities_have_unique_dependency_order() -> None:
     assert "merge_test_impact" in names
     assert "merge_candidate_test_execution" in names
     assert "tested_merge_attestations" in names
+    assert "task_contracts" in names
     assert names.index("concurrent_targets") < names.index("test_targets")
     assert names.index("test_targets") < names.index("test_runs")
     assert names.index("test_runs") < names.index("test_batches")
@@ -69,7 +70,9 @@ def test_public_capabilities_have_unique_dependency_order() -> None:
     assert names.index("merge_candidate_test_execution") < names.index(
         "tested_merge_attestations"
     )
+    assert names.index("test_targets") < names.index("task_contracts")
     assert names.index("tested_merge_attestations") < names.index("policy")
+    assert names.index("task_contracts") < names.index("policy")
     assert "resume_snapshot" in names
     assert "selected_merge_train_preview" in names
 
@@ -127,7 +130,7 @@ def test_public_install_loads_modules_in_order_and_replaces_help_once() -> None:
 
     def loader(name: str) -> ModuleType:
         loaded.append(name)
-        if name == "weave_frontend.mcp_tested_merge_attestation_guidance":
+        if name == "weave_frontend.mcp_task_guidance":
             return guidance  # type: ignore[return-value]
         return ModuleType(name)
 
@@ -146,13 +149,13 @@ def test_public_install_loads_modules_in_order_and_replaces_help_once() -> None:
     assert loaded == [
         "example.base",
         "example.feature",
-        "weave_frontend.mcp_tested_merge_attestation_guidance",
+        "weave_frontend.mcp_task_guidance",
     ]
     assert server._mcp_server.instructions == "final instructions"
     assert server.removed == ["weave_help"]
     assert server.added == ["weave_help"]
     assert server.tools["weave_help"] is final_help
-    assert "tested-merge attestations" in server.descriptions["weave_help"]
+    assert "task contracts" in server.descriptions["weave_help"]
     assert manifest == capability_manifest(capabilities)
 
 
