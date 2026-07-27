@@ -53,9 +53,11 @@ def test_public_capabilities_have_unique_dependency_order() -> None:
     assert len(names) == len(set(names))
     assert "test_targets" in names
     assert "test_runs" in names
+    assert "test_batches" in names
     assert names.index("concurrent_targets") < names.index("test_targets")
     assert names.index("test_targets") < names.index("test_runs")
-    assert names.index("test_targets") < names.index("policy")
+    assert names.index("test_runs") < names.index("test_batches")
+    assert names.index("test_batches") < names.index("policy")
     assert "resume_snapshot" in names
     assert "selected_merge_train_preview" in names
 
@@ -113,7 +115,7 @@ def test_public_install_loads_modules_in_order_and_replaces_help_once() -> None:
 
     def loader(name: str) -> ModuleType:
         loaded.append(name)
-        if name == "weave_frontend.mcp_test_run_guidance":
+        if name == "weave_frontend.mcp_test_batch_guidance":
             return guidance  # type: ignore[return-value]
         return ModuleType(name)
 
@@ -132,13 +134,13 @@ def test_public_install_loads_modules_in_order_and_replaces_help_once() -> None:
     assert loaded == [
         "example.base",
         "example.feature",
-        "weave_frontend.mcp_test_run_guidance",
+        "weave_frontend.mcp_test_batch_guidance",
     ]
     assert server._mcp_server.instructions == "final instructions"
     assert server.removed == ["weave_help"]
     assert server.added == ["weave_help"]
     assert server.tools["weave_help"] is final_help
-    assert "strict sandboxed test runs" in server.descriptions["weave_help"]
+    assert "explicit test batches" in server.descriptions["weave_help"]
     assert manifest == capability_manifest(capabilities)
 
 
