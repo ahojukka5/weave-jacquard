@@ -23,12 +23,43 @@ if [[ -z "$out_dir" || "$out_dir" == "/" || "$out_dir" == "." ]]; then
   exit 2
 fi
 
-if python -m ruff --version >/dev/null 2>&1; then
-  ruff_cmd=(python -m ruff)
+required_imports=(mcp pytest)
+if [[ "$mode" == "full" ]]; then
+  required_imports+=(pytest_cov)
+fi
+
+imports_csv="$(IFS=,; printf '%s' "${required_imports[*]}")"
+if python - "$imports_csv" <<'PY' >/dev/null 2>&1
+import importlib
+import sys
+
+for name in sys.argv[1].split(","):
+    importlib.import_module(name)
+PY
+then
+  python_cmd=(python)
+  environment_kind="current-python"
+elif command -v uv >/dev/null 2>&1; then
+  python_cmd=(uv run --extra dev python)
+  environment_kind="uv-project-environment"
+else
+  echo "the selected Python is missing required modules: ${required_imports[*]}" >&2
+  echo "install the project dependencies with:" >&2
+  echo "  python -m pip install -e '.[dev]'" >&2
+  echo "or install uv and rerun the qualification script" >&2
+  exit 2
+fi
+
+if "${python_cmd[@]}" -m ruff --version >/dev/null 2>&1; then
+  ruff_cmd=("${python_cmd[@]}" -m ruff)
+elif [[ "$environment_kind" == "uv-project-environment" ]]; then
+  ruff_cmd=(uv run --extra dev ruff)
 elif command -v ruff >/dev/null 2>&1; then
   ruff_cmd=(ruff)
 else
-  echo "ruff is unavailable: install the dev dependencies or add ruff to PATH" >&2
+  echo "ruff is unavailable in the selected qualification environment" >&2
+  echo "install the project development dependencies with:" >&2
+  echo "  python -m pip install -e '.[dev]'" >&2
   exit 2
 fi
 
@@ -40,8 +71,12 @@ mkdir -p "$out_dir"
   printf 'git_sha=%s\n' "$(git rev-parse HEAD)"
   printf 'git_branch=%s\n' "$(git branch --show-current)"
   printf 'repository_root=%s\n' "$root_dir"
-  printf 'python=%s\n' "$(python --version 2>&1)"
-  printf 'python_executable=%s\n' "$(python -c 'import sys; print(sys.executable)')"
+  printf 'environment_kind=%s\n' "$environment_kind"
+  printf 'python=%s\n' "$("${python_cmd[@]}" --version 2>&1)"
+  printf 'python_executable=%s\n' "$("${python_cmd[@]}" -c 'import sys; print(sys.executable)')"
+  printf 'python_command='
+  printf '%q ' "${python_cmd[@]}"
+  printf '\n'
   printf 'pythonpath=%s\n' "$PYTHONPATH"
   printf 'ruff=%s\n' "$("${ruff_cmd[@]}" --version 2>&1)"
   printf 'ruff_command='
@@ -51,11 +86,11 @@ mkdir -p "$out_dir"
 } | tee "$out_dir/environment.txt"
 
 set -o pipefail
-python -m compileall -q src tests 2>&1 | tee "$out_dir/compileall.log"
+"${python_cmd[@]}" -m compileall -q src tests 2>&1 | tee "$out_dir/compileall.log"
 "${ruff_cmd[@]}" check . 2>&1 | tee "$out_dir/ruff.log"
 
 if [[ "$mode" == "focused" ]]; then
-  python -m pytest -q --tb=short \
+  "${python_cmd[@]}" -m pytest -q --tb=short \
     tests/test_revert.py \
     tests/test_build_target_reference_integrity.py \
     tests/test_application.py \
@@ -64,7 +99,7 @@ if [[ "$mode" == "focused" ]]; then
     tests/e2e/test_real_mcp_revert.py \
     --basetemp "$base_temp" 2>&1 | tee "$out_dir/pytest.log"
 else
-  python -m pytest -q --tb=short \
+  "${python_cmd[@]}" -m pytest -q --tb=short \
     --cov=weave_frontend --cov-report=term-missing \
     --basetemp "$base_temp" 2>&1 | tee "$out_dir/pytest.log"
 fi
