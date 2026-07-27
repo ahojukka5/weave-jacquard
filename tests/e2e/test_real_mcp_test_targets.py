@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import sqlite3
 import sys
 from pathlib import Path
 from typing import Any
@@ -11,6 +10,8 @@ from typing import Any
 import pytest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
+from weave_frontend.database import Database
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT = "revisioned-test-targets"
@@ -303,9 +304,8 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
 
 
 def _verify_database(tmp_path: Path) -> None:
-    connection = sqlite3.connect(tmp_path / "jacquard.db")
-    connection.row_factory = sqlite3.Row
-    try:
+    with Database(tmp_path / "jacquard.db") as database:
+        connection = database.connection
         operations = connection.execute(
             """SELECT revision_id, operation_kind, target
                FROM operations
@@ -333,8 +333,6 @@ def _verify_database(tmp_path: Path) -> None:
             assert snapshot is not None
             root = json.loads(str(snapshot["ast_json"]))
             assert root["kind"] == "list"
-    finally:
-        connection.close()
 
 
 @pytest.mark.real_mcp
