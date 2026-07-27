@@ -14,6 +14,7 @@ import signal
 import subprocess
 import tempfile
 import time
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -399,7 +400,5 @@ class BubblewrapSandbox:
     def _kill(process: subprocess.Popen[bytes]) -> None:
         if process.poll() is not None:
             return
-        try:
+        with suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
