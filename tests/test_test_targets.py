@@ -8,11 +8,8 @@ from weave_frontend import SExpressionWorkspace, ValidationError
 from weave_frontend.errors import NotFoundError
 from weave_frontend.metadata_build_targets import BuildTargetRegistry
 from weave_frontend.project_metadata import TEST_TARGET_PREFIX
-from weave_frontend.test_targets import (
-    MAX_TEST_ARGUMENTS,
-    MAX_TEST_TIMEOUT_MS,
-    TestTargetRegistry as _TestTargetRegistry,
-)
+from weave_frontend.test_targets import MAX_TEST_ARGUMENTS, MAX_TEST_TIMEOUT_MS
+from weave_frontend.test_targets import TestTargetRegistry as _TestTargetRegistry
 
 
 def _workspace_with_target(
