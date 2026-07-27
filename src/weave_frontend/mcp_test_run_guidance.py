@@ -67,8 +67,8 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
 
     response = _base.weave_help(topic)
     help_value = deepcopy(response["help"])
-    tools = help_value.setdefault("tools", {})
     if topic == "read":
+        tools = help_value["tools"]
         tools["sandbox_capabilities"] = (
             "Probe strict sandbox availability and inspect the exact enforced policy."
         )
@@ -79,6 +79,7 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
             "Read verified bounded stdout or stderr bytes from one retained run."
         )
     elif topic == "build":
+        tools = help_value.setdefault("tools", {})
         tools["test_run"] = (
             "Build and execute one exact revisioned behavioral test in the strict sandbox."
         )
