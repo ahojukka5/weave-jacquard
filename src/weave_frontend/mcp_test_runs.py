@@ -25,6 +25,12 @@ def test_runs() -> TestRunService:
     )
 
 
+def _public_run(result: dict[str, Any]) -> dict[str, Any]:
+    """Remove server-local storage paths from the agent-facing run evidence."""
+
+    return {key: value for key, value in result.items() if key != "artifact_paths"}
+
+
 @mcp.tool()
 def sandbox_capabilities() -> dict[str, Any]:
     """Probe whether strict sandbox execution is available and report its policy."""
@@ -42,11 +48,13 @@ def test_run(
     """Build and execute one exact revisioned test in the strict sandbox."""
 
     return _result(
-        lambda: test_runs().run(
-            project,
-            test_target,
-            branch=branch,
-            revision_id=revision_id,
+        lambda: _public_run(
+            test_runs().run(
+                project,
+                test_target,
+                branch=branch,
+                revision_id=revision_id,
+            )
         )
     )
 
@@ -55,7 +63,7 @@ def test_run(
 def test_run_get(run_id: str) -> dict[str, Any]:
     """Read and verify one immutable sandboxed test-run manifest."""
 
-    return _result(lambda: test_runs().get(run_id))
+    return _result(lambda: _public_run(test_runs().get(run_id)))
 
 
 @mcp.tool()
