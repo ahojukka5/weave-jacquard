@@ -15,11 +15,19 @@ class _Runs:
 
     def run(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         self.calls.append(("run", args, kwargs))
-        return {"run_id": "a" * 32, "passed": True}
+        return {
+            "run_id": "a" * 32,
+            "passed": True,
+            "artifact_paths": {"manifest": "/private/run-manifest.json"},
+        }
 
     def get(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         self.calls.append(("get", args, kwargs))
-        return {"run_id": args[0], "passed": True}
+        return {
+            "run_id": args[0],
+            "passed": True,
+            "artifact_paths": {"stdout": "/private/stdout.bin"},
+        }
 
     def output_page(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         self.calls.append(("output_page", args, kwargs))
@@ -39,7 +47,7 @@ def test_sandbox_capabilities_forwards_probe(monkeypatch) -> None:
     assert runs.calls == [("capabilities", (), {})]
 
 
-def test_test_run_forwards_exact_revision(monkeypatch) -> None:
+def test_test_run_forwards_exact_revision_without_storage_paths(monkeypatch) -> None:
     runs = _Runs()
     monkeypatch.setattr(mcp_test_runs, "test_runs", lambda: runs)
 
@@ -52,6 +60,7 @@ def test_test_run_forwards_exact_revision(monkeypatch) -> None:
 
     assert response["ok"] is True
     assert response["result"]["run_id"] == "a" * 32
+    assert "artifact_paths" not in response["result"]
     assert runs.calls == [
         (
             "run",
@@ -74,6 +83,7 @@ def test_run_reads_forward_identity_and_output_bounds(monkeypatch) -> None:
     )
 
     assert get_response["result"]["passed"] is True
+    assert "artifact_paths" not in get_response["result"]
     assert page_response["result"]["returned_bytes"] == 3
     assert runs.calls == [
         ("get", ("a" * 32,), {}),
