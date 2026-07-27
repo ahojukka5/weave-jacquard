@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from weave_frontend import ValidationError
-from weave_frontend.compiler_artifacts import ArtifactIntegrityError
+from weave_frontend.errors import ArtifactIntegrityError
 from weave_frontend.sandbox import SandboxLimits, SandboxResult
 from weave_frontend.test_runs import TestRunService
 
@@ -90,8 +90,9 @@ class _Compiler:
             "compiler_sha256": "c" * 64,
         }
         if self.status == "succeeded":
+            result["artifacts"] = {"executable": "program"}
             result["artifact_paths"] = {"executable": str(self.executable)}
-            result["artifact_sha256"] = {"executable": executable_hash}
+            result["artifact_sha256"] = {"program": executable_hash}
         return result
 
 
