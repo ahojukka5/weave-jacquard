@@ -8,10 +8,8 @@ import pytest
 
 from weave_frontend import ValidationError
 from weave_frontend.errors import ArtifactIntegrityError, NotFoundError
-from weave_frontend.test_batches import (
-    MAX_TEST_BATCH_TARGETS,
-    TestBatchService as _TestBatchService,
-)
+from weave_frontend.test_batches import MAX_TEST_BATCH_TARGETS
+from weave_frontend.test_batches import TestBatchService as _TestBatchService
 
 
 class _Workspace:
