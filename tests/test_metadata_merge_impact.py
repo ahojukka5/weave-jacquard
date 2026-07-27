@@ -4,7 +4,7 @@ from weave_frontend.merge_preview import MergePreviewService
 from weave_frontend.metadata_build_targets import BuildTargetRegistry
 from weave_frontend.metadata_merge_impact import MergeTargetImpactService
 from weave_frontend.project_metadata import TEST_TARGET_PREFIX
-from weave_frontend.test_targets import TestTargetRegistry
+from weave_frontend.test_targets import TestTargetRegistry as _TestTargetRegistry
 
 
 def test_test_definition_only_merge_is_not_compiler_source_impact(
@@ -26,7 +26,7 @@ def test_test_definition_only_merge_is_not_compiler_source_impact(
     )
     sexpr_workspace.create_branch("sexpr-demo", "target", from_branch="main")
     sexpr_workspace.create_branch("sexpr-demo", "source", from_branch="main")
-    source_test = TestTargetRegistry(sexpr_workspace).set(
+    source_test = _TestTargetRegistry(sexpr_workspace).set(
         "sexpr-demo",
         "source",
         "smoke",
