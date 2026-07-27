@@ -15,6 +15,8 @@ each selected test through the reported strict sandbox. Candidate builds and run
 evidence bind target/source heads, common base, preview_id, merged_root_hash,
 definition hashes, compiler hash, executable hash, sandbox policy, and limits.
 Behavioral failures remain evidence. Build failures make the batch incomplete.
+Ordinary test_batch_run is incompatible with an uncommitted merge candidate;
+use branch_merge_test_batch_run for this exact preview-bound evidence instead.
 Execution publishes no merge and advances no branch. Always use branch_merge with
 the same preview_id separately; it will reject stale heads.
 """.strip()
@@ -66,24 +68,25 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
 
     response = _base.weave_help(topic)
     help_value = deepcopy(response["help"])
+    tools = help_value.setdefault("tools", {})
     if topic == "build":
-        help_value["tools"]["branch_merge_build_target"] = (
+        tools["branch_merge_build_target"] = (
             "Build one named target from an exact clean virtual merge candidate."
         )
-        help_value["tools"]["merge_candidate_build_get"] = (
+        tools["merge_candidate_build_get"] = (
             "Read one verified candidate-build manifest without server-local paths."
         )
-        help_value["tools"]["merge_candidate_build_diagnostics_page"] = (
+        tools["merge_candidate_build_diagnostics_page"] = (
             "Page verified mapped diagnostics from one candidate build."
         )
     if topic == "test_batches":
-        help_value["tools"]["branch_merge_test_batch_run"] = (
+        tools["branch_merge_test_batch_run"] = (
             "Run an explicit ordered test list on one exact virtual merge candidate."
         )
-        help_value["tools"]["merge_candidate_test_batch_get"] = (
+        tools["merge_candidate_test_batch_get"] = (
             "Read and verify retained aggregate virtual-candidate evidence."
         )
-        help_value["tools"]["merge_candidate_test_output_page"] = (
+        tools["merge_candidate_test_output_page"] = (
             "Read bounded verified candidate stdout or stderr."
         )
     return {**response, "help": help_value}
