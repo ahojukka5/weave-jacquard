@@ -6,7 +6,6 @@ import hashlib
 import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from types import ModuleType
 from typing import Any
 
 from .mcp_capabilities import (
@@ -125,13 +124,18 @@ def build_tool_manifest(
 ) -> dict[str, Any]:
     """Build a content-derived manifest for one exact public tool-name set."""
 
-    names = tuple(sorted(tool_names))
-    if not names or any(not isinstance(name, str) or not name for name in names):
+    raw_names = tuple(tool_names)
+    if not raw_names or any(
+        not isinstance(name, str) or not name for name in raw_names
+    ):
         raise ApplicationCompositionError("tool manifest requires non-empty string names")
+    names = tuple(sorted(raw_names))
     if len(names) != len(set(names)):
         raise ApplicationCompositionError("tool manifest contains duplicate names")
 
     required = frozenset(required_tools)
+    if any(not isinstance(name, str) or not name for name in required):
+        raise ApplicationCompositionError("required tool names must be non-empty strings")
     missing = sorted(required.difference(names))
     if missing:
         raise ApplicationCompositionError(
