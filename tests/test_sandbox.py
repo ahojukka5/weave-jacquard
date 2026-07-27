@@ -117,6 +117,24 @@ def test_bubblewrap_denies_host_files_and_host_network(tmp_path: Path) -> None:
     server.bind(("127.0.0.1", 0))
     server.listen(1)
     port = server.getsockname()[1]
+    host_probe = subprocess.run(
+        [
+            bash,
+            "-c",
+            'exec 3<>"/dev/tcp/127.0.0.1/$1"',
+            "host-network-probe",
+            str(port),
+        ],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        timeout=2,
+    )
+    assert host_probe.returncode == 0, host_probe.stderr.decode(errors="replace")
+    accepted, _ = server.accept()
+    accepted.close()
+
     script = r'''
 secret=$1
 port=$2
