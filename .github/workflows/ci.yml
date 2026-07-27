@@ -36,7 +36,7 @@ jobs:
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
           if [[ -e /proc/sys/kernel/unprivileged_userns_clone ]]; then
-            sudo sysctl -w kernel.unprivileged_userns_clone=1
+            sudo sysctl -w kernel/unprivileged_userns_clone=1
           fi
 
       - name: Install package and test tools
@@ -124,6 +124,9 @@ jobs:
           mapfile -t revision_evidence_traces < <(
             find "$base" -name revision-evidence-trace.json -print
           )
+          mapfile -t immutable_revert_traces < <(
+            find "$base" -name immutable-revert-trace.json -print
+          )
           test "${#revision_traces[@]}" -eq 1
           test "${#node_concurrency_traces[@]}" -eq 1
           test "${#program_target_traces[@]}" -eq 1
@@ -145,6 +148,7 @@ jobs:
           test "${#merge_candidate_test_run_traces[@]}" -eq 1
           test "${#task_contract_traces[@]}" -eq 1
           test "${#revision_evidence_traces[@]}" -eq 1
+          test "${#immutable_revert_traces[@]}" -eq 1
           cp "${revision_traces[0]}" qualification/revision-reads-trace.json
           cp "${node_concurrency_traces[0]}" \
             qualification/single-node-concurrency-trace.json
@@ -186,6 +190,8 @@ jobs:
             qualification/task-contracts-trace.json
           cp "${revision_evidence_traces[0]}" \
             qualification/revision-evidence-trace.json
+          cp "${immutable_revert_traces[0]}" \
+            qualification/immutable-revert-trace.json
 
       - name: Upload CI qualification evidence
         uses: actions/upload-artifact@v4
