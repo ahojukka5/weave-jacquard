@@ -7,12 +7,20 @@ from typing import Any
 
 from .mcp_build import build_targets, merge_previews
 from .mcp_server import _result, mcp
-from .mcp_test_targets import test_targets
+from .mcp_test_targets import (
+    install_metadata_aware_merge_services,
+    test_targets,
+)
 from .merge_test_impact import MergeCandidateTestImpactService
 from .test_impact import (
     DEFAULT_TEST_IMPACT_EVIDENCE_LIMIT,
     DEFAULT_TEST_IMPACT_PAGE_SIZE,
 )
+
+# Capability modules may already be cached when the declarative installer runs.
+# Reapply the final service composition explicitly before constructing this
+# preview-dependent capability.
+install_metadata_aware_merge_services()
 
 
 @lru_cache(maxsize=1)
