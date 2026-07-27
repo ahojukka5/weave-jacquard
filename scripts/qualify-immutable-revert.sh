@@ -11,6 +11,10 @@ case "$mode" in
     ;;
 esac
 
+root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$root_dir"
+export PYTHONPATH="$root_dir/src${PYTHONPATH:+:$PYTHONPATH}"
+
 out_dir="${2:-local-qualification/immutable-revert-$mode}"
 base_temp="$out_dir/pytest-tmp"
 
@@ -35,7 +39,10 @@ mkdir -p "$out_dir"
   printf 'timestamp_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'git_sha=%s\n' "$(git rev-parse HEAD)"
   printf 'git_branch=%s\n' "$(git branch --show-current)"
+  printf 'repository_root=%s\n' "$root_dir"
   printf 'python=%s\n' "$(python --version 2>&1)"
+  printf 'python_executable=%s\n' "$(python -c 'import sys; print(sys.executable)')"
+  printf 'pythonpath=%s\n' "$PYTHONPATH"
   printf 'ruff=%s\n' "$("${ruff_cmd[@]}" --version 2>&1)"
   printf 'ruff_command='
   printf '%q ' "${ruff_cmd[@]}"
