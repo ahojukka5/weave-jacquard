@@ -119,6 +119,12 @@ retained evidence.
 ## Operational requirements
 
 - Install Bubblewrap on Linux hosts that are permitted to execute tests.
+- The host kernel and security policy must permit the user and network namespaces
+  reported by `sandbox_capabilities`. Ubuntu AppArmor policies can deliberately
+  restrict unprivileged user namespaces; in that configuration the probe refuses
+  execution until an administrator explicitly permits the required namespaces.
+- Do not weaken the sandbox or share the host network merely to make the probe
+  pass. A host that cannot create the declared isolation boundary is unsupported.
 - Call `sandbox_capabilities` before relying on execution availability.
 - Pin `revision_id` when testing reviewed or merge-candidate work.
 - Treat `definition_hash`, build identity, executable hash, and policy hash as a
