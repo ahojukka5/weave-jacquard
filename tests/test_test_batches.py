@@ -8,7 +8,10 @@ import pytest
 
 from weave_frontend import ValidationError
 from weave_frontend.errors import ArtifactIntegrityError, NotFoundError
-from weave_frontend.test_batches import MAX_TEST_BATCH_TARGETS, TestBatchService
+from weave_frontend.test_batches import (
+    MAX_TEST_BATCH_TARGETS,
+    TestBatchService as _TestBatchService,
+)
 
 
 class _Workspace:
@@ -73,7 +76,12 @@ class _Runs:
         run = {
             "run_id": run_id,
             "manifest_sha256": name[0] * 64,
+            "project": project,
+            "branch": branch,
+            "revision_id": revision_id,
+            "test_target": name,
             "definition_hash": name[0] * 64,
+            "sandbox": {"policy_hash": "p" * 64},
             "passed": passed,
         }
         self.retained[run_id] = run
@@ -88,14 +96,18 @@ def _service(
     *,
     tests: _Tests | None = None,
     runs: _Runs | None = None,
-) -> tuple[TestBatchService, _Tests, _Runs]:
+) -> tuple[_TestBatchService, _Tests, _Runs]:
     resolved_tests = tests or _Tests()
     resolved_runs = runs or _Runs(tmp_path / "runs")
     return (
-        TestBatchService(_Workspace(), resolved_tests, resolved_runs),
+        _TestBatchService(_Workspace(), resolved_tests, resolved_runs),
         resolved_tests,
         resolved_runs,
     )
+
+
+def _manifest_path(tmp_path: Path) -> Path:
+    return next((tmp_path / "runs" / "batches").glob("*/batch-manifest.json"))
 
 
 def test_batch_preserves_order_and_retains_pass_and_failure_evidence(
@@ -187,22 +199,46 @@ def test_batch_selection_is_explicit_unique_and_bounded(
     assert runs.calls == []
 
 
-def test_batch_get_rejects_tampered_manifest_and_subordinate_evidence(
-    tmp_path: Path,
-) -> None:
-    service, _, runs = _service(tmp_path)
-    batch = service.run("demo", ["alpha"])
-    manifest_path = next((tmp_path / "runs" / "batches").glob("*/batch-manifest.json"))
+def test_batch_get_rejects_aggregate_manifest_tampering(tmp_path: Path) -> None:
+    service, _, _ = _service(tmp_path)
+    batch = service.run("demo", ["alpha", "beta"])
+    manifest_path = _manifest_path(tmp_path)
     original = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    original["passed_test_count"] = 0
-    manifest_path.write_text(json.dumps(original), encoding="utf-8")
-    with pytest.raises(ArtifactIntegrityError, match="passed count"):
+    tampered = dict(original)
+    tampered["selected_test_count"] = 1
+    manifest_path.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ArtifactIntegrityError, match="selected count"):
         service.get(batch["batch_id"])
 
-    original["passed_test_count"] = 1
-    manifest_path.write_text(json.dumps(original), encoding="utf-8")
+    tampered = json.loads(json.dumps(original))
+    tampered["results"][0]["definition_hash"] = "0" * 64
+    manifest_path.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ArtifactIntegrityError, match="result definition hash"):
+        service.get(batch["batch_id"])
+
+    tampered = json.loads(json.dumps(original))
+    tampered["revision_id"] = "revision-tampered"
+    manifest_path.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ArtifactIntegrityError, match="input hash"):
+        service.get(batch["batch_id"])
+
+
+def test_batch_get_rejects_subordinate_run_identity_tampering(tmp_path: Path) -> None:
+    service, _, runs = _service(tmp_path)
+    batch = service.run("demo", ["alpha"])
     run_id = batch["results"][0]["run_id"]
+
     runs.retained[run_id]["manifest_sha256"] = "0" * 64
     with pytest.raises(ArtifactIntegrityError, match="run manifest hash"):
+        service.get(batch["batch_id"])
+
+    runs.retained[run_id]["manifest_sha256"] = "a" * 64
+    runs.retained[run_id]["revision_id"] = "revision-other"
+    with pytest.raises(ArtifactIntegrityError, match="revision"):
+        service.get(batch["batch_id"])
+
+    runs.retained[run_id]["revision_id"] = "revision-exact"
+    runs.retained[run_id]["sandbox"]["policy_hash"] = "0" * 64
+    with pytest.raises(ArtifactIntegrityError, match="sandbox policy hash"):
         service.get(batch["batch_id"])
