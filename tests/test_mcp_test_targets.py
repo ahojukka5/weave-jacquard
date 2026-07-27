@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from weave_frontend import mcp_build, mcp_test_targets
+from weave_frontend import mcp_build, mcp_test_targets, selected_merge_train_preview
 from weave_frontend.metadata_build_targets import BuildTargetRegistry
 from weave_frontend.metadata_merge_impact import MergeTargetImpactService
 from weave_frontend.metadata_merge_preview import MergePreviewService
+from weave_frontend.metadata_selected_merge_train_preview import (
+    SelectedMergeTrainPreviewService,
+)
 
 
 class _Tests:
@@ -123,7 +126,11 @@ def test_test_target_reads_and_delete_forward_exact_revisions(monkeypatch) -> No
     ]
 
 
-def test_test_capability_installs_metadata_aware_build_and_merge_services() -> None:
+def test_test_capability_installs_metadata_aware_merge_services() -> None:
     assert mcp_build.BuildTargetRegistry is BuildTargetRegistry
     assert mcp_build.MergePreviewService is MergePreviewService
     assert mcp_build.MergeTargetImpactService is MergeTargetImpactService
+    assert (
+        selected_merge_train_preview.SelectedMergeTrainPreviewService
+        is SelectedMergeTrainPreviewService
+    )
