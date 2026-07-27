@@ -10,15 +10,15 @@ from weave_frontend.concurrent_merge_policy import MergePolicyRegistry
 from weave_frontend.metadata_build_targets import BuildTargetRegistry
 from weave_frontend.test_resume_snapshot import (
     MAX_RESUME_TEST_TARGETS,
-    TestResumeSnapshotService,
+    TestResumeSnapshotService as _TestResumeSnapshotService,
 )
-from weave_frontend.test_targets import TestTargetRegistry
+from weave_frontend.test_targets import TestTargetRegistry as _TestTargetRegistry
 
 
-def _service(workspace: SExpressionWorkspace) -> TestResumeSnapshotService:
+def _service(workspace: SExpressionWorkspace) -> _TestResumeSnapshotService:
     targets = BuildTargetRegistry(workspace)
-    tests = TestTargetRegistry(workspace)
-    return TestResumeSnapshotService(
+    tests = _TestTargetRegistry(workspace)
+    return _TestResumeSnapshotService(
         workspace,
         targets,
         MergePolicyRegistry(workspace),
@@ -46,7 +46,7 @@ def test_resume_snapshot_separates_programs_and_bounded_test_summaries(
             "main.weave",
             expected_revision_id=program["revision_id"],
         )
-        tests = TestTargetRegistry(workspace)
+        tests = _TestTargetRegistry(workspace)
         first = tests.set(
             "demo",
             "main",
