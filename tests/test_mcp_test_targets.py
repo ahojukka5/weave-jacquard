@@ -159,6 +159,8 @@ def test_test_target_reads_list_page_and_delete_forward_exact_state(monkeypatch)
 
 
 def test_test_capability_installs_metadata_aware_merge_services() -> None:
+    mcp_test_targets.install_capability()
+
     assert mcp_build.BuildTargetRegistry is BuildTargetRegistry
     assert mcp_build.MergePreviewService is MergePreviewService
     assert mcp_build.MergeTargetImpactService is MergeTargetImpactService
