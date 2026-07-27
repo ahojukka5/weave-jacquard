@@ -83,7 +83,12 @@ class SandboxBackend(Protocol):
 
 
 class BubblewrapSandbox:
-    """Run one executable in a default-deny bubblewrap namespace sandbox."""
+    """Run one native executable in a default-deny bubblewrap namespace sandbox.
+
+    The executable is mounted and invoked directly as ``/app/program``. Callers that
+    need an interpreter must pass that interpreter binary as ``executable`` and provide
+    the script or expression through ``arguments`` or ``stdin``.
+    """
 
     def __init__(self, executable: str | Path | None = None) -> None:
         configured = executable or os.environ.get("WEAVE_BWRAP") or shutil.which("bwrap")
@@ -256,7 +261,6 @@ class BubblewrapSandbox:
             "--new-session",
             "--cap-drop",
             "ALL",
-            "--clearenv",
         ]
         for path in self._runtime_paths():
             command.extend(["--ro-bind-try", path, path])
@@ -277,21 +281,13 @@ class BubblewrapSandbox:
                 "/app/program",
                 "--chdir",
                 "/work",
-                "--setenv",
-                "HOME",
-                "/nonexistent",
-                "--setenv",
-                "PATH",
-                "/usr/bin:/bin",
-                "--setenv",
-                "LANG",
-                "C",
-                "--setenv",
-                "LC_ALL",
-                "C",
-                "--setenv",
-                "TMPDIR",
-                "/tmp",
+                "/usr/bin/env",
+                "-i",
+                "HOME=/nonexistent",
+                "PATH=/usr/bin:/bin",
+                "LANG=C",
+                "LC_ALL=C",
+                "TMPDIR=/tmp",
                 "/app/program",
                 *arguments,
             ]

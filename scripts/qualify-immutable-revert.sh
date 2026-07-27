@@ -102,11 +102,26 @@ set -o pipefail
 python -m compileall -q src tests 2>&1 | tee "$out_dir/compileall.log"
 "${ruff_cmd[@]}" check . 2>&1 | tee "$out_dir/ruff.log"
 
+python - <<'PY' | tee "$out_dir/sandbox-capabilities.json"
+import json
+import sys
+
+from weave_frontend.sandbox import BubblewrapSandbox
+
+capabilities = BubblewrapSandbox().capabilities()
+print(json.dumps(capabilities, indent=2, sort_keys=True))
+if not capabilities["available"]:
+    error = capabilities.get("probe_error") or "strict sandbox is unavailable"
+    print(f"mandatory strict sandbox qualification failed: {error}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+
 if [[ "$mode" == "focused" ]]; then
   python -m pytest -q --tb=short \
     tests/test_revert.py \
     tests/test_build_target_reference_integrity.py \
     tests/test_portable_sandbox.py \
+    tests/test_sandbox.py \
     tests/test_sexpr_context.py \
     tests/test_application.py \
     tests/test_mcp_capabilities.py \
@@ -129,8 +144,8 @@ cp "${traces[0]}" "$out_dir/immutable-revert-trace.json"
 
 (
   cd "$out_dir"
-  sha256sum environment.txt compileall.log ruff.log pytest.log \
-    immutable-revert-trace.json > SHA256SUMS
+  sha256sum environment.txt compileall.log ruff.log sandbox-capabilities.json \
+    pytest.log immutable-revert-trace.json > SHA256SUMS
 )
 
 printf 'qualification complete: %s\n' "$out_dir"
