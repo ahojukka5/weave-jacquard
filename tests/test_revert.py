@@ -10,7 +10,7 @@ from weave_frontend.merge_preview import MergePreviewService
 from weave_frontend.metadata_build_targets import BuildTargetRegistry
 from weave_frontend.revert import RevertService
 from weave_frontend.sexpr import head_symbol, walk_nodes
-from weave_frontend.test_targets import TestTargetRegistry
+from weave_frontend.test_targets import TestTargetRegistry as _TestTargetRegistry
 
 
 def _workspace(path: Path) -> tuple[SExpressionWorkspace, str, str]:
@@ -233,7 +233,7 @@ def test_revert_rejects_dangling_build_and_test_metadata(tmp_path: Path) -> None
     workspace, program_revision, _ = _workspace(tmp_path / "metadata.db")
     service = _service(workspace)
     targets = BuildTargetRegistry(workspace)
-    tests = TestTargetRegistry(workspace)
+    tests = _TestTargetRegistry(workspace)
     with workspace:
         target = targets.set(
             "demo",
