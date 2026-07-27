@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
-
-from .errors import ValidationError
+from .errors import NotFoundError, ValidationError
 from .project_metadata import TEST_TARGET_PREFIX
 from .sexpr import JsonObject
 from .test_targets import TestTargetRegistry
@@ -31,7 +29,7 @@ def validate_test_target_references(state: dict[str, JsonObject]) -> None:
     for build_target, test_names in test_target_references(state).items():
         try:
             TestTargetRegistry._require_build_target(state, build_target)
-        except Exception as exc:
+        except NotFoundError as exc:
             raise ValidationError(
                 "INVALID_TEST_TARGET_REFERENCE",
                 f"build target {build_target!r} is required by tests {test_names!r}",
