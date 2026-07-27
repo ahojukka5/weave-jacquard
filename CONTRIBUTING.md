@@ -96,13 +96,15 @@ Read `docs/single-node-concurrency.md`,
 `docs/selected-merge-preflight-batch.md`,
 `docs/selected-merge-train-preview.md`,
 `docs/sandboxed-test-runs.md`,
-`docs/explicit-test-batches.md`, and
-`docs/test-impact-plans.md` before changing branch writes, fork semantics,
-one-call orientation reads, handoff protocols, checkpoint supervision,
-project-wide agent status, project merge catalogs and queues, non-compiling
-merge-impact review, compiler-backed selected preflight orchestration,
-order-aware virtual merge simulation, executable test isolation and evidence,
-explicit behavioral-test orchestration, or structural test-impact planning.
+`docs/explicit-test-batches.md`,
+`docs/test-impact-plans.md`, and
+`docs/merge-candidate-test-impact.md` before changing branch writes, fork
+semantics, one-call orientation reads, handoff protocols, checkpoint
+supervision, project-wide agent status, project merge catalogs and queues,
+non-compiling merge-impact review, compiler-backed selected preflight
+orchestration, order-aware virtual merge simulation, executable test isolation
+and evidence, explicit behavioral-test orchestration, structural test-impact
+planning, or virtual merge-candidate test-impact planning.
 Consult `docs/write-concurrency-audit.md` before adding a new mutating tool.
 
 In particular:
@@ -248,6 +250,20 @@ In particular:
 - replayable `test_batch_run` arguments must include the exact target revision and
   may appear only when the complete non-empty candidate selection fits the first
   page; partial or continuation pages must never be presented as complete;
+- merge-candidate test-impact plans must recreate one exact preview and bind the
+  common base, target head, source head, preview ID, and merged-state root hash;
+- stale preview identities and structural conflicts must stop before candidate
+  test-impact evidence is returned;
+- virtual impacted tests must use only definition, referenced build-target, and
+  referenced source changes relative to the committed target head; removed tests
+  and structural gaps must remain separate bounded evidence;
+- virtual candidate definitions must remain explicitly uncommitted and must never
+  be exposed through ordinary revision-bound `test_target_get` or `test_batch_run`;
+- merge-candidate test-impact planning must run no compiler or test, publish no
+  merge, advance no branch, and claim no correctness or complete semantic
+  coverage;
+- merge-candidate plan IDs must bind complete unpaginated candidate evidence and
+  remain stable across lexical pages for the same exact preview;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
