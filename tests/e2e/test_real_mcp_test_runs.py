@@ -197,6 +197,7 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert capabilities["policy"]["network"] == "deny"
         assert capabilities["policy"]["filesystem"] == "isolated"
         assert capabilities["policy"]["seccomp"] is False
+        assert capabilities["resource_limits"]["process_count"] is False
 
         await _call(session, trace, "project_initialize", project=PROJECT)
         initial = _main_head(
