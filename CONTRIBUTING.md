@@ -93,12 +93,13 @@ Read `docs/single-node-concurrency.md`,
 `docs/project-merge-catalog.md`,
 `docs/project-merge-queue.md`,
 `docs/project-merge-impact-queue.md`,
-`docs/selected-merge-preflight-batch.md`, and
-`docs/selected-merge-train-preview.md` before changing branch writes, fork
-semantics, one-call orientation reads, handoff protocols, checkpoint
-supervision, project-wide agent status, project merge catalogs and queues,
-non-compiling merge-impact review, compiler-backed selected preflight
-orchestration, or order-aware virtual merge simulation.
+`docs/selected-merge-preflight-batch.md`,
+`docs/selected-merge-train-preview.md`, and
+`docs/sandboxed-test-runs.md` before changing branch writes, fork semantics,
+one-call orientation reads, handoff protocols, checkpoint supervision,
+project-wide agent status, project merge catalogs and queues, non-compiling
+merge-impact review, compiler-backed selected preflight orchestration,
+order-aware virtual merge simulation, or executable test isolation and evidence.
 Consult `docs/write-concurrency-audit.md` before adding a new mutating tool.
 
 In particular:
@@ -198,6 +199,19 @@ In particular:
   and preflight the next source against the new target head;
 - merge-train source order is structural caller input and must not be interpreted
   as priority, urgency, quality, business value, or human readiness;
+- executable behavioral tests must never fall back to an unrestricted host
+  subprocess when the declared isolation backend is missing or its probe fails;
+- sandbox capability responses are authoritative and callers must not infer
+  seccomp, networking, filesystem, or kernel protections that are not reported;
+- every behavioral run must bind one exact revision, test `definition_hash`,
+  compiler build, executable hash, sandbox policy hash, and resource-limit set;
+- test execution must not advance a branch or publish a project revision;
+- sandbox or build refusal must publish no behavioral run evidence, while failed
+  behavioral assertions must remain immutable evidence with `passed = false`;
+- retained run manifests and output artifacts must be verified before publication
+  and on every read, and existing run identities must never be overwritten;
+- public MCP responses must not expose server-local run paths; retained stdout and
+  stderr must remain behind bounded, hash-bearing output pages;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
