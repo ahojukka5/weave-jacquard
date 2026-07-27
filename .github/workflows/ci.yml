@@ -53,6 +53,24 @@ jobs:
           set -o pipefail
           ruff check . 2>&1 | tee ruff.log
 
+      - name: Require strict sandbox
+        run: |
+          set -o pipefail
+          mkdir -p qualification
+          python - <<'PY' | tee qualification/sandbox-capabilities.json
+          import json
+          import sys
+
+          from weave_frontend.sandbox import BubblewrapSandbox
+
+          capabilities = BubblewrapSandbox().capabilities()
+          print(json.dumps(capabilities, indent=2, sort_keys=True))
+          if not capabilities["available"]:
+              error = capabilities.get("probe_error") or "strict sandbox is unavailable"
+              print(f"mandatory strict sandbox qualification failed: {error}", file=sys.stderr)
+              raise SystemExit(1)
+          PY
+
       - name: Test
         run: |
           set -o pipefail
@@ -207,6 +225,7 @@ jobs:
         with:
           name: jacquard-ci-failure
           path: |
+            qualification/sandbox-capabilities.json
             ruff.log
             pytest.log
           if-no-files-found: ignore
