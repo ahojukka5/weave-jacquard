@@ -194,7 +194,16 @@ def test_merge_candidate_plan_binds_preview_and_structural_reasons() -> None:
     assert plan["uncovered_changed_program_documents"] == ["unused.weave"]
     assert plan["untested_changed_build_targets"] == ["untested"]
     assert plan["complete_selection"] is True
-    assert plan["candidate_execution"] is None
+    assert plan["candidate_execution"] == {
+        "tool": "branch_merge_test_batch_run",
+        "arguments": {
+            "project": "demo",
+            "target_branch": "main",
+            "source_branch": "feature",
+            "test_targets": ["config-test", "new-test", "smoke"],
+            "preview_id": PREVIEW,
+        },
+    }
     assert plan["interpretation"] == {
         "kind": "virtual_merge_structural_candidate_plan",
         "executes_tests": False,
@@ -202,6 +211,7 @@ def test_merge_candidate_plan_binds_preview_and_structural_reasons() -> None:
         "claims_correctness": False,
         "claims_complete_semantic_coverage": False,
         "ordinary_test_batch_compatible": False,
+        "candidate_test_batch_compatible": True,
         "caller_order": "lexical_pagination_only",
     }
 
@@ -225,9 +235,12 @@ def test_merge_candidate_plan_pages_under_one_stable_identity() -> None:
     ]
     assert first["impacted_tests_truncated"] is True
     assert first["next_after_name"] == "new-test"
+    assert first["candidate_execution"] is None
+    assert first["interpretation"]["candidate_test_batch_compatible"] is False
     assert [item["name"] for item in second["impacted_tests"]] == ["smoke"]
     assert second["impacted_tests_truncated"] is False
     assert second["candidate_execution"] is None
+    assert second["interpretation"]["candidate_test_batch_compatible"] is False
 
 
 def test_merge_candidate_plan_rejects_conflicts_and_stale_preview() -> None:

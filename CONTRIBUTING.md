@@ -97,14 +97,16 @@ Read `docs/single-node-concurrency.md`,
 `docs/selected-merge-train-preview.md`,
 `docs/sandboxed-test-runs.md`,
 `docs/explicit-test-batches.md`,
-`docs/test-impact-plans.md`, and
-`docs/merge-candidate-test-impact.md` before changing branch writes, fork
+`docs/test-impact-plans.md`,
+`docs/merge-candidate-test-impact.md`, and
+`docs/merge-candidate-test-execution.md` before changing branch writes, fork
 semantics, one-call orientation reads, handoff protocols, checkpoint
 supervision, project-wide agent status, project merge catalogs and queues,
 non-compiling merge-impact review, compiler-backed selected preflight
 orchestration, order-aware virtual merge simulation, executable test isolation
 and evidence, explicit behavioral-test orchestration, structural test-impact
-planning, or virtual merge-candidate test-impact planning.
+planning, virtual merge-candidate test-impact planning, or virtual-candidate
+build and behavioral evidence.
 Consult `docs/write-concurrency-audit.md` before adding a new mutating tool.
 
 In particular:
@@ -264,6 +266,34 @@ In particular:
   coverage;
 - merge-candidate plan IDs must bind complete unpaginated candidate evidence and
   remain stable across lexical pages for the same exact preview;
+- complete non-empty first-page merge-candidate plans may expose exact
+  `branch_merge_test_batch_run` arguments, while partial, continuation, and empty
+  pages must expose no candidate execution call;
+- virtual-candidate builds must use a separate non-revision manifest with
+  `committed_revision_id = null` and a content-derived identity binding preview,
+  merged root, target definition, ordered sources, compiler hash, and target;
+- every candidate build read must reconstruct the merge from immutable base,
+  target, and source revisions, verify the deterministic preview and merged root,
+  and reverify all retained artifacts;
+- virtual-candidate test execution must accept only an explicit bounded unique
+  caller-ordered selection and resolve every definition from one captured merged
+  state before building or executing;
+- tests sharing a candidate build target may reuse only the same exact verified
+  candidate executable; different targets must retain independent build evidence;
+- unavailable strict isolation must reject the whole candidate execution request;
+  unrestricted host fallback remains forbidden;
+- behavioral assertion failures must remain immutable candidate evidence, while
+  failed candidate builds must produce independent errors and an `incomplete`
+  aggregate without inventing stdout or stderr artifacts;
+- candidate qualification manifests must bind definitions, builds, compiler and
+  executable hashes, sandbox policy, resource limits, outputs, counts, outcomes,
+  and caller order, and must verify that complete evidence graph on every read;
+- candidate execution must publish no merge, create no project revision, and
+  advance no branch; head-stability flags are observations rather than admission
+  decisions or bearer tokens;
+- passing selected candidate tests must not imply complete semantic coverage,
+  merge admission, human approval, production readiness, or anything about
+  unselected tests;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;

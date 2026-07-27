@@ -122,7 +122,8 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         assert help_payload["ok"] is True
         help_result = help_payload["help"]
         assert "merged_root_hash" in help_result["preview"]
-        assert "candidate_execution=null" in help_result["execution"]
+        assert "branch_merge_test_batch_run" in help_result["execution"]
+        assert "Partial" in help_result["execution"]
 
         await _call(session, trace, "project_initialize", project=PROJECT)
         heads = _branch_heads(await _call(session, trace, "branch_list", project=PROJECT))
@@ -228,9 +229,19 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             "committed_revision_id": None,
         }
         assert plan["complete_selection"] is True
-        assert plan["candidate_execution"] is None
+        assert plan["candidate_execution"] == {
+            "tool": "branch_merge_test_batch_run",
+            "arguments": {
+                "project": PROJECT,
+                "target_branch": "main",
+                "source_branch": "feature",
+                "test_targets": ["smoke"],
+                "preview_id": preview["preview_id"],
+            },
+        }
         assert plan["interpretation"]["executes_tests"] is False
         assert plan["interpretation"]["publishes_merge"] is False
+        assert plan["interpretation"]["candidate_test_batch_compatible"] is True
 
         repeated = await _call(
             session,
@@ -245,6 +256,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         )
         assert repeated["plan_id"] == plan["plan_id"]
         assert repeated["impacted_tests"] == plan["impacted_tests"]
+        assert repeated["candidate_execution"] == plan["candidate_execution"]
         heads_after = _branch_heads(
             await _call(session, trace, "branch_list", project=PROJECT)
         )

@@ -13,9 +13,11 @@ It compares the committed target head with the preview's in-memory merged state,
 then applies the same test-definition, build-target, and source-change rules as
 revision impact planning. A supplied preview_id must still match current target
 and source heads. Conflicted previews stop before impact analysis. Candidate test
-definitions are virtual and have no committed revision, so ordinary
-test_batch_run is incompatible and no execution call is emitted. The plan runs
-nothing and publishes no merge.
+definitions are virtual and have no committed revision. ordinary test_batch_run is
+incompatible with that uncommitted subject. A complete non-empty first page emits
+explicit branch_merge_test_batch_run arguments for the exact preview; partial and
+continuation pages emit no execution call. Planning itself runs nothing and
+publishes no merge.
 """.strip()
 
 INSTRUCTIONS = f"{_base.INSTRUCTIONS}\n{_MERGE_IMPACT_INSTRUCTION}"
@@ -38,8 +40,9 @@ _TOPIC: dict[str, Any] = {
         "revision_id and cannot be read with ordinary revision-bound test_target_get."
     ),
     "execution": (
-        "The plan emits candidate_execution=null. Ordinary test_batch_run accepts committed "
-        "revision IDs and must not be used as if it executed this virtual candidate."
+        "A complete non-empty first page emits branch_merge_test_batch_run with the exact "
+        "preview_id and full lexical candidate list. Partial, continuation, and empty pages emit "
+        "candidate_execution=null. Ordinary revision-bound test_batch_run remains incompatible."
     ),
     "pagination": (
         "Candidate tests are paged lexically under one stable plan_id. Lexical order is not "
