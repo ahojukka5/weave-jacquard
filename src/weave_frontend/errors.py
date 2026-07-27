@@ -20,6 +20,10 @@ class ValidationError(WeaveFrontendError):
         return {"code": self.code, "message": self.message, "node_id": self.node_id}
 
 
+class ArtifactIntegrityError(WeaveFrontendError):
+    """Raised when immutable retained artifact evidence cannot be verified."""
+
+
 class NotFoundError(WeaveFrontendError):
     """Raised when a requested project object does not exist."""
 
