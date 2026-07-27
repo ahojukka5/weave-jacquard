@@ -175,7 +175,7 @@ class BubblewrapSandbox:
                 "captured_output": True,
                 "core_dump": True,
                 "open_files": True,
-                "process_count": True,
+                "process_count": False,
             },
         }
         return dict(self._capabilities)
@@ -325,8 +325,6 @@ class BubblewrapSandbox:
                 (limits.max_file_bytes, limits.max_file_bytes),
             )
             resource.setrlimit(resource.RLIMIT_NOFILE, (64, 64))
-            if hasattr(resource, "RLIMIT_NPROC"):
-                resource.setrlimit(resource.RLIMIT_NPROC, (32, 32))
 
         return apply
 
