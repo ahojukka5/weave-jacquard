@@ -135,3 +135,12 @@ def test_public_install_loads_modules_in_order_and_replaces_help_once() -> None:
     assert server.tools["weave_help"] is final_help
     assert "merge trains" in server.descriptions["weave_help"]
     assert manifest == capability_manifest(capabilities)
+
+
+def test_public_entrypoint_exposes_the_validated_capability_manifest() -> None:
+    from weave_jacquard import mcp_build as public_entrypoint
+
+    assert public_entrypoint.PUBLIC_CAPABILITY_MANIFEST == capability_manifest()
+    assert [entry["name"] for entry in public_entrypoint.PUBLIC_CAPABILITY_MANIFEST] == [
+        capability.name for capability in PUBLIC_CAPABILITIES
+    ]
