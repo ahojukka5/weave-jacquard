@@ -11,7 +11,7 @@ from .mcp_server import _result, mcp
 from .mcp_test_targets import install_metadata_aware_merge_services, test_targets
 from .merge_candidate_build import MergeCandidateBuildService
 from .merge_candidate_test_runs import DEFAULT_OUTPUT_PAGE_BYTES
-from .sandbox import BubblewrapSandbox
+from .portable_sandbox import PortableBubblewrapSandbox
 from .verified_merge_candidate_test_runs import MergeCandidateTestBatchService
 
 
@@ -41,7 +41,7 @@ def merge_candidate_test_batches() -> MergeCandidateTestBatchService:
         merge_previews(),
         test_targets(),
         merge_candidate_builds(),
-        BubblewrapSandbox(),
+        PortableBubblewrapSandbox(),
     )
 
 
