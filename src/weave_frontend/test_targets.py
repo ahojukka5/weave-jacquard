@@ -24,6 +24,20 @@ DEFAULT_MEMORY_BYTES = 256 * 1024 * 1024
 DEFAULT_OUTPUT_BYTES = 64 * 1024
 DEFAULT_FILE_BYTES = 1024 * 1024
 
+_SINGLE_FIELDS: tuple[tuple[str, str, str], ...] = (
+    ("build_target", "build-target", "string"),
+    ("stdin", "stdin", "string"),
+    ("expected_exit_code", "expect-exit", "integer"),
+    ("expected_stdout", "expect-stdout", "string"),
+    ("expected_stderr", "expect-stderr", "string"),
+    ("timeout_ms", "timeout-ms", "integer"),
+    ("max_memory_bytes", "max-memory-bytes", "integer"),
+    ("max_output_bytes", "max-output-bytes", "integer"),
+    ("max_file_bytes", "max-file-bytes", "integer"),
+    ("network_policy", "network", "string"),
+    ("filesystem_policy", "filesystem", "string"),
+)
+
 
 class TestTargetRegistry:
     """Create and inspect immutable, revision-bound behavioral test definitions."""
@@ -202,8 +216,7 @@ class TestTargetRegistry:
 
     @staticmethod
     def _require_build_target(state: dict[str, JsonObject], name: str) -> None:
-        storage_document = f"{BUILD_TARGET_PREFIX}{name}"
-        root = state.get(storage_document)
+        root = state.get(f"{BUILD_TARGET_PREFIX}{name}")
         if root is None or head_symbol(root) != "build-target":
             raise NotFoundError(f"build target {name!r} not found")
 
@@ -255,12 +268,12 @@ class TestTargetRegistry:
             unique=True,
             pattern=TEST_TAG,
         )
-        for field, value in (
+        for field_name, value in (
             ("stdin", stdin),
             ("expected_stdout", expected_stdout),
             ("expected_stderr", expected_stderr),
         ):
-            cls._validate_text(field, value)
+            cls._validate_text(field_name, value)
         cls._validate_integer("expected_exit_code", expected_exit_code, 0, 255)
         cls._validate_integer("timeout_ms", timeout_ms, 1, MAX_TEST_TIMEOUT_MS)
         cls._validate_integer(
@@ -299,22 +312,22 @@ class TestTargetRegistry:
         }
 
     @staticmethod
-    def _validate_text(field: str, value: Any) -> None:
+    def _validate_text(field_name: str, value: Any) -> None:
         if not isinstance(value, str):
             raise ValidationError(
                 "INVALID_TEST_TARGET",
-                f"{field} must be a string",
+                f"{field_name} must be a string",
             )
         if len(value.encode("utf-8")) > MAX_TEST_STRING_BYTES:
             raise ValidationError(
                 "INVALID_TEST_TARGET",
-                f"{field} exceeds {MAX_TEST_STRING_BYTES} UTF-8 bytes",
+                f"{field_name} exceeds {MAX_TEST_STRING_BYTES} UTF-8 bytes",
             )
 
     @classmethod
     def _validate_strings(
         cls,
-        field: str,
+        field_name: str,
         values: Any,
         *,
         maximum: int,
@@ -324,35 +337,35 @@ class TestTargetRegistry:
         if not isinstance(values, list) or len(values) > maximum:
             raise ValidationError(
                 "INVALID_TEST_TARGET",
-                f"{field} must be a list with at most {maximum} items",
+                f"{field_name} must be a list with at most {maximum} items",
             )
         result: list[str] = []
         for value in values:
-            cls._validate_text(field, value)
+            cls._validate_text(field_name, value)
             if pattern is not None and not pattern.fullmatch(value):
                 raise ValidationError(
                     "INVALID_TEST_TARGET",
-                    f"{field} contains an invalid value {value!r}",
+                    f"{field_name} contains an invalid value {value!r}",
                 )
             result.append(value)
         if unique and len(result) != len(set(result)):
             raise ValidationError(
                 "INVALID_TEST_TARGET",
-                f"{field} must not contain duplicates",
+                f"{field_name} must not contain duplicates",
             )
         return result
 
     @staticmethod
-    def _validate_integer(field: str, value: Any, minimum: int, maximum: int) -> None:
+    def _validate_integer(field_name: str, value: Any, minimum: int, maximum: int) -> None:
         if isinstance(value, bool) or not isinstance(value, int):
             raise ValidationError(
                 "INVALID_TEST_TARGET",
-                f"{field} must be an integer",
+                f"{field_name} must be an integer",
             )
         if value < minimum or value > maximum:
             raise ValidationError(
                 "INVALID_TEST_TARGET",
-                f"{field} must be between {minimum} and {maximum}",
+                f"{field_name} must be between {minimum} and {maximum}",
             )
 
     @classmethod
@@ -364,30 +377,19 @@ class TestTargetRegistry:
     ) -> JsonObject:
         existing_fields = cls._existing_fields(existing)
         root = cls._form_with_identity(TEST_TARGET_HEAD, existing)
-        fields: list[tuple[str, str, Any]] = [
-            ("build-target", "string", config["build_target"]),
+        ordered: list[tuple[str, str, Any]] = [
+            (head, kind, config[key]) for key, head, kind in _SINGLE_FIELDS[:1]
         ]
-        fields.extend(("arg", "string", value) for value in config["arguments"])
-        fields.extend(
-            [
-                ("stdin", "string", config["stdin"]),
-                ("expect-exit", "integer", config["expected_exit_code"]),
-                ("expect-stdout", "string", config["expected_stdout"]),
-                ("expect-stderr", "string", config["expected_stderr"]),
-                ("timeout-ms", "integer", config["timeout_ms"]),
-                ("max-memory-bytes", "integer", config["max_memory_bytes"]),
-                ("max-output-bytes", "integer", config["max_output_bytes"]),
-                ("max-file-bytes", "integer", config["max_file_bytes"]),
-                ("network", "string", config["network_policy"]),
-                ("filesystem", "string", config["filesystem_policy"]),
-            ]
+        ordered.extend(("arg", "string", value) for value in config["arguments"])
+        ordered.extend(
+            (head, kind, config[key]) for key, head, kind in _SINGLE_FIELDS[1:]
         )
-        fields.extend(("tag", "string", value) for value in config["tags"])
+        ordered.extend(("tag", "string", value) for value in config["tags"])
         used: dict[str, int] = {}
-        for head, kind, value in fields:
+        for head, kind, value in ordered:
             index = used.get(head, 0)
-            existing_values = existing_fields.get(head, [])
-            current = existing_values[index] if index < len(existing_values) else None
+            previous = existing_fields.get(head, [])
+            current = previous[index] if index < len(previous) else None
             root["children"].append(cls._field(head, kind, value, existing=current))
             used[head] = index + 1
         return root
@@ -401,85 +403,63 @@ class TestTargetRegistry:
                 f"test target {name!r} has invalid root form",
             )
         fields = cls._existing_fields(root)
-        allowed = {
-            "build-target",
-            "arg",
-            "stdin",
-            "expect-exit",
-            "expect-stdout",
-            "expect-stderr",
-            "timeout-ms",
-            "max-memory-bytes",
-            "max-output-bytes",
-            "max-file-bytes",
-            "network",
-            "filesystem",
-            "tag",
-        }
+        allowed = {head for _, head, _ in _SINGLE_FIELDS} | {"arg", "tag"}
         unknown = sorted(set(fields) - allowed)
         if unknown:
             raise ValidationError(
                 "INVALID_TEST_TARGET",
                 f"test target {name!r} has unknown fields {unknown!r}",
             )
-        single = {
-            "build-target": "string",
-            "stdin": "string",
-            "expect-exit": "integer",
-            "expect-stdout": "string",
-            "expect-stderr": "string",
-            "timeout-ms": "integer",
-            "max-memory-bytes": "integer",
-            "max-output-bytes": "integer",
-            "max-file-bytes": "integer",
-            "network": "string",
-            "filesystem": "string",
-        }
         values: dict[str, Any] = {}
-        for field, kind in single.items():
-            entries = fields.get(field, [])
+        for key, head, kind in _SINGLE_FIELDS:
+            entries = fields.get(head, [])
             if len(entries) != 1:
                 raise ValidationError(
                     "INVALID_TEST_TARGET",
-                    f"test target {name!r} requires exactly one {field!r} field",
+                    f"test target {name!r} requires exactly one {head!r} field",
                 )
-            values[field] = cls._field_value(entries[0], kind=kind, field=field)
+            values[key] = cls._field_value(entries[0], kind=kind, field_name=head)
         arguments = [
-            cls._field_value(entry, kind="string", field="arg")
-            for entry in fields.get("arg", [])
+            cls._field_value(node, kind="string", field_name="arg")
+            for node in fields.get("arg", [])
         ]
         tags = [
-            cls._field_value(entry, kind="string", field="tag")
-            for entry in fields.get("tag", [])
+            cls._field_value(node, kind="string", field_name="tag")
+            for node in fields.get("tag", [])
         ]
         config = cls._config(
             name,
-            values["build-target"],
+            values["build_target"],
             arguments=arguments,
             stdin=values["stdin"],
-            expected_exit_code=values["expect-exit"],
-            expected_stdout=values["expect-stdout"],
-            expected_stderr=values["expect-stderr"],
-            timeout_ms=values["timeout-ms"],
-            max_memory_bytes=values["max-memory-bytes"],
-            max_output_bytes=values["max-output-bytes"],
-            max_file_bytes=values["max-file-bytes"],
+            expected_exit_code=values["expected_exit_code"],
+            expected_stdout=values["expected_stdout"],
+            expected_stderr=values["expected_stderr"],
+            timeout_ms=values["timeout_ms"],
+            max_memory_bytes=values["max_memory_bytes"],
+            max_output_bytes=values["max_output_bytes"],
+            max_file_bytes=values["max_file_bytes"],
             tags=tags,
         )
-        if values["network"] != "deny" or values["filesystem"] != "isolated":
+        if values["network_policy"] != "deny":
             raise ValidationError(
                 "INVALID_TEST_TARGET",
-                "test targets require network='deny' and filesystem='isolated'",
+                "test targets require network policy 'deny'",
+            )
+        if values["filesystem_policy"] != "isolated":
+            raise ValidationError(
+                "INVALID_TEST_TARGET",
+                "test targets require filesystem policy 'isolated'",
             )
         return config
 
     @staticmethod
-    def _field_value(field: JsonObject, *, kind: str, field: str) -> Any:
-        children = field.get("children", [])
+    def _field_value(node: JsonObject, *, kind: str, field_name: str) -> Any:
+        children = node.get("children", [])
         if len(children) != 2 or children[1].get("kind") != kind:
             raise ValidationError(
                 "INVALID_TEST_TARGET",
-                f"field {field!r} must contain one {kind} value",
+                f"field {field_name!r} must contain one {kind} value",
             )
         return children[1]["value"]
 
