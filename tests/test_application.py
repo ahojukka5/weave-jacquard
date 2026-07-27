@@ -119,13 +119,13 @@ def test_public_entrypoint_exposes_one_composed_application() -> None:
 
     assert public_entrypoint.PUBLIC_APP.server is public_entrypoint.mcp
     assert (
-        public_entrypoint.PUBLIC_CAPABILITY_MANIFEST
-        == public_entrypoint.PUBLIC_APP.capability_manifest
+        public_entrypoint.PUBLIC_APP.capability_manifest
+        == public_entrypoint.PUBLIC_CAPABILITY_MANIFEST
     )
-    assert public_entrypoint.PUBLIC_TOOL_MANIFEST == public_entrypoint.PUBLIC_APP.tool_manifest
+    assert public_entrypoint.PUBLIC_APP.tool_manifest == public_entrypoint.PUBLIC_TOOL_MANIFEST
     assert (
-        public_entrypoint.PUBLIC_APPLICATION_MANIFEST
-        == public_entrypoint.PUBLIC_APP.application_manifest
+        public_entrypoint.PUBLIC_APP.application_manifest
+        == public_entrypoint.PUBLIC_APPLICATION_MANIFEST
     )
     assert public_entrypoint.PUBLIC_TOOL_MANIFEST["tools"] == sorted(
         public_entrypoint.PUBLIC_TOOL_MANIFEST["tools"]
