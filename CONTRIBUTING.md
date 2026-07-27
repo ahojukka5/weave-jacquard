@@ -95,13 +95,14 @@ Read `docs/single-node-concurrency.md`,
 `docs/project-merge-impact-queue.md`,
 `docs/selected-merge-preflight-batch.md`,
 `docs/selected-merge-train-preview.md`,
-`docs/sandboxed-test-runs.md`, and
-`docs/explicit-test-batches.md` before changing branch writes, fork semantics,
+`docs/sandboxed-test-runs.md`,
+`docs/explicit-test-batches.md`, and
+`docs/test-impact-plans.md` before changing branch writes, fork semantics,
 one-call orientation reads, handoff protocols, checkpoint supervision,
 project-wide agent status, project merge catalogs and queues, non-compiling
 merge-impact review, compiler-backed selected preflight orchestration,
-order-aware virtual merge simulation, executable test isolation and evidence, or
-explicit behavioral-test orchestration.
+order-aware virtual merge simulation, executable test isolation and evidence,
+explicit behavioral-test orchestration, or structural test-impact planning.
 Consult `docs/write-concurrency-audit.md` before adding a new mutating tool.
 
 In particular:
@@ -227,6 +228,26 @@ In particular:
   statuses, sandbox policy, counts, and caller order;
 - test batches must not advance branches, publish project revisions, imply merge
   admission, or make claims about unselected tests;
+- test-impact plans must compare one project-owned exact base revision with one
+  exact target revision, capturing a branch head only once when the target is
+  omitted;
+- impacted tests must be surviving target-revision tests selected only because
+  their definition, referenced build target, or referenced source documents
+  changed;
+- removed tests and build targets must remain separate evidence and must never be
+  emitted as runnable candidates;
+- uncovered changed source documents and changed targets referenced by no tests
+  must remain explicit bounded gaps with totals, returned counts, and truncation;
+- test-impact plan IDs must bind the complete unpaginated comparison and remain
+  stable across lexical pages;
+- test-impact lexical ordering must remain deterministic pagination and must not
+  be interpreted as priority, urgency, cost, quality, or failure probability;
+- test-impact planning must run no compiler or test and must not claim
+  correctness, complete semantic coverage, merge admission, or anything about
+  unselected tests;
+- replayable `test_batch_run` arguments must include the exact target revision and
+  may appear only when the complete non-empty candidate selection fits the first
+  page; partial or continuation pages must never be presented as complete;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
