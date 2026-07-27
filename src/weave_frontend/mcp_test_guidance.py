@@ -12,10 +12,11 @@ Use test_target_set to define expected behavior against one revisioned named
 build target. Test definitions are immutable project metadata: they include
 arguments, controlled stdin, exact expected exit/stdout/stderr values, bounded
 resource limits, an isolated filesystem policy, and denied network access.
-They do not execute programs. Use test_target_get or test_target_list at the
-exact revision being reviewed. A later sandbox runner must bind its evidence to
-that same revision and definition; do not treat the existence of a test target
-as proof that it passed.
+Writes and exact reads return a deterministic definition_hash. Use bounded
+lexical test_target_list summaries for discovery and test_target_get for full
+content at the exact reviewed revision. They do not execute programs. A later
+sandbox runner must bind its evidence to that same revision and definition hash;
+do not treat the existence of a test target as proof that it passed.
 """.strip()
 
 INSTRUCTIONS = f"{_base.INSTRUCTIONS}\n{_TEST_INSTRUCTION}"
@@ -28,6 +29,14 @@ _TEST_TOPIC: dict[str, Any] = {
     "expectations": (
         "Definitions contain ordered arguments, controlled stdin, exact expected exit code, "
         "stdout and stderr, resource bounds, and optional tags."
+    ),
+    "identity": (
+        "test_target_set and test_target_get return definition_hash, a deterministic hash of "
+        "the exact structural definition at revision_id."
+    ),
+    "discovery": (
+        "test_target_list returns bounded lexical summaries with totals, truncation, "
+        "next_after_name continuation, expectation byte counts, and exact detail calls."
     ),
     "sandbox": (
         "Every definition fixes network_policy='deny' and filesystem_policy='isolated'. "
@@ -58,14 +67,14 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
     help_value = deepcopy(response["help"])
     if topic == "read":
         help_value["tools"]["test_target_get"] = (
-            "Read one revisioned behavioral test definition at a branch head or exact revision."
+            "Read one full hashed behavioral test definition at a branch head or exact revision."
         )
         help_value["tools"]["test_target_list"] = (
-            "List revisioned behavioral test definitions at a branch head or exact revision."
+            "Page bounded lexical test summaries at a branch head or exact revision."
         )
     elif topic == "write":
         help_value["tools"]["test_target_set"] = (
-            "Publish one race-safe sandbox-ready test definition against a named build target."
+            "Publish one race-safe hashed sandbox-ready test definition against a named target."
         )
         help_value["tools"]["test_target_delete"] = (
             "Delete one test definition through an immutable compare-and-set revision."
