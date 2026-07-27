@@ -36,6 +36,7 @@ def test_missing_bubblewrap_reports_unavailable_and_refuses_execution(
     assert capabilities["policy"]["network"] == "deny"
     assert capabilities["policy"]["filesystem"] == "isolated"
     assert capabilities["policy"]["seccomp"] is False
+    assert capabilities["resource_limits"]["process_count"] is False
     assert capabilities["policy_hash"]
 
     executable = tmp_path / "program"
