@@ -64,6 +64,28 @@ def test_verified_reads_and_writes_return_deterministic_definition_hash(
         assert created["definition_hash"] == workspace.db.hash_value(root)
 
 
+def test_verified_writes_reject_falsey_non_list_collections(tmp_path: Path) -> None:
+    workspace, registry, _, base_revision = _services(tmp_path / "collections.db")
+    with workspace:
+        for field_name, value in (
+            ("arguments", ()),
+            ("arguments", ""),
+            ("tags", ()),
+            ("tags", ""),
+        ):
+            with pytest.raises(ValidationError) as raised:
+                registry.set(
+                    "demo",
+                    "main",
+                    f"invalid-{field_name}",
+                    "application",
+                    expected_revision_id=base_revision,
+                    **{field_name: value},
+                )
+            assert raised.value.code == "INVALID_TEST_TARGET"
+        assert workspace.branch_head("demo", "main") == base_revision
+
+
 def test_bounded_page_uses_lexical_continuation_without_large_bodies(
     tmp_path: Path,
 ) -> None:
