@@ -46,7 +46,7 @@ class _FakeFastMCP:
 
 
 def _loader(name: str) -> ModuleType:
-    if name == "weave_frontend.mcp_task_guidance":
+    if name == "weave_frontend.mcp_evidence_guidance":
         return SimpleNamespace(  # type: ignore[return-value]
             INSTRUCTIONS="composed instructions",
             weave_help=lambda topic="workflow": {"ok": True, "topic": topic},
@@ -133,3 +133,4 @@ def test_public_entrypoint_exposes_one_composed_application() -> None:
     assert "weave_help" in public_entrypoint.PUBLIC_TOOL_MANIFEST["tools"]
     assert "tested_merge_attest" in public_entrypoint.PUBLIC_TOOL_MANIFEST["tools"]
     assert "task_node_apply_batch" in public_entrypoint.PUBLIC_TOOL_MANIFEST["tools"]
+    assert "revision_evidence_page" in public_entrypoint.PUBLIC_TOOL_MANIFEST["tools"]
