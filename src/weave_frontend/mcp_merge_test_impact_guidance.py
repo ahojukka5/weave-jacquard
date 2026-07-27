@@ -13,7 +13,7 @@ It compares the committed target head with the preview's in-memory merged state,
 then applies the same test-definition, build-target, and source-change rules as
 revision impact planning. A supplied preview_id must still match current target
 and source heads. Conflicted previews stop before impact analysis. Candidate test
-definitions are virtual and have no committed revision. Ordinary test_batch_run is
+definitions are virtual and have no committed revision. ordinary test_batch_run is
 incompatible with that uncommitted subject. A complete non-empty first page emits
 explicit branch_merge_test_batch_run arguments for the exact preview; partial and
 continuation pages emit no execution call. Planning itself runs nothing and
