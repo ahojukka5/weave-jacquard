@@ -13,7 +13,7 @@ from weave_frontend.task_contracts import TaskContractRegistry
 from weave_frontend.task_scoped_batch import TaskScopedBatchExecutor
 
 
-def _workspace(path: Path) -> tuple[SExpressionWorkspace, dict[str, object]]:
+def _workspace(path: Path) -> tuple[SExpressionWorkspace, str]:
     workspace = SExpressionWorkspace(path)
     workspace.initialize("demo")
     main = workspace.create_program(
@@ -29,7 +29,10 @@ def _workspace(path: Path) -> tuple[SExpressionWorkspace, dict[str, object]]:
         program_name="other",
         expected_revision_id=str(main["revision_id"]),
     )
-    return workspace, main
+    documents = {
+        item["document"]: item for item in workspace.list_documents("demo", "main")
+    }
+    return workspace, str(documents["main.weave"]["root_node_id"])
 
 
 def test_task_contracts_are_revisioned_bounded_and_non_source(tmp_path: Path) -> None:
@@ -139,7 +142,7 @@ def test_task_status_transitions_require_owner_and_preserve_identity(tmp_path: P
 
 
 def test_task_scoped_batch_enforces_dependencies_scope_and_audit(tmp_path: Path) -> None:
-    workspace, main = _workspace(tmp_path / "task-batch.db")
+    workspace, main_root_id = _workspace(tmp_path / "task-batch.db")
     registry = TaskContractRegistry(workspace)
     executor = TaskScopedBatchExecutor(registry, EditBatchExecutor(workspace))
     with workspace:
@@ -163,7 +166,7 @@ def test_task_scoped_batch_enforces_dependencies_scope_and_audit(tmp_path: Path)
         )
         operation = {
             "op": "create_form",
-            "parent": main["root_node_id"],
+            "parent": main_root_id,
             "head": "do",
             "as": "body",
         }
