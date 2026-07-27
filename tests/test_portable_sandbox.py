@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from weave_frontend.portable_sandbox import PortableBubblewrapSandbox
+from weave_frontend.sandbox import BubblewrapSandbox
 
 
-def test_portable_bubblewrap_uses_inner_environment_allowlist(tmp_path: Path) -> None:
+def test_canonical_bubblewrap_uses_inner_environment_allowlist(tmp_path: Path) -> None:
     bwrap = tmp_path / "bwrap"
     bwrap.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     bwrap.chmod(0o755)
@@ -13,7 +13,7 @@ def test_portable_bubblewrap_uses_inner_environment_allowlist(tmp_path: Path) ->
     program.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     program.chmod(0o755)
 
-    command = PortableBubblewrapSandbox(bwrap)._command(program, ["alpha", "beta"])
+    command = BubblewrapSandbox(bwrap)._command(program, ["alpha", "beta"])
 
     assert "--clearenv" not in command
     env_index = command.index("/usr/bin/env")
