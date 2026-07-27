@@ -385,16 +385,42 @@ class RevisionWorkspace:
                     queue.append(parent)
         return distances
 
-    def _common_ancestor(self, left: str, right: str) -> str:
-        left_distances = self._ancestor_distances(left)
-        right_distances = self._ancestor_distances(right)
-        common = set(left_distances) & set(right_distances)
+    def _best_common_ancestors(self, left: str, right: str) -> tuple[str, ...]:
+        """Return sorted common ancestors that are not ancestors of another common one."""
+
+        common = set(self._ancestor_distances(left)) & set(
+            self._ancestor_distances(right)
+        )
         if not common:
             raise ConflictError(["branches have no common ancestor"])
-        return min(
-            common,
-            key=lambda item: left_distances[item] + right_distances[item],
-        )
+
+        ancestor_cache: dict[str, set[str]] = {}
+
+        def ancestors(revision: str) -> set[str]:
+            if revision not in ancestor_cache:
+                ancestor_cache[revision] = set(self._ancestor_distances(revision))
+            return ancestor_cache[revision]
+
+        best = [
+            candidate
+            for candidate in common
+            if not any(
+                candidate != other and candidate in ancestors(other)
+                for other in common
+            )
+        ]
+        return tuple(sorted(best))
+
+    def _common_ancestor(self, left: str, right: str) -> str:
+        best = self._best_common_ancestors(left, right)
+        if len(best) != 1:
+            raise ConflictError(
+                [
+                    "branches have multiple best common ancestors: "
+                    + ", ".join(best)
+                ]
+            )
+        return best[0]
 
     @classmethod
     def _validate_state(cls, state: dict[str, JsonObject]) -> None:
