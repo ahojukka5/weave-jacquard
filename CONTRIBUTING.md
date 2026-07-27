@@ -90,14 +90,15 @@ Read `docs/single-node-concurrency.md`,
 `docs/agent-checkpoints.md`,
 `docs/agent-checkpoint-timeline.md`,
 `docs/project-agent-status.md`,
+`docs/project-merge-catalog.md`,
 `docs/project-merge-queue.md`,
 `docs/project-merge-impact-queue.md`,
 `docs/selected-merge-preflight-batch.md`, and
 `docs/selected-merge-train-preview.md` before changing branch writes, fork
 semantics, one-call orientation reads, handoff protocols, checkpoint
-supervision, project-wide agent status, project merge queues, non-compiling
-merge-impact review, compiler-backed selected preflight orchestration, or
-order-aware virtual merge simulation.
+supervision, project-wide agent status, project merge catalogs and queues,
+non-compiling merge-impact review, compiler-backed selected preflight
+orchestration, or order-aware virtual merge simulation.
 Consult `docs/write-concurrency-audit.md` before adding a new mutating tool.
 
 In particular:
@@ -135,6 +136,9 @@ In particular:
 - project agent status must not infer inactivity, correctness, completion,
   blockage, or review readiness from timestamps, checkpoint lag, status labels,
   or program root hashes;
+- project merge orchestration must reuse `ProjectMergeCatalogService` for lexical
+  branch membership, target/source partitioning, fanout enforcement, and catalog
+  hashing rather than querying branches or rebuilding catalog identities itself;
 - project merge queues must bind one exact target head and every source head in a
   stable catalog, rejecting source or target changes rather than mixing previews;
 - merge-queue pages must independently bound source count, checkpoint scanning,
