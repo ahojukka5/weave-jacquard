@@ -173,6 +173,21 @@ class MergeCandidateTestImpactService:
             ]
         returned_entries = remaining_entries[:limit]
         remaining_count = len(remaining_entries) - len(returned_entries)
+        complete_selection = start_after_name is None and remaining_count == 0
+        candidate_execution = (
+            {
+                "tool": "branch_merge_test_batch_run",
+                "arguments": {
+                    "project": project,
+                    "target_branch": target_branch,
+                    "source_branch": source_branch,
+                    "test_targets": [item["name"] for item in impacted_tests],
+                    "preview_id": candidate["preview_id"],
+                },
+            }
+            if complete_selection and impacted_tests
+            else None
+        )
         next_after_name = (
             returned_entries[-1]["name"]
             if returned_entries and remaining_count > 0
@@ -197,8 +212,8 @@ class MergeCandidateTestImpactService:
             "impacted_tests_truncated": remaining_count > 0,
             "next_after_name": next_after_name,
             "impacted_tests": returned_entries,
-            "complete_selection": start_after_name is None and remaining_count == 0,
-            "candidate_execution": None,
+            "complete_selection": complete_selection,
+            "candidate_execution": candidate_execution,
             **self._bounded_evidence(
                 "changed_program_documents", changed_program_documents, evidence_limit
             ),
@@ -231,6 +246,7 @@ class MergeCandidateTestImpactService:
                 "claims_correctness": False,
                 "claims_complete_semantic_coverage": False,
                 "ordinary_test_batch_compatible": False,
+                "candidate_test_batch_compatible": candidate_execution is not None,
                 "caller_order": "lexical_pagination_only",
             },
         }
