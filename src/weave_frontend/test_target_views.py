@@ -17,6 +17,13 @@ class VerifiedTestTargetRegistry(TestTargetRegistry):
     """Attach deterministic definition hashes to exact test-target reads and writes."""
 
     def set(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        for field_name in ("arguments", "tags"):
+            value = kwargs.get(field_name)
+            if value is not None and not isinstance(value, list):
+                raise ValidationError(
+                    "INVALID_TEST_TARGET",
+                    f"{field_name} must be a list",
+                )
         result = super().set(*args, **kwargs)
         return self._with_definition_hash(result)
 
@@ -59,13 +66,14 @@ class TestTargetPageService:
         revision = revision_id or self.workspace.branch_head(project, branch)
         self.registry._require_project_revision(project, revision)
         state = self.workspace._state_at_revision(revision)
-        names = sorted(
+        all_names = sorted(
             document[len(TEST_TARGET_PREFIX) :]
             for document in state
             if document.startswith(TEST_TARGET_PREFIX)
         )
+        names = all_names
         if start_after_name is not None:
-            names = [name for name in names if name > start_after_name]
+            names = [name for name in all_names if name > start_after_name]
         selected = names[:limit]
         entries = [
             self._summary(
@@ -86,13 +94,7 @@ class TestTargetPageService:
             "revision_id": revision,
             "start_after_name": start_after_name,
             "limit": limit,
-            "total_test_target_count": len(
-                [
-                    document
-                    for document in state
-                    if document.startswith(TEST_TARGET_PREFIX)
-                ]
-            ),
+            "total_test_target_count": len(all_names),
             "remaining_after_cursor_count": len(names),
             "returned_test_target_count": len(entries),
             "test_targets_truncated": remaining > 0,
