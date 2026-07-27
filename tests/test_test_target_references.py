@@ -7,12 +7,12 @@ import pytest
 from weave_frontend import SExpressionWorkspace, ValidationError
 from weave_frontend.metadata_build_targets import BuildTargetRegistry
 from weave_frontend.metadata_merge_preview import MergePreviewService
-from weave_frontend.test_targets import TestTargetRegistry
+from weave_frontend.test_targets import TestTargetRegistry as _TestTargetRegistry
 
 
 def _base_state(
     workspace: SExpressionWorkspace,
-) -> tuple[BuildTargetRegistry, TestTargetRegistry, str]:
+) -> tuple[BuildTargetRegistry, _TestTargetRegistry, str]:
     workspace.initialize("demo")
     program = workspace.create_program(
         "demo",
@@ -28,7 +28,7 @@ def _base_state(
         "main.weave",
         expected_revision_id=program["revision_id"],
     )
-    return targets, TestTargetRegistry(workspace), str(target["revision_id"])
+    return targets, _TestTargetRegistry(workspace), str(target["revision_id"])
 
 
 def test_build_target_delete_is_blocked_until_tests_are_removed(tmp_path: Path) -> None:
