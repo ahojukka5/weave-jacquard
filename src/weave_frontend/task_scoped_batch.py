@@ -72,7 +72,7 @@ class TaskScopedBatchExecutor:
         if task_root is None:
             raise NotFoundError(f"task contract {task_name!r} not found")
         contract = self.registry._parse_tree(task_root, name=task_name)
-        self.registry._validate_references(state, contract, creating=False)
+        self.registry._validate_references(state, contract)
         self.registry.require_executable(
             state,
             contract,
@@ -82,7 +82,6 @@ class TaskScopedBatchExecutor:
         )
         contract_hash = self.registry.contract_hash(contract)
         task_revision_id = self.registry._latest_task_revision(
-            project,
             base_revision_id,
             task_document,
         )
