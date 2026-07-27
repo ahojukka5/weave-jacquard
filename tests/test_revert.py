@@ -76,10 +76,10 @@ def test_revert_preserves_independent_later_edits_and_writes_new_history(
         assert result["parent_revision_id"] == current_head
         assert result["history_rewritten"] is False
         assert workspace.branch_head("demo", "main") == result["revision_id"]
-        assert {item["document"] for item in workspace.list_documents("demo", "main")} == {
-            "main.weave",
-            "other.weave",
+        document_names = {
+            item["document"] for item in workspace.list_documents("demo", "main")
         }
+        assert document_names == {"main.weave", "other.weave"}
         state = workspace._state_at_revision(result["revision_id"])
         assert set(state) == {"main.weave", "other.weave"}
         assert "do" not in {
