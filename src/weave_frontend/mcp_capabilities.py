@@ -179,11 +179,14 @@ def install_public_capabilities(
     capabilities: Iterable[Capability] = PUBLIC_CAPABILITIES,
     module_loader: ModuleLoader = import_module,
 ) -> tuple[dict[str, Any], ...]:
-    """Load tools in dependency order and install the final guidance exactly once."""
+    """Load capabilities in order and run idempotent installers even when cached."""
 
     ordered = validate_capabilities(capabilities)
     for capability in ordered:
-        module_loader(capability.module)
+        module = module_loader(capability.module)
+        installer = getattr(module, "install_capability", None)
+        if callable(installer):
+            installer()
 
     guidance = module_loader("weave_frontend.mcp_merge_test_impact_guidance")
     server._mcp_server.instructions = guidance.INSTRUCTIONS
