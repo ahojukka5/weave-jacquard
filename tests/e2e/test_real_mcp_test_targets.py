@@ -140,6 +140,8 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             "max_file_bytes",
             "tags",
         } <= set(set_properties)
+        list_properties = _schema(by_name["test_target_list"])["properties"]
+        assert {"revision_id", "start_after_name", "limit"} <= set(list_properties)
 
         help_payload = await _call_payload(
             session,
@@ -197,6 +199,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         assert created["base_revision_id"] == target["revision_id"]
         assert created["network_policy"] == "deny"
         assert created["filesystem_policy"] == "isolated"
+        assert created["definition_hash"]
 
         resolved = await _call(
             session,
@@ -209,14 +212,24 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         assert resolved["arguments"] == ["--count", "3"]
         assert resolved["expected_stdout"] == "done\n"
         assert resolved["tags"] == ["smoke", "cli/fast"]
+        assert resolved["definition_hash"] == created["definition_hash"]
         listed = await _call(
             session,
             trace,
             "test_target_list",
             project=PROJECT,
             revision_id=created["revision_id"],
+            limit=1,
         )
-        assert [item["name"] for item in listed] == ["cli-smoke"]
+        assert listed["format"] == "weave-test-target-list-v1"
+        assert listed["total_test_target_count"] == 1
+        assert listed["returned_test_target_count"] == 1
+        assert listed["test_targets_truncated"] is False
+        assert [item["name"] for item in listed["test_targets"]] == ["cli-smoke"]
+        summary = listed["test_targets"][0]
+        assert summary["definition_hash"] == created["definition_hash"]
+        assert summary["expected_stdout_bytes"] == 5
+        assert "expected_stdout" not in summary
 
         source_documents = await _call(
             session,
@@ -240,6 +253,9 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         ]
         assert [item["name"] for item in snapshot["test_targets"]] == ["cli-smoke"]
         assert snapshot["test_targets"][0]["expected_stdout_bytes"] == 5
+        assert snapshot["test_targets"][0]["definition_hash"] == created[
+            "definition_hash"
+        ]
 
         stale = await _call_error(
             session,
@@ -268,6 +284,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         )
         assert updated["base_revision_id"] == created["revision_id"]
         assert updated["root_node_id"] == created["root_node_id"]
+        assert updated["definition_hash"] != created["definition_hash"]
         current = await _call(
             session,
             trace,
@@ -277,6 +294,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         )
         assert current["arguments"] == ["--count", "4"]
         assert current["expected_stdout"] == "updated\n"
+        assert current["definition_hash"] == updated["definition_hash"]
         assert _main_head(
             await _call(session, trace, "branch_list", project=PROJECT)
         ) == updated["revision_id"]
