@@ -81,6 +81,9 @@ def test_resume_snapshot_separates_programs_and_bounded_test_summaries(
         assert snapshot["returned_test_target_count"] == 1
         assert snapshot["test_targets_truncated"] is True
         assert snapshot["limits"]["test_target_limit"] == 1
+        alpha_root = workspace._state_at_revision(second["revision_id"])[
+            "@test-target/alpha"
+        ]
         assert snapshot["test_targets"] == [
             {
                 "name": "alpha",
@@ -97,7 +100,8 @@ def test_resume_snapshot_separates_programs_and_bounded_test_summaries(
                 "network_policy": "deny",
                 "filesystem_policy": "isolated",
                 "tags": ["smoke"],
-                "root_node_id": snapshot["test_targets"][0]["root_node_id"],
+                "root_node_id": alpha_root["id"],
+                "definition_hash": workspace.db.hash_value(alpha_root),
                 "detail": {
                     "tool": "test_target_get",
                     "arguments": {
