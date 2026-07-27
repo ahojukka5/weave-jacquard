@@ -6,10 +6,12 @@ from functools import lru_cache
 from typing import Any
 
 from . import mcp_build as _build
+from . import selected_merge_train_preview as _train
 from .mcp_server import _result, mcp, workspace
 from .metadata_build_targets import BuildTargetRegistry
 from .metadata_merge_impact import MergeTargetImpactService
 from .metadata_merge_preview import MergePreviewService
+from .metadata_selected_merge_train_preview import SelectedMergeTrainPreviewService
 from .test_targets import (
     DEFAULT_FILE_BYTES,
     DEFAULT_MEMORY_BYTES,
@@ -18,11 +20,13 @@ from .test_targets import (
     TestTargetRegistry,
 )
 
-# All later build, preview, impact, validation, policy, and preflight services must
-# share the metadata-aware implementations. Clear any test-populated compositions.
+# All later build, preview, impact, validation, policy, preflight, and train
+# services must share the metadata-aware implementations. Clear any
+# test-populated compositions before later capability modules register tools.
 _build.BuildTargetRegistry = BuildTargetRegistry
 _build.MergePreviewService = MergePreviewService
 _build.MergeTargetImpactService = MergeTargetImpactService
+_train.SelectedMergeTrainPreviewService = SelectedMergeTrainPreviewService
 for _service in (
     _build.build_targets,
     _build.merge_previews,
