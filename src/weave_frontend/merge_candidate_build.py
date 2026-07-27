@@ -126,7 +126,7 @@ class MergeCandidateBuildService(CompilerArtifactMixin):
             tempfile.mkdtemp(prefix=f".{build_id}-", dir=self.build_root)
         )
         try:
-            result = self._execute(
+            self._execute(
                 subject=subject,
                 target=target,
                 documents=documents,
