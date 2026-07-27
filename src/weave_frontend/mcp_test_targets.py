@@ -9,6 +9,7 @@ from . import mcp_build as _build
 from .mcp_server import _result, mcp, workspace
 from .metadata_build_targets import BuildTargetRegistry
 from .metadata_merge_impact import MergeTargetImpactService
+from .metadata_merge_preview import MergePreviewService
 from .test_targets import (
     DEFAULT_FILE_BYTES,
     DEFAULT_MEMORY_BYTES,
@@ -17,12 +18,14 @@ from .test_targets import (
     TestTargetRegistry,
 )
 
-# All later build, impact, validation, policy, and preflight services must share
-# the metadata-aware implementations. Clear any test-populated compositions.
+# All later build, preview, impact, validation, policy, and preflight services must
+# share the metadata-aware implementations. Clear any test-populated compositions.
 _build.BuildTargetRegistry = BuildTargetRegistry
+_build.MergePreviewService = MergePreviewService
 _build.MergeTargetImpactService = MergeTargetImpactService
 for _service in (
     _build.build_targets,
+    _build.merge_previews,
     _build.merge_impacts,
     _build.merge_validations,
     _build.merge_validation_sets,
