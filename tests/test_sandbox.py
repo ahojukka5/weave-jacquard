@@ -129,8 +129,7 @@ def test_bubblewrap_denies_host_files_and_host_network(tmp_path: Path) -> None:
             str(port),
         ],
         stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         check=False,
         timeout=2,
     )
