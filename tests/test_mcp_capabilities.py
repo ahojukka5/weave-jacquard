@@ -61,6 +61,7 @@ def test_public_capabilities_have_unique_dependency_order() -> None:
         "tested_merge_attestations",
         "revision_evidence",
         "task_contracts",
+        "revert",
         "resume_snapshot",
         "selected_merge_train_preview",
     ):
@@ -80,6 +81,7 @@ def test_public_capabilities_have_unique_dependency_order() -> None:
     assert names.index("build_discovery") < names.index("revision_evidence")
     assert names.index("test_batches") < names.index("revision_evidence")
     assert names.index("test_targets") < names.index("task_contracts")
+    assert names.index("task_contracts") < names.index("revert")
     assert names.index("tested_merge_attestations") < names.index("policy")
     assert names.index("task_contracts") < names.index("policy")
 
@@ -137,7 +139,7 @@ def test_public_install_loads_modules_in_order_and_replaces_help_once() -> None:
 
     def loader(name: str) -> ModuleType:
         loaded.append(name)
-        if name == "weave_frontend.mcp_evidence_guidance":
+        if name == "weave_frontend.mcp_revert_guidance":
             return guidance  # type: ignore[return-value]
         return ModuleType(name)
 
@@ -156,13 +158,13 @@ def test_public_install_loads_modules_in_order_and_replaces_help_once() -> None:
     assert loaded == [
         "example.base",
         "example.feature",
-        "weave_frontend.mcp_evidence_guidance",
+        "weave_frontend.mcp_revert_guidance",
     ]
     assert server._mcp_server.instructions == "final instructions"
     assert server.removed == ["weave_help"]
     assert server.added == ["weave_help"]
     assert server.tools["weave_help"] is final_help
-    assert "revision evidence" in server.descriptions["weave_help"]
+    assert "immutable reverts" in server.descriptions["weave_help"]
     assert manifest == capability_manifest(capabilities)
 
 
