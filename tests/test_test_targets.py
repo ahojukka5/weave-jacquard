@@ -11,13 +11,13 @@ from weave_frontend.project_metadata import TEST_TARGET_PREFIX
 from weave_frontend.test_targets import (
     MAX_TEST_ARGUMENTS,
     MAX_TEST_TIMEOUT_MS,
-    TestTargetRegistry,
+    TestTargetRegistry as _TestTargetRegistry,
 )
 
 
 def _workspace_with_target(
     path: Path,
-) -> tuple[SExpressionWorkspace, BuildTargetRegistry, TestTargetRegistry, str]:
+) -> tuple[SExpressionWorkspace, BuildTargetRegistry, _TestTargetRegistry, str]:
     workspace = SExpressionWorkspace(path)
     workspace.initialize("demo")
     program = workspace.create_program(
@@ -34,7 +34,7 @@ def _workspace_with_target(
         "main.weave",
         expected_revision_id=program["revision_id"],
     )
-    return workspace, targets, TestTargetRegistry(workspace), target["revision_id"]
+    return workspace, targets, _TestTargetRegistry(workspace), target["revision_id"]
 
 
 def _counts(workspace: SExpressionWorkspace) -> tuple[int, int]:
