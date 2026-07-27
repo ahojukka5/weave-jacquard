@@ -9,14 +9,19 @@ from weave_frontend.metadata_build_targets import BuildTargetRegistry
 from weave_frontend.test_target_views import (
     MAX_TEST_TARGET_PAGE_SIZE,
     TEST_TARGET_LIST_FORMAT,
-    TestTargetPageService,
+    TestTargetPageService as _TestTargetPageService,
     VerifiedTestTargetRegistry,
 )
 
 
 def _services(
     path: Path,
-) -> tuple[SExpressionWorkspace, VerifiedTestTargetRegistry, TestTargetPageService, str]:
+) -> tuple[
+    SExpressionWorkspace,
+    VerifiedTestTargetRegistry,
+    _TestTargetPageService,
+    str,
+]:
     workspace = SExpressionWorkspace(path)
     workspace.initialize("demo")
     program = workspace.create_program(
@@ -33,7 +38,12 @@ def _services(
         expected_revision_id=program["revision_id"],
     )
     registry = VerifiedTestTargetRegistry(workspace)
-    return workspace, registry, TestTargetPageService(registry), target["revision_id"]
+    return (
+        workspace,
+        registry,
+        _TestTargetPageService(registry),
+        target["revision_id"],
+    )
 
 
 def test_verified_reads_and_writes_return_deterministic_definition_hash(
