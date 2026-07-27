@@ -378,7 +378,7 @@ class BubblewrapSandbox:
                     accepted = chunk[:capacity]
                     streams[stream].extend(accepted)
                     total += len(accepted)
-                    if len(accepted) < len(chunk) or total >= max_output_bytes:
+                    if len(accepted) < len(chunk):
                         output_limited = True
                         cls._kill(process)
                         break
