@@ -52,16 +52,26 @@ def _payload(response: Any) -> dict[str, Any]:
     raise AssertionError(f"tool result did not contain a JSON object: {response!r}")
 
 
+async def _call_payload(
+    session: ClientSession,
+    trace: list[dict[str, Any]],
+    tool_name: str,
+    **arguments: Any,
+) -> dict[str, Any]:
+    response = await session.call_tool(tool_name, arguments=arguments)
+    payload = _payload(response)
+    trace.append({"tool": tool_name, "arguments": arguments, "payload": payload})
+    assert _attribute(response, "is_error", "isError") is not True, payload
+    return payload
+
+
 async def _call(
     session: ClientSession,
     trace: list[dict[str, Any]],
     tool_name: str,
     **arguments: Any,
 ) -> Any:
-    response = await session.call_tool(tool_name, arguments=arguments)
-    payload = _payload(response)
-    trace.append({"tool": tool_name, "arguments": arguments, "payload": payload})
-    assert _attribute(response, "is_error", "isError") is not True, payload
+    payload = await _call_payload(session, trace, tool_name, **arguments)
     assert payload.get("ok") is True, payload
     return payload["result"]
 
@@ -103,7 +113,14 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         by_name = {tool.name: tool for tool in tools.tools}
         assert set(by_name) >= REQUIRED_TOOLS
 
-        help_result = await _call(session, trace, "weave_help", topic="merge_test_impact")
+        help_payload = await _call_payload(
+            session,
+            trace,
+            "weave_help",
+            topic="merge_test_impact",
+        )
+        assert help_payload["ok"] is True
+        help_result = help_payload["help"]
         assert "in-memory merged state" in help_result["preview"]
         assert "candidate_execution=null" in help_result["execution"]
 
