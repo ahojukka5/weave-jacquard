@@ -121,7 +121,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         )
         assert help_payload["ok"] is True
         help_result = help_payload["help"]
-        assert "in-memory merged state" in help_result["preview"]
+        assert "merged_root_hash" in help_result["preview"]
         assert "candidate_execution=null" in help_result["execution"]
 
         await _call(session, trace, "project_initialize", project=PROJECT)
