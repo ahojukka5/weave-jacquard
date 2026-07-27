@@ -43,8 +43,9 @@ class TestRunService(CompilerArtifactMixin):
         self.compiler = compiler
         self.sandbox = sandbox or BubblewrapSandbox()
         configured_root = run_root or os.environ.get("WEAVE_TEST_RUN_ROOT")
-        default_root = workspace.db.path.parent / ".weave-test-runs"
-        self.run_root = Path(configured_root or default_root).resolve()
+        if configured_root is None:
+            configured_root = workspace.db.path.parent / ".weave-test-runs"
+        self.run_root = Path(configured_root).resolve()
         self.run_root.mkdir(parents=True, exist_ok=True)
 
     def capabilities(self) -> dict[str, Any]:
