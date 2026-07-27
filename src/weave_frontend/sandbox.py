@@ -83,7 +83,12 @@ class SandboxBackend(Protocol):
 
 
 class BubblewrapSandbox:
-    """Run one executable in a default-deny bubblewrap namespace sandbox."""
+    """Run one native executable in a default-deny bubblewrap namespace sandbox.
+
+    The executable is mounted and invoked directly as ``/app/program``. Callers that
+    need an interpreter must pass that interpreter binary as ``executable`` and provide
+    the script or expression through ``arguments`` or ``stdin``.
+    """
 
     def __init__(self, executable: str | Path | None = None) -> None:
         configured = executable or os.environ.get("WEAVE_BWRAP") or shutil.which("bwrap")
