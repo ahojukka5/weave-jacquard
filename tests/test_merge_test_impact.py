@@ -82,7 +82,6 @@ class _Previews:
     def __init__(self, workspace: _Workspace, *, conflicts: list[str] | None = None) -> None:
         self.workspace = workspace
         self.conflicts = conflicts or []
-        self.required: list[str] = []
 
     def candidate(
         self,
@@ -103,15 +102,11 @@ class _Previews:
             "source_head_revision_id": SOURCE_HEAD,
             "base_revision_id": BASE,
             "preview_id": PREVIEW,
-            "merged_root_hash": "f" * 64,
-            "merged_state": self.workspace.merged_state,
+            "mergeable": not self.conflicts,
             "conflicts": list(self.conflicts),
+            "merged_root_hash": "f" * 64 if not self.conflicts else None,
+            "_merged_state": self.workspace.merged_state if not self.conflicts else None,
         }
-
-    def require_preview(self, candidate: dict[str, Any], preview_id: str) -> None:
-        self.required.append(preview_id)
-        if candidate["preview_id"] != preview_id:
-            raise ValidationError("STALE_MERGE_PREVIEW", "preview changed")
 
 
 class _BuildTargets:
@@ -141,7 +136,10 @@ class _Tests:
         assert f"@build-target/{name}" in state
 
 
-def _service(*, conflicts: list[str] | None = None) -> tuple[_MergeCandidateTestImpactService, _Previews]:
+def _service(
+    *,
+    conflicts: list[str] | None = None,
+) -> tuple[_MergeCandidateTestImpactService, _Previews]:
     workspace = _Workspace()
     previews = _Previews(workspace, conflicts=conflicts)
     return (
@@ -151,7 +149,7 @@ def _service(*, conflicts: list[str] | None = None) -> tuple[_MergeCandidateTest
 
 
 def test_merge_candidate_plan_binds_preview_and_structural_reasons() -> None:
-    service, previews = _service()
+    service, _ = _service()
 
     plan = service.page(
         "demo",
@@ -161,7 +159,6 @@ def test_merge_candidate_plan_binds_preview_and_structural_reasons() -> None:
         limit=10,
     )
 
-    assert previews.required == [PREVIEW]
     assert plan["format"] == "weave-merge-test-impact-plan-v1"
     assert plan["preview_id"] == PREVIEW
     assert plan["target_head_revision_id"] == TARGET_HEAD
@@ -247,6 +244,21 @@ def test_merge_candidate_plan_rejects_conflicts_and_stale_preview() -> None:
             preview_id="preview-stale",
         )
     assert raised.value.code == "STALE_MERGE_PREVIEW"
+
+
+def test_merge_candidate_plan_rejects_missing_clean_candidate_state() -> None:
+    service, previews = _service()
+    original = previews.candidate
+
+    def missing_state(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        candidate = original(*args, **kwargs)
+        candidate["_merged_state"] = None
+        return candidate
+
+    previews.candidate = missing_state  # type: ignore[method-assign]
+    with pytest.raises(ValidationError) as raised:
+        service.page("demo", "main", "feature")
+    assert raised.value.code == "INVALID_MERGE_CANDIDATE"
 
 
 @pytest.mark.parametrize(
