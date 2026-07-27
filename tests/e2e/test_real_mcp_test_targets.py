@@ -141,13 +141,14 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             "tags",
         } <= set(set_properties)
 
-        help_value = await _call(
+        help_payload = await _call_payload(
             session,
             trace,
             "weave_help",
             topic="test_targets",
         )
-        assert "no program execution" in help_value["help"]["execution"]
+        assert help_payload["ok"] is True
+        assert "no program execution" in help_payload["help"]["execution"]
 
         await _call(session, trace, "project_initialize", project=PROJECT)
         initial = _main_head(
@@ -297,7 +298,9 @@ def _verify_database(tmp_path: Path) -> None:
             "set_test_target",
             "set_test_target",
         ]
-        assert all(str(row["target"]) == "@test-target/cli-smoke" for row in operations)
+        assert all(
+            str(row["target"]) == "@test-target/cli-smoke" for row in operations
+        )
         stale_rows = connection.execute(
             """SELECT COUNT(*) AS count FROM module_snapshots
                WHERE qualified_name = '@test-target/stale'"""
