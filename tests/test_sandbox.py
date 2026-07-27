@@ -109,38 +109,29 @@ def test_bubblewrap_denies_host_files_and_host_network(tmp_path: Path) -> None:
     if not capabilities["available"]:
         pytest.skip(str(capabilities["probe_error"]))
 
+    bash = shutil.which("bash")
+    assert bash is not None
     secret = tmp_path / "host-secret"
     secret.write_text("must-not-be-visible", encoding="utf-8")
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(("127.0.0.1", 0))
     server.listen(1)
     port = server.getsockname()[1]
-    program = tmp_path / "sandbox-check.py"
-    program.write_text(
-        """#!/usr/bin/python3
-import pathlib
-import socket
-import sys
-
-secret = pathlib.Path(sys.argv[1])
-if secret.exists():
-    raise SystemExit(80)
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.settimeout(0.25)
-try:
-    sock.connect(("127.0.0.1", int(sys.argv[2])))
-except OSError:
-    print("isolated")
-    raise SystemExit(0)
-raise SystemExit(81)
-""",
-        encoding="utf-8",
-    )
-    program.chmod(0o755)
+    script = r'''
+secret=$1
+port=$2
+if [[ -e "$secret" ]]; then
+    exit 80
+fi
+if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
+    exit 81
+fi
+printf 'isolated\n'
+'''
     try:
         result = sandbox.run(
-            program,
-            [str(secret), str(port)],
+            Path(bash),
+            ["-c", script, "sandbox-check", str(secret), str(port)],
             b"",
             _limits(),
         )
