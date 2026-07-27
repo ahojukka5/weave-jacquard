@@ -17,6 +17,15 @@ def reverts() -> RevertService:
     return RevertService(workspace(), merge_previews())
 
 
+def install_capability() -> None:
+    """Discard stale revert composition when public capabilities are reinstalled."""
+
+    reverts.cache_clear()
+
+
+install_capability()
+
+
 @mcp.tool()
 def branch_revert_preview(
     project: str,
