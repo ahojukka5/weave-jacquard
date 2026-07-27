@@ -112,6 +112,9 @@ jobs:
           mapfile -t test_impact_traces < <(
             find "$base" -name test-impact-trace.json -print
           )
+          mapfile -t merge_test_impact_traces < <(
+            find "$base" -name merge-test-impact-trace.json -print
+          )
           test "${#revision_traces[@]}" -eq 1
           test "${#node_concurrency_traces[@]}" -eq 1
           test "${#program_target_traces[@]}" -eq 1
@@ -129,6 +132,7 @@ jobs:
           test "${#test_run_traces[@]}" -eq 1
           test "${#test_batch_traces[@]}" -eq 1
           test "${#test_impact_traces[@]}" -eq 1
+          test "${#merge_test_impact_traces[@]}" -eq 1
           cp "${revision_traces[0]}" qualification/revision-reads-trace.json
           cp "${node_concurrency_traces[0]}" \
             qualification/single-node-concurrency-trace.json
@@ -162,6 +166,8 @@ jobs:
             qualification/test-batches-trace.json
           cp "${test_impact_traces[0]}" \
             qualification/test-impact-trace.json
+          cp "${merge_test_impact_traces[0]}" \
+            qualification/merge-test-impact-trace.json
 
       - name: Upload CI qualification evidence
         uses: actions/upload-artifact@v4

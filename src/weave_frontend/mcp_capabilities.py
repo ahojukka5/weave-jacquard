@@ -71,9 +71,14 @@ PUBLIC_CAPABILITIES: tuple[Capability, ...] = (
         ("test_batches",),
     ),
     Capability(
+        "merge_test_impact",
+        "weave_frontend.mcp_merge_test_impact",
+        ("test_impact",),
+    ),
+    Capability(
         "policy",
         "weave_frontend.mcp_policy",
-        ("test_impact",),
+        ("merge_test_impact",),
     ),
     Capability(
         "preflight",
@@ -174,13 +179,16 @@ def install_public_capabilities(
     capabilities: Iterable[Capability] = PUBLIC_CAPABILITIES,
     module_loader: ModuleLoader = import_module,
 ) -> tuple[dict[str, Any], ...]:
-    """Load tools in dependency order and install the final guidance exactly once."""
+    """Load capabilities in order and run idempotent installers even when cached."""
 
     ordered = validate_capabilities(capabilities)
     for capability in ordered:
-        module_loader(capability.module)
+        module = module_loader(capability.module)
+        installer = getattr(module, "install_capability", None)
+        if callable(installer):
+            installer()
 
-    guidance = module_loader("weave_frontend.mcp_test_impact_guidance")
+    guidance = module_loader("weave_frontend.mcp_merge_test_impact_guidance")
     server._mcp_server.instructions = guidance.INSTRUCTIONS
     server.remove_tool("weave_help")
     server.add_tool(
@@ -189,7 +197,8 @@ def install_public_capabilities(
         description=(
             "Explain structural, revision, checkpoint, project supervision, merge queues, "
             "merge trains, test definitions, strict test runs, explicit test batches, test "
-            "impact plans, selected preflight, resume, validation, and build workflows."
+            "impact plans, merge candidate test impact plans, selected preflight, resume, "
+            "validation, and build workflows."
         ),
     )
     return capability_manifest(ordered)
