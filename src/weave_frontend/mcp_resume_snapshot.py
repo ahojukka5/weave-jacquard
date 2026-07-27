@@ -9,7 +9,6 @@ from .checkpoint_resume_snapshot import CheckpointResumeSnapshotService
 from .mcp_agent_checkpoint import agent_checkpoints
 from .mcp_build import build_targets
 from .mcp_preflight import merge_policies
-from .mcp_resume_guidance import install_resume_guidance
 from .mcp_server import _result, mcp, workspace
 from .resume_snapshot import ResumeSnapshotService
 
@@ -55,6 +54,3 @@ def branch_resume_snapshot(
             operation_limit=operation_limit,
         )
     )
-
-
-install_resume_guidance(mcp)
