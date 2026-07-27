@@ -133,7 +133,7 @@ def test_batch_retains_independent_domain_errors_as_incomplete(tmp_path: Path) -
     assert batch["error_test_count"] == 1
     error = batch["results"][1]
     assert error["outcome"] == "error"
-    assert error["run_id"] if "run_id" in error else True
+    assert "run_id" not in error
     assert error["error"]["code"] == "TEST_BUILD_FAILED"
     assert error["passed"] is None
 
