@@ -52,7 +52,7 @@ class _Runs:
             "probe_error": None if self.available else "disabled",
             "backend": "fake",
             "version": "fake 1",
-            "policy_hash": "p" * 64,
+            "policy_hash": "1" * 64,
             "policy": {"network": "deny"},
             "resource_limits": {"process_count": False},
         }
@@ -79,7 +79,7 @@ class _Runs:
             "revision_id": revision_id,
             "test_target": name,
             "definition_hash": name[0] * 64,
-            "sandbox": {"policy_hash": "p" * 64},
+            "sandbox": {"policy_hash": "1" * 64},
             "passed": passed,
         }
         self.retained[run_id] = run
@@ -126,7 +126,7 @@ def test_batch_preserves_order_and_retains_pass_and_failure_evidence(
     assert batch["passed_test_count"] == 1
     assert batch["failed_test_count"] == 1
     assert batch["error_test_count"] == 0
-    assert batch["sandbox"]["policy_hash"] == "p" * 64
+    assert batch["sandbox"]["policy_hash"] == "1" * 64
     assert repeated["manifest_sha256"] == batch["manifest_sha256"]
     assert list((tmp_path / "runs" / "batches").glob("*/batch-manifest.json"))
 
