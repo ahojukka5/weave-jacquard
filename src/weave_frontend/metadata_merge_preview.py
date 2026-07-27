@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .build_target_validation import validate_build_target_references
 from .errors import ConflictError, ValidationError
 from .merge_preview import MergePreviewService as _BaseMergePreviewService
 from .task_contracts import validate_task_contract_references
@@ -11,7 +12,7 @@ from .test_target_validation import validate_test_target_references
 
 
 class MergePreviewService(_BaseMergePreviewService):
-    """Reject previews and publications with dangling test or task definitions."""
+    """Reject previews and publications with dangling project metadata."""
 
     def _snapshot(
         self,
@@ -22,6 +23,7 @@ class MergePreviewService(_BaseMergePreviewService):
         snapshot = super()._snapshot(project, target_branch, source_branch)
         merged_state = snapshot.get("_merged_state")
         if snapshot["mergeable"] and isinstance(merged_state, dict):
+            validate_build_target_references(merged_state)
             validate_test_target_references(merged_state)
             validate_task_contract_references(merged_state)
         return snapshot
