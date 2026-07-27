@@ -25,7 +25,10 @@ def test_context_is_versioned_with_branch(sexpr_workspace):
     assert context[0]["title"] == "Interface rule"
 
 
-def test_validation_reports_missing_weavec_without_guessing(sexpr_workspace):
+def test_validation_reports_missing_weavec_without_guessing(
+    sexpr_workspace,
+    monkeypatch,
+):
     sexpr_workspace.create_program(
         "sexpr-demo",
         "main",
@@ -33,6 +36,11 @@ def test_validation_reports_missing_weavec_without_guessing(sexpr_workspace):
         program_name="sexpr-demo",
     )
     sexpr_workspace.validator.binary = None
+    monkeypatch.setattr(
+        sexpr_workspace.validator,
+        "_resolve_binary",
+        lambda binary: None,
+    )
     result = sexpr_workspace.validate_program(
         "sexpr-demo",
         "main",
