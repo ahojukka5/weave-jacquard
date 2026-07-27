@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from .errors import ConflictError, ValidationError
-from .merge_impact import MERGE_TARGET_IMPACT_FORMAT, MergeTargetImpactService as _Base
+from .merge_impact import MERGE_TARGET_IMPACT_FORMAT
+from .merge_impact import MergeTargetImpactService as _Base
 from .project_metadata import (
     BUILD_TARGET_PREFIX,
     TEST_TARGET_PREFIX,
