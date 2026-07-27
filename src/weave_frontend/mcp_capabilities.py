@@ -86,9 +86,14 @@ PUBLIC_CAPABILITIES: tuple[Capability, ...] = (
         ("merge_candidate_test_execution",),
     ),
     Capability(
+        "task_contracts",
+        "weave_frontend.mcp_task_contracts",
+        ("test_targets",),
+    ),
+    Capability(
         "policy",
         "weave_frontend.mcp_policy",
-        ("tested_merge_attestations",),
+        ("tested_merge_attestations", "task_contracts"),
     ),
     Capability(
         "preflight",
@@ -123,7 +128,7 @@ PUBLIC_CAPABILITIES: tuple[Capability, ...] = (
     Capability(
         "resume_snapshot",
         "weave_frontend.mcp_resume_snapshot",
-        ("agent_checkpoint", "test_targets", "preflight"),
+        ("agent_checkpoint", "test_targets", "task_contracts", "preflight"),
     ),
     Capability(
         "revision_reads",
@@ -198,7 +203,7 @@ def install_public_capabilities(
         if callable(installer):
             installer()
 
-    guidance = module_loader("weave_frontend.mcp_tested_merge_attestation_guidance")
+    guidance = module_loader("weave_frontend.mcp_task_guidance")
     server._mcp_server.instructions = guidance.INSTRUCTIONS
     server.remove_tool("weave_help")
     server.add_tool(
@@ -207,8 +212,9 @@ def install_public_capabilities(
         description=(
             "Explain structural, revision, checkpoint, project supervision, merge queues, "
             "merge trains, test definitions, strict test runs, explicit test batches, test "
-            "impact plans, virtual candidate qualification, tested-merge attestations, selected "
-            "preflight, resume, validation, and build workflows."
+            "impact plans, virtual candidate qualification, tested-merge attestations, "
+            "revisioned task contracts, scoped edits, selected preflight, resume, validation, "
+            "and build workflows."
         ),
     )
     return capability_manifest(ordered)
