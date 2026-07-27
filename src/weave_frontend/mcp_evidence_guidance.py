@@ -35,9 +35,9 @@ _TOPIC: dict[str, Any] = {
         "bounded error codes; server-local paths are never exposed."
     ),
     "boundary": (
-        "The graph covers retained artifact stores only. Merge preview and preflight "
-        "responses are intentionally non-persistent, and graph absence or presence does "
-        "not establish complete coverage, policy admission, approval, or readiness."
+        "The graph covers retained artifacts in immutable stores only. Merge preview and "
+        "preflight responses are intentionally non-persistent, and graph absence or presence "
+        "does not establish complete coverage, policy admission, approval, or readiness."
     ),
 }
 
