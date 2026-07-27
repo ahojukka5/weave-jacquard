@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .build_target_validation import validate_build_target_references
 from .errors import ConflictError, NotFoundError, ValidationError
 from .merge_preview import MergePreviewService
 from .task_contracts import validate_task_contract_references
@@ -146,6 +147,7 @@ class RevertService:
                 parent_state,
             )
             self.workspace._validate_state(reverted_state)
+            validate_build_target_references(reverted_state)
             validate_test_target_references(reverted_state)
             validate_task_contract_references(reverted_state)
         except ConflictError as exc:
