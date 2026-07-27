@@ -2,8 +2,6 @@
 set -euo pipefail
 
 mode="${1:-full}"
-out_dir="${2:-local-qualification/immutable-revert}"
-base_temp="$out_dir/pytest-tmp"
 
 case "$mode" in
   focused|full) ;;
@@ -12,6 +10,14 @@ case "$mode" in
     exit 2
     ;;
 esac
+
+out_dir="${2:-local-qualification/immutable-revert-$mode}"
+base_temp="$out_dir/pytest-tmp"
+
+if [[ -z "$out_dir" || "$out_dir" == "/" || "$out_dir" == "." ]]; then
+  echo "refusing unsafe output directory: $out_dir" >&2
+  exit 2
+fi
 
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
@@ -34,6 +40,7 @@ if [[ "$mode" == "focused" ]]; then
     tests/test_build_target_reference_integrity.py \
     tests/test_application.py \
     tests/test_mcp_capabilities.py \
+    tests/test_mcp_revert.py \
     tests/e2e/test_real_mcp_revert.py \
     --basetemp "$base_temp" 2>&1 | tee "$out_dir/pytest.log"
 else
