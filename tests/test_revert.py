@@ -9,7 +9,7 @@ from weave_frontend import ConflictError, SExpressionWorkspace, ValidationError
 from weave_frontend.merge_preview import MergePreviewService
 from weave_frontend.metadata_build_targets import BuildTargetRegistry
 from weave_frontend.revert import RevertService
-from weave_frontend.sexpr import walk_nodes
+from weave_frontend.sexpr import head_symbol, walk_nodes
 from weave_frontend.test_targets import TestTargetRegistry
 
 
@@ -61,6 +61,9 @@ def test_revert_preserves_independent_later_edits_and_writes_new_history(
         assert preview["branch_head_revision_id"] == current_head
         assert preview["reverted_parent_revision_id"] == program_revision
         assert preview["changed_documents"] == ["main.weave"]
+        assert [item["document"] for item in preview["document_changes"]] == [
+            "main.weave"
+        ]
         assert workspace.branch_head("demo", "main") == current_head
 
         result = service.revert(
@@ -73,16 +76,18 @@ def test_revert_preserves_independent_later_edits_and_writes_new_history(
         assert result["parent_revision_id"] == current_head
         assert result["history_rewritten"] is False
         assert workspace.branch_head("demo", "main") == result["revision_id"]
-        assert workspace.list_documents("demo", "main") == [
-            item
-            for item in workspace.list_documents("demo", "main")
-            if item["document"] in {"main.weave", "other.weave"}
-        ]
+        assert {item["document"] for item in workspace.list_documents("demo", "main")} == {
+            "main.weave",
+            "other.weave",
+        }
         state = workspace._state_at_revision(result["revision_id"])
         assert set(state) == {"main.weave", "other.weave"}
-        assert all(
-            node.get("value") != "do"
-            for node in walk_nodes(state["main.weave"])
+        assert "do" not in {
+            head_symbol(node) for node in walk_nodes(state["main.weave"])
+        }
+        assert any(
+            node.get("kind") == "string" and node.get("value") == "independent"
+            for node in walk_nodes(state["other.weave"])
         )
 
         revision_row = workspace.db.connection.execute(
@@ -92,14 +97,17 @@ def test_revert_preserves_independent_later_edits_and_writes_new_history(
         assert revision_row["parent1_id"] == current_head
         assert revision_row["parent2_id"] is None
         operation = workspace.db.connection.execute(
-            """SELECT operation_kind, payload_json FROM operations
+            """SELECT operation_kind, target, payload_json FROM operations
                WHERE revision_id = ?""",
             (result["revision_id"],),
         ).fetchone()
         assert operation["operation_kind"] == "revert"
+        assert operation["target"] == "main"
         payload = json.loads(str(operation["payload_json"]))
         assert payload["preview_id"] == preview["preview_id"]
         assert payload["reverted_revision_id"] == selected["revision_id"]
+        assert payload["reviewed_branch_head_revision_id"] == current_head
+        assert payload["prospective_root_hash"] == result["root_hash"]
 
 
 def test_revert_reports_conflict_when_later_edit_overlaps_selected_change(
@@ -135,6 +143,7 @@ def test_revert_reports_conflict_when_later_edit_overlaps_selected_change(
         assert preview["revertible"] is False
         assert preview["would_change_branch"] is False
         assert preview["conflicts"]
+        assert preview["prospective_root_hash"] is None
         assert workspace.branch_head("demo", "main") == later["revision_id"]
         with pytest.raises(ConflictError):
             service.revert(
@@ -175,6 +184,8 @@ def test_revert_rejects_stale_preview_unreachable_revision_and_noop(tmp_path: Pa
                 preview_id=preview["preview_id"],
             )
         assert raised.value.code == "STALE_REVERT_PREVIEW"
+        assert workspace.branch_head("demo", "main") == advanced["revision_id"]
+
         fresh = service.preview("demo", "main", str(selected["revision_id"]))
         reverted = service.revert(
             "demo",
@@ -218,7 +229,7 @@ def test_revert_rejects_stale_preview_unreachable_revision_and_noop(tmp_path: Pa
         assert raised.value.code == "INITIAL_REVISION_NOT_REVERTIBLE"
 
 
-def test_revert_rejects_dangling_test_metadata(tmp_path: Path) -> None:
+def test_revert_rejects_dangling_build_and_test_metadata(tmp_path: Path) -> None:
     workspace, program_revision, _ = _workspace(tmp_path / "metadata.db")
     service = _service(workspace)
     targets = BuildTargetRegistry(workspace)
@@ -238,10 +249,13 @@ def test_revert_rejects_dangling_test_metadata(tmp_path: Path) -> None:
             "application",
             expected_revision_id=target["revision_id"],
         )
+
         with pytest.raises(ValidationError) as raised:
             service.preview("demo", "main", str(target["revision_id"]))
-        assert raised.value.code in {
-            "INVALID_TEST_TARGET_REFERENCE",
-            "INVALID_TEST_BUILD_TARGET_REFERENCE",
-        }
+        assert raised.value.code == "INVALID_TEST_TARGET_REFERENCE"
+        assert workspace.branch_head("demo", "main") == test["revision_id"]
+
+        with pytest.raises(ValidationError) as raised:
+            service.preview("demo", "main", program_revision)
+        assert raised.value.code == "INVALID_BUILD_TARGET_DOCUMENT_REFERENCE"
         assert workspace.branch_head("demo", "main") == test["revision_id"]
