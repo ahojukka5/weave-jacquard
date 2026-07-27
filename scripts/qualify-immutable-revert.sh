@@ -13,7 +13,10 @@ esac
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root_dir"
-export PYTHONPATH="$root_dir/src${PYTHONPATH:+:$PYTHONPATH}"
+case ":${PYTHONPATH:-}:" in
+  *":$root_dir/src:"*) ;;
+  *) export PYTHONPATH="$root_dir/src${PYTHONPATH:+:$PYTHONPATH}" ;;
+esac
 
 required_imports=(mcp pytest)
 if [[ "$mode" == "full" ]]; then
@@ -103,6 +106,8 @@ if [[ "$mode" == "focused" ]]; then
   python -m pytest -q --tb=short \
     tests/test_revert.py \
     tests/test_build_target_reference_integrity.py \
+    tests/test_portable_sandbox.py \
+    tests/test_sexpr_context.py \
     tests/test_application.py \
     tests/test_mcp_capabilities.py \
     tests/test_mcp_revert.py \
