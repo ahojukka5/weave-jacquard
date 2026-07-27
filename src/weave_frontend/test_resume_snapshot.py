@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from .checkpoint_resume_snapshot import CheckpointResumeSnapshotService
+from .errors import NotFoundError
 from .project_metadata import BUILD_TARGET_PREFIX, TEST_TARGET_PREFIX
 from .test_targets import TestTargetRegistry
 
@@ -120,8 +121,6 @@ class TestResumeSnapshotService(CheckpointResumeSnapshotService):
                 (revision_id, document, build_pattern, test_pattern),
             ).fetchone()
             if row is None:
-                from .errors import NotFoundError
-
                 raise NotFoundError(f"program document {document!r} not found")
 
     def _tests(
@@ -178,6 +177,7 @@ class TestResumeSnapshotService(CheckpointResumeSnapshotService):
                     "filesystem_policy": config["filesystem_policy"],
                     "tags": config["tags"],
                     "root_node_id": root["id"],
+                    "definition_hash": self.workspace.db.hash_value(root),
                     "detail": {
                         "tool": "test_target_get",
                         "arguments": {
