@@ -22,8 +22,13 @@ RUN_TOOLS = {
     "test_run_output_page",
     "test_batch_run",
     "test_batch_get",
+    "test_impact_plan",
 }
 RUN_ID = re.compile(r"^[0-9a-f]{32}$")
+PROGRAM_V2 = """(program
+  (name "sandboxed-test-runs")
+  (version "0.2"))
+"""
 
 
 def _attribute(value: Any, snake: str, camel: str) -> Any:
@@ -203,6 +208,14 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         )
         assert batch_help["ok"] is True
         assert "never expands tags" in batch_help["help"]["selection"]
+        impact_help = await _call_payload(
+            session,
+            trace,
+            "weave_help",
+            topic="test_impact",
+        )
+        assert impact_help["ok"] is True
+        assert "runs no compiler or test" in impact_help["help"]["boundary"]
 
         capabilities = await _call(session, trace, "sandbox_capabilities")
         assert capabilities["available"] is True, capabilities
@@ -363,6 +376,84 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert resolved_batch["manifest_sha256"] == batch["manifest_sha256"]
         assert resolved_batch["results"] == batch["results"]
 
+        imported = await _call(
+            session,
+            trace,
+            "program_import",
+            project=PROJECT,
+            branch="main",
+            document="main.weave",
+            source=PROGRAM_V2,
+            replace=True,
+            expected_revision_id=head_before_batch,
+        )
+        target_revision = imported["revision_id"]
+        assert _main_head(
+            await _call(session, trace, "branch_list", project=PROJECT)
+        ) == target_revision
+
+        impact = await _call(
+            session,
+            trace,
+            "test_impact_plan",
+            project=PROJECT,
+            base_revision_id=failing_definition["revision_id"],
+            branch="main",
+            target_revision_id=target_revision,
+            limit=10,
+            evidence_limit=10,
+        )
+        assert impact["base_revision_id"] == failing_definition["revision_id"]
+        assert impact["target_revision_id"] == target_revision
+        assert impact["changed_program_documents"] == ["main.weave"]
+        assert impact["changed_build_targets"] == []
+        assert impact["changed_test_targets"] == []
+        assert impact["uncovered_changed_program_documents"] == []
+        assert [item["name"] for item in impact["impacted_tests"]] == [
+            "failing",
+            "passing",
+        ]
+        assert all(
+            item["reasons"] == ["source_changed"]
+            for item in impact["impacted_tests"]
+        )
+        assert impact["complete_selection"] is True
+        assert impact["interpretation"]["executes_tests"] is False
+        assert impact["test_batch_run"] == {
+            "tool": "test_batch_run",
+            "arguments": {
+                "project": PROJECT,
+                "test_targets": ["failing", "passing"],
+                "branch": "main",
+                "revision_id": target_revision,
+            },
+        }
+        assert _main_head(
+            await _call(session, trace, "branch_list", project=PROJECT)
+        ) == target_revision
+
+        impact_batch = await _call(
+            session,
+            trace,
+            impact["test_batch_run"]["tool"],
+            **impact["test_batch_run"]["arguments"],
+        )
+        assert impact_batch["status"] == "failed"
+        assert impact_batch["revision_id"] == target_revision
+        assert impact_batch["test_targets"] == ["failing", "passing"]
+        resolved_impact_batch = await _call(
+            session,
+            trace,
+            "test_batch_get",
+            batch_id=impact_batch["batch_id"],
+        )
+        assert resolved_impact_batch["manifest_sha256"] == impact_batch[
+            "manifest_sha256"
+        ]
+        assert _main_head(
+            await _call(session, trace, "branch_list", project=PROJECT)
+        ) == target_revision
+
     return trace
 
 
@@ -373,7 +464,7 @@ def _verify_retained_evidence(tmp_path: Path) -> None:
         for path in run_root.iterdir()
         if path.is_dir() and RUN_ID.fullmatch(path.name)
     )
-    assert len(run_directories) == 4
+    assert len(run_directories) == 6
     statuses: list[str] = []
     run_ids: set[str] = set()
     for directory in run_directories:
@@ -386,15 +477,24 @@ def _verify_retained_evidence(tmp_path: Path) -> None:
         assert (directory / "stderr.bin").read_bytes() == b"warning\n"
         statuses.append(manifest["status"])
         run_ids.add(manifest["run_id"])
-    assert sorted(statuses) == ["failed", "failed", "passed", "passed"]
+    assert sorted(statuses) == [
+        "failed",
+        "failed",
+        "failed",
+        "passed",
+        "passed",
+        "passed",
+    ]
 
     manifests = sorted((run_root / "batches").glob("*/batch-manifest.json"))
-    assert len(manifests) == 1
-    batch = json.loads(manifests[0].read_text(encoding="utf-8"))
-    assert batch["format"] == "weave-test-batch-manifest-v1"
-    assert batch["status"] == "failed"
-    assert batch["test_targets"] == ["failing", "passing"]
-    assert {item["run_id"] for item in batch["results"]}.issubset(run_ids)
+    assert len(manifests) == 2
+    batches = [json.loads(path.read_text(encoding="utf-8")) for path in manifests]
+    assert all(batch["format"] == "weave-test-batch-manifest-v1" for batch in batches)
+    assert all(batch["status"] == "failed" for batch in batches)
+    assert all(batch["test_targets"] == ["failing", "passing"] for batch in batches)
+    assert len({batch["revision_id"] for batch in batches}) == 2
+    for batch in batches:
+        assert {item["run_id"] for item in batch["results"]}.issubset(run_ids)
 
 
 @pytest.mark.real_mcp
@@ -420,11 +520,28 @@ def test_real_mcp_runs_behavioral_tests_in_strict_sandbox(tmp_path: Path) -> Non
         json.dumps(batch_trace, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    impact_trace = [
+        entry
+        for entry in trace
+        if entry["tool"] in {"program_import", "test_impact_plan"}
+        or (
+            entry["tool"] == "weave_help"
+            and entry["arguments"].get("topic") == "test_impact"
+        )
+        or entry["tool"] in {"test_batch_run", "test_batch_get"}
+    ]
+    (tmp_path / "test-impact-trace.json").write_text(
+        json.dumps(impact_trace, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     run_calls = [entry for entry in trace if entry["tool"] == "test_run"]
     assert [entry["payload"]["result"]["passed"] for entry in run_calls] == [
         True,
         False,
     ]
     batch_calls = [entry for entry in trace if entry["tool"] == "test_batch_run"]
-    assert len(batch_calls) == 1
-    assert batch_calls[0]["payload"]["result"]["status"] == "failed"
+    assert len(batch_calls) == 2
+    assert all(entry["payload"]["result"]["status"] == "failed" for entry in batch_calls)
+    impact_calls = [entry for entry in trace if entry["tool"] == "test_impact_plan"]
+    assert len(impact_calls) == 1
+    assert impact_calls[0]["payload"]["result"]["complete_selection"] is True
