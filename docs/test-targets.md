@@ -48,15 +48,29 @@ A successful response identifies both the consumed base and published revision:
     "base_revision_id": "<reviewed-head>",
     "revision_id": "<new-revision>",
     "storage_document": "@test-target/cli-smoke",
-    "root_node_id": "n_..."
+    "root_node_id": "n_...",
+    "definition_hash": "..."
   }
 }
 ```
 
-Use `test_target_get` for one exact definition and `test_target_list` for the
-revision's complete lexical list. Both accept `revision_id`; omit it only when
-the current branch head is intentionally desired. `test_target_delete` creates
-another immutable revision and supports `expected_revision_id`.
+`definition_hash` is the deterministic hash of the exact structural definition.
+`test_target_get` returns the complete definition and the same hash at an exact
+revision.
+
+Use `test_target_list` for bounded lexical discovery. It accepts `revision_id`,
+`start_after_name`, and `limit`, and returns:
+
+- total and returned test counts;
+- `test_targets_truncated`;
+- exact `next_after_name` continuation;
+- bounded summaries with expectation byte counts and `definition_hash`;
+- an exact `test_target_get` call for each full definition.
+
+Large stdin/stdout/stderr bodies never appear in list pages. Omit `revision_id`
+only when the current branch head is intentionally desired.
+`test_target_delete` creates another immutable revision and supports
+`expected_revision_id`.
 
 ## Definition contract
 
@@ -101,8 +115,9 @@ Merge impact reports test-definition changes separately as
 
 `branch_resume_snapshot` accepts `test_target_limit`. It returns bounded test
 summaries containing the target binding, expectation sizes, exit status,
-resource policy, tags, stable root ID, and an exact `test_target_get` call.
-Large stdin/stdout/stderr bodies remain behind that focused read.
+resource policy, tags, stable root ID, `definition_hash`, and an exact
+`test_target_get` call. Large stdin/stdout/stderr bodies remain behind that
+focused read.
 
 The summary is orientation evidence only. It does not contain a run status.
 
@@ -111,7 +126,7 @@ The summary is orientation evidence only. It does not contain a run status.
 This capability deliberately exposes no unrestricted `program_run` operation.
 A later runner must:
 
-1. resolve the exact project revision and test-definition hash;
+1. resolve the exact project revision and `definition_hash`;
 2. build the referenced target reproducibly;
 3. enforce denied networking and isolated filesystem access;
 4. enforce every resource and output bound;
