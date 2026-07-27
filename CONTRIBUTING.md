@@ -94,12 +94,14 @@ Read `docs/single-node-concurrency.md`,
 `docs/project-merge-queue.md`,
 `docs/project-merge-impact-queue.md`,
 `docs/selected-merge-preflight-batch.md`,
-`docs/selected-merge-train-preview.md`, and
-`docs/sandboxed-test-runs.md` before changing branch writes, fork semantics,
+`docs/selected-merge-train-preview.md`,
+`docs/sandboxed-test-runs.md`, and
+`docs/explicit-test-batches.md` before changing branch writes, fork semantics,
 one-call orientation reads, handoff protocols, checkpoint supervision,
 project-wide agent status, project merge catalogs and queues, non-compiling
 merge-impact review, compiler-backed selected preflight orchestration,
-order-aware virtual merge simulation, or executable test isolation and evidence.
+order-aware virtual merge simulation, executable test isolation and evidence, or
+explicit behavioral-test orchestration.
 Consult `docs/write-concurrency-audit.md` before adding a new mutating tool.
 
 In particular:
@@ -212,6 +214,19 @@ In particular:
   and on every read, and existing run identities must never be overwritten;
 - public MCP responses must not expose server-local run paths; retained stdout and
   stderr must remain behind bounded, hash-bearing output pages;
+- behavioral test batches must accept only an explicit bounded unique test-target
+  list and preserve caller order without discovery, tag expansion, ranking, or
+  reordering;
+- every selected batch definition must resolve from one captured immutable
+  revision before any test starts;
+- unavailable strict isolation must reject the entire test batch, while per-test
+  domain errors must remain independent ordered evidence and must not erase
+  successful or failed sibling runs;
+- individual retained runs remain authoritative; aggregate test-batch manifests
+  must bind and verify definition hashes, run IDs, run-manifest hashes, pass
+  statuses, sandbox policy, counts, and caller order;
+- test batches must not advance branches, publish project revisions, imply merge
+  admission, or make claims about unselected tests;
 - merge must use a common base revision;
 - merged states must be semantically validated;
 - canonical rendering must remain deterministic;
