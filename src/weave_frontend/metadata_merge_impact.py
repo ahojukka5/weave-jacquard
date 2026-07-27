@@ -1,4 +1,4 @@
-"""Merge impact analysis that separates source, build, and test metadata."""
+"""Merge impact analysis that separates source, build, test, and task metadata."""
 
 from __future__ import annotations
 
@@ -9,13 +9,14 @@ from .merge_impact import MERGE_TARGET_IMPACT_FORMAT
 from .merge_impact import MergeTargetImpactService as _Base
 from .project_metadata import (
     BUILD_TARGET_PREFIX,
+    TASK_CONTRACT_PREFIX,
     TEST_TARGET_PREFIX,
     is_project_metadata_document,
 )
 
 
 class MergeTargetImpactService(_Base):
-    """Explain build-target impact without compiling revisioned test metadata."""
+    """Explain build-target impact without compiling revisioned project metadata."""
 
     def analyze(
         self,
@@ -56,6 +57,9 @@ class MergeTargetImpactService(_Base):
         changed_test_documents = sorted(
             name for name in changed_documents if name.startswith(TEST_TARGET_PREFIX)
         )
+        changed_task_documents = sorted(
+            name for name in changed_documents if name.startswith(TASK_CONTRACT_PREFIX)
+        )
 
         before_targets = self._targets(target_state)
         after_targets = self._targets(merged_state)
@@ -91,6 +95,7 @@ class MergeTargetImpactService(_Base):
             "changed_program_documents": changed_program_documents,
             "changed_target_documents": changed_target_documents,
             "changed_test_documents": changed_test_documents,
+            "changed_task_documents": changed_task_documents,
             "candidate_covered_changed_documents": candidate_covered_documents,
             "uncovered_changed_documents": uncovered,
             "total_target_count_before": len(before_targets),
