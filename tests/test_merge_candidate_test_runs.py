@@ -217,7 +217,10 @@ def main() -> int:
     output = Path(sys.argv[output_index + 1]).resolve()
     manifest = Path(sys.argv[manifest_index + 1]).resolve()
     diagnostics = Path(sys.argv[diagnostics_index + 1]).resolve()
-    output.write_text("#!/bin/sh\nprintf 'done\\n'\nprintf 'warning\\n' >&2\nexit 7\n", encoding="utf-8")
+    output.write_text(
+        "#!/bin/sh\nprintf 'done\\n'\nprintf 'warning\\n' >&2\nexit 7\n",
+        encoding="utf-8",
+    )
     os.chmod(output, 0o755)
     write(manifest, {
         "format": "weavec-build-manifest-v1",
