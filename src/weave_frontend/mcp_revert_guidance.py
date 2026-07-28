@@ -88,9 +88,29 @@ _STORAGE_TOPIC: dict[str, Any] = {
     ),
 }
 
+_BACKUP_TOPIC: dict[str, Any] = {
+    "tools": ["database_backup_create", "database_backup_get"],
+    "purpose": (
+        "Create one consistent online SQLite backup, verify its schema and content, and "
+        "retain a content-derived immutable backup manifest."
+    ),
+    "workflow": (
+        "Call database_backup_create, retain the returned backup_id externally, and use "
+        "database_backup_get to reverify the backup before planned recovery operations."
+    ),
+    "restore": (
+        "Restore is intentionally an offline weave-build CLI operation. It publishes only "
+        "to a new destination and never replaces the database used by the running server."
+    ),
+    "boundary": (
+        "Database backup covers SQLite program state only. Artifact roots, qualification "
+        "evidence, retention policy, and remote replication require separate operations."
+    ),
+}
+
 
 def weave_help(topic: str = "workflow") -> dict[str, Any]:
-    """Extend runtime help with revert, storage, and runtime identity guidance."""
+    """Extend runtime help with revert, backup, storage, and identity guidance."""
 
     if topic == "revert":
         return {"ok": True, "topic": topic, "help": deepcopy(_REVERT_TOPIC)}
@@ -98,6 +118,8 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
         return {"ok": True, "topic": topic, "help": deepcopy(_RUNTIME_TOPIC)}
     if topic == "storage":
         return {"ok": True, "topic": topic, "help": deepcopy(_STORAGE_TOPIC)}
+    if topic == "backup":
+        return {"ok": True, "topic": topic, "help": deepcopy(_BACKUP_TOPIC)}
 
     response = _base.weave_help(topic)
     help_value = deepcopy(response["help"])
@@ -111,6 +133,12 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
         )
     if topic in {"workflow", "read"}:
         tools = help_value.setdefault("tools", {})
+        tools["database_backup_create"] = (
+            "Create and verify one immutable online SQLite backup."
+        )
+        tools["database_backup_get"] = (
+            "Read and reverify one immutable database backup."
+        )
         tools["artifact_storage_report"] = (
             "Report bounded retained usage and aggregate publication quota state."
         )
