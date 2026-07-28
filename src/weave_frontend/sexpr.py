@@ -9,6 +9,14 @@ from typing import Any
 from uuid import uuid4
 
 from .errors import NotFoundError, ValidationError
+from .structural_limits import (
+    MAX_ATOM_VALUE_BYTES,
+    MAX_RENDERED_SOURCE_BYTES,
+    MAX_SOURCE_BYTES,
+    MAX_TREE_DEPTH,
+    MAX_TREE_NODES,
+    MAX_TREE_VALUE_BYTES,
+)
 
 JsonObject = dict[str, Any]
 ATOM_KINDS = {"symbol", "string", "integer", "float", "boolean"}
@@ -86,12 +94,39 @@ def validate_node(node: Any) -> None:
             "boolean value must be true or false",
             node_id=node_id,
         )
+    value_bytes = _atom_value_bytes(kind, value)
+    if value_bytes > MAX_ATOM_VALUE_BYTES:
+        raise ValidationError(
+            "ATOM_VALUE_TOO_LARGE",
+            f"atom value exceeds {MAX_ATOM_VALUE_BYTES} UTF-8 bytes",
+            node_id=node_id,
+        )
 
 
 def validate_tree(root: JsonObject) -> None:
+    if not isinstance(root, dict):
+        raise ValidationError("INVALID_NODE", "tree root must be an object")
+
     seen: set[str] = set()
-    for node in walk_nodes(root):
+    node_count = 0
+    value_bytes = 0
+    stack: list[tuple[JsonObject, int]] = [(root, 0)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > MAX_TREE_DEPTH:
+            raise ValidationError(
+                "TREE_TOO_DEEP",
+                f"tree depth exceeds {MAX_TREE_DEPTH}",
+                node_id=node.get("id") if isinstance(node, dict) else None,
+            )
         validate_node(node)
+        node_count += 1
+        if node_count > MAX_TREE_NODES:
+            raise ValidationError(
+                "TREE_TOO_LARGE",
+                f"tree contains more than {MAX_TREE_NODES} nodes",
+                node_id=node.get("id"),
+            )
         node_id = node["id"]
         if node_id in seen:
             raise ValidationError(
@@ -101,14 +136,45 @@ def validate_tree(root: JsonObject) -> None:
             )
         seen.add(node_id)
 
+        if node["kind"] == "list":
+            children = node["children"]
+            for child in reversed(children):
+                stack.append((child, depth + 1))
+        else:
+            value_bytes += _atom_value_bytes(node["kind"], node["value"])
+            if value_bytes > MAX_TREE_VALUE_BYTES:
+                raise ValidationError(
+                    "TREE_VALUE_BYTES_EXCEEDED",
+                    f"tree atom payload exceeds {MAX_TREE_VALUE_BYTES} UTF-8 bytes",
+                    node_id=node_id,
+                )
+
 
 def walk_nodes(root: Any) -> Iterable[JsonObject]:
     if not isinstance(root, dict):
         return
-    yield root
-    if root.get("kind") == "list":
-        for child in root.get("children", []):
-            yield from walk_nodes(child)
+    stack: list[tuple[JsonObject, int]] = [(root, 0)]
+    visited = 0
+    while stack:
+        node, depth = stack.pop()
+        if depth > MAX_TREE_DEPTH:
+            raise ValidationError(
+                "TREE_TOO_DEEP",
+                f"tree depth exceeds {MAX_TREE_DEPTH}",
+                node_id=node.get("id") if isinstance(node, dict) else None,
+            )
+        visited += 1
+        if visited > MAX_TREE_NODES:
+            raise ValidationError(
+                "TREE_TOO_LARGE",
+                f"tree contains more than {MAX_TREE_NODES} nodes",
+                node_id=node.get("id") if isinstance(node, dict) else None,
+            )
+        yield node
+        children = node.get("children") if node.get("kind") == "list" else None
+        if isinstance(children, list):
+            for child in reversed(children):
+                stack.append((child, depth + 1))
 
 
 def find_node(root: JsonObject, node_id: str) -> JsonObject:
@@ -148,14 +214,22 @@ def render_node(
 
     validate_tree(node)
     if annotated:
-        return _render_annotated(
+        rendered = _render_annotated(
             node,
             indent=indent,
             annotate_atoms=annotate_atoms,
         )
-    parts: list[str] = []
-    _render_canonical(node, parts, indent=indent)
-    return "".join(parts)
+    else:
+        parts: list[str] = []
+        _render_canonical(node, parts, indent=indent)
+        rendered = "".join(parts)
+    if len(rendered.encode("utf-8")) > MAX_RENDERED_SOURCE_BYTES:
+        raise ValidationError(
+            "RENDERED_SOURCE_TOO_LARGE",
+            f"rendered source exceeds {MAX_RENDERED_SOURCE_BYTES} UTF-8 bytes",
+            node_id=node.get("id"),
+        )
+    return rendered
 
 
 def _render_canonical(node: JsonObject, parts: list[str], *, indent: int) -> None:
@@ -263,6 +337,14 @@ def _render_atom(node: JsonObject) -> str:
     return str(value)
 
 
+def _atom_value_bytes(kind: str, value: Any) -> int:
+    if kind in {"string", "symbol"}:
+        return len(value.encode("utf-8"))
+    if kind == "float":
+        return len(repr(float(value)).encode("utf-8"))
+    return len(str(value).encode("utf-8"))
+
+
 class _Token:
     def __init__(self, kind: str, value: str, position: int) -> None:
         self.kind = kind
@@ -271,10 +353,37 @@ class _Token:
 
 
 def parse_source(source: str) -> JsonObject:
-    """Parse one generic S-expression, including the agent @node wrapper."""
+    """Parse one bounded generic S-expression, including the agent @node wrapper."""
+
+    if not isinstance(source, str):
+        raise ValidationError("INVALID_SOURCE", "source must be a string")
+    source_bytes = len(source.encode("utf-8"))
+    if source_bytes > MAX_SOURCE_BYTES:
+        raise ValidationError(
+            "SOURCE_TOO_LARGE",
+            f"source exceeds {MAX_SOURCE_BYTES} UTF-8 bytes",
+        )
 
     tokens = iter(_tokenize(source))
     buffered: list[_Token] = []
+    parsed_nodes = 0
+
+    def account(node: JsonObject, depth: int) -> JsonObject:
+        nonlocal parsed_nodes
+        if depth > MAX_TREE_DEPTH:
+            raise ValidationError(
+                "TREE_TOO_DEEP",
+                f"tree depth exceeds {MAX_TREE_DEPTH}",
+                node_id=node.get("id"),
+            )
+        parsed_nodes += 1
+        if parsed_nodes > MAX_TREE_NODES:
+            raise ValidationError(
+                "TREE_TOO_LARGE",
+                f"tree contains more than {MAX_TREE_NODES} parsed nodes",
+                node_id=node.get("id"),
+            )
+        return node
 
     def next_token() -> _Token | None:
         if buffered:
@@ -284,11 +393,16 @@ def parse_source(source: str) -> JsonObject:
     def push(token: _Token) -> None:
         buffered.append(token)
 
-    def parse_one() -> JsonObject:
+    def parse_one(depth: int = 0) -> JsonObject:
         token = next_token()
         if token is None:
             raise ValidationError("UNEXPECTED_EOF", "expected an S-expression")
         if token.kind == "LPAREN":
+            if depth > MAX_TREE_DEPTH:
+                raise ValidationError(
+                    "TREE_TOO_DEEP",
+                    f"tree depth exceeds {MAX_TREE_DEPTH}",
+                )
             children: list[JsonObject] = []
             while True:
                 item = next_token()
@@ -297,8 +411,11 @@ def parse_source(source: str) -> JsonObject:
                 if item.kind == "RPAREN":
                     break
                 push(item)
-                children.append(parse_one())
-            node = make_list(children)
+                children.append(parse_one(depth + 1))
+            node = account(
+                {"id": new_node_id(), "kind": "list", "children": children},
+                depth,
+            )
             if (
                 len(children) == 2
                 and children[0].get("kind") == "symbol"
@@ -312,8 +429,8 @@ def parse_source(source: str) -> JsonObject:
         if token.kind == "RPAREN":
             raise ValidationError("UNEXPECTED_RPAREN", "unexpected ')' in source")
         if token.kind == "STRING":
-            return make_atom("string", token.value)
-        return _parse_atom(token.value)
+            return account(make_atom("string", token.value), depth)
+        return account(_parse_atom(token.value), depth)
 
     root = parse_one()
     trailing = next_token()
