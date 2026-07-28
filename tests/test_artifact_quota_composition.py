@@ -22,6 +22,7 @@ def test_quota_composition_attaches_one_guard_to_every_publisher(
         "test_batches": tmp_path / "batches",
         "candidate_test_qualifications": tmp_path / "qualifications",
         "tested_merge_attestations": tmp_path / "attestations",
+        "database_backups": tmp_path / "database-backups",
     }
     for root in roots.values():
         root.mkdir()
@@ -37,6 +38,9 @@ def test_quota_composition_attaches_one_guard_to_every_publisher(
         ),
         "tested_merge_attestations": SimpleNamespace(
             attestation_root=roots["tested_merge_attestations"]
+        ),
+        "database_backups": SimpleNamespace(
+            backup_root=roots["database_backups"]
         ),
     }
     monkeypatch.setattr(composition, "compiler_bridge", lambda: bridge)
@@ -56,6 +60,11 @@ def test_quota_composition_attaches_one_guard_to_every_publisher(
         composition,
         "tested_merge_attestations",
         lambda: services["tested_merge_attestations"],
+    )
+    monkeypatch.setattr(
+        composition,
+        "database_backups",
+        lambda: services["database_backups"],
     )
     monkeypatch.setattr(
         composition,
