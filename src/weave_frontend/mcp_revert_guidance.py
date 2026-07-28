@@ -51,8 +51,8 @@ _RUNTIME_TOPIC: dict[str, Any] = {
         "database policy, compiler identity, and strict sandbox identity."
     ),
     "redaction": (
-        "Configuration values and configured executable paths are not returned. The report "
-        "lists only public variable names and which names are set."
+        "Configuration values and executable paths are not returned. Domain-separated "
+        "opaque IDs allow equality comparison without exposing raw values."
     ),
     "stability": (
         "Repeated calls against an unchanged process return the same content-derived "
@@ -71,16 +71,20 @@ _STORAGE_TOPIC: dict[str, Any] = {
         "candidate builds, test evidence, qualifications, and attestations."
     ),
     "redaction": (
-        "Storage paths are replaced by content-derived root IDs. Family names, counts, "
-        "limits, and nested-root ownership remain visible."
+        "Storage paths are replaced by content-derived root and lock IDs. Family names, "
+        "counts, limits, quota state, and nested-root ownership remain visible."
     ),
     "bounds": (
         "The scan fails rather than truncates when root count, total entries, or directory "
         "depth exceeds its explicit ceiling. Symlinks are counted but never followed."
     ),
+    "quota": (
+        "WEAVE_ARTIFACT_MAX_BYTES enables one interprocess logical-byte admission ceiling "
+        "across all six production artifact publishers."
+    ),
     "boundary": (
-        "The report is read-only accounting, not retention, garbage collection, or an "
-        "enforced publication quota."
+        "Quota refusal prevents new retained publication but does not implement retention, "
+        "garbage collection, physical-block limits, or database-size policy."
     ),
 }
 
@@ -108,7 +112,7 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
     if topic in {"workflow", "read"}:
         tools = help_value.setdefault("tools", {})
         tools["artifact_storage_report"] = (
-            "Report bounded logical usage across all live retained-artifact stores."
+            "Report bounded retained usage and aggregate publication quota state."
         )
         tools["runtime_identity"] = (
             "Report the exact live application, compiler, database, and sandbox identity."
