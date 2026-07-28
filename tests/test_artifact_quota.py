@@ -107,14 +107,13 @@ def test_exact_stage_accepts_quota_boundary_and_publishes(tmp_path: Path) -> Non
         temporary=temporary,
         final=final,
     ) as evidence:
-        assert evidence == {
-            "family": "committed_builds",
-            "quota_bytes": 7,
-            "current_bytes": 4,
-            "staged_bytes": 3,
-            "projected_bytes": 7,
-            "storage_snapshot_id": evidence["storage_snapshot_id"],
-        }
+        assert evidence is not None
+        assert evidence["family"] == "committed_builds"
+        assert evidence["quota_bytes"] == 7
+        assert evidence["current_bytes"] == 4
+        assert evidence["staged_bytes"] == 3
+        assert evidence["projected_bytes"] == 7
+        assert len(evidence["storage_snapshot_id"]) == 64
         os.replace(temporary, final)
 
     assert quota.report()["aggregate"]["logical_bytes"] == 7
@@ -168,7 +167,7 @@ def test_quota_error_uses_stable_mcp_envelope() -> None:
             projected_bytes=11,
         )
 
-    assert _result(fail)["error"] == fail_error = {
+    expected = {
         "code": "ARTIFACT_STORAGE_QUOTA_EXCEEDED",
         "message": "artifact publication would exceed the configured logical-byte quota",
         "node_id": None,
@@ -180,7 +179,7 @@ def test_quota_error_uses_stable_mcp_envelope() -> None:
         "staged_bytes": 3,
         "projected_bytes": 11,
     }
-    assert fail_error["retryable"] is False
+    assert _result(fail) == {"ok": False, "error": expected}
 
 
 def test_prefix_admission_ignores_other_staging_then_prevents_oversubscription(
@@ -202,6 +201,7 @@ def test_prefix_admission_ignores_other_staging_then_prevents_oversubscription(
         family="committed_builds",
         final=first_final,
     ) as evidence:
+        assert evidence is not None
         assert evidence["current_bytes"] == 0
         assert evidence["staged_bytes"] == 6
         os.replace(first_stage, first_final)
@@ -235,6 +235,7 @@ def test_prefix_admission_uses_largest_duplicate_stage(tmp_path: Path) -> None:
         family="committed_builds",
         final=final,
     ) as evidence:
+        assert evidence is not None
         assert evidence["staged_bytes"] == 4
 
 
