@@ -23,6 +23,7 @@ jobs:
     timeout-minutes: 35
     env:
       QUALIFICATION_DIR: ${{ runner.temp }}/jacquard-native-qualification
+      COMPILER_STAGE: ${{ runner.temp }}/jacquard-weavec-release
 
     steps:
       - name: Check out Jacquard
@@ -55,15 +56,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          mkdir -p "$COMPILER_STAGE"
           gh api "repos/ahojukka5/weavec/releases/tags/$WEAVEC_RELEASE" \
-            > release-metadata.json
+            > "$COMPILER_STAGE/release-metadata.json"
 
           python - <<'PY'
           import json
           import os
           from pathlib import Path
 
-          release = json.loads(Path("release-metadata.json").read_text(encoding="utf-8"))
+          stage = Path(os.environ["COMPILER_STAGE"])
+          release = json.loads(
+              (stage / "release-metadata.json").read_text(encoding="utf-8")
+          )
           assets = release.get("assets", [])
           archives = [
               asset
@@ -87,29 +92,33 @@ jobs:
           CHECKSUM_URL: ${{ steps.release.outputs.checksum_url }}
         run: |
           set -euo pipefail
-          mkdir -p dist compiler
+          mkdir -p "$COMPILER_STAGE/dist" "$COMPILER_STAGE/compiler"
           curl --fail --location --retry 3 \
             "$ARCHIVE_URL" \
-            --output "dist/$ARCHIVE_NAME"
+            --output "$COMPILER_STAGE/dist/$ARCHIVE_NAME"
           curl --fail --location --retry 3 \
             "$CHECKSUM_URL" \
-            --output dist/SHA256SUMS
+            --output "$COMPILER_STAGE/dist/SHA256SUMS"
 
-          grep -F " $ARCHIVE_NAME" dist/SHA256SUMS > dist/GLIBC-SHA256SUM
+          grep -F " $ARCHIVE_NAME" "$COMPILER_STAGE/dist/SHA256SUMS" \
+            > "$COMPILER_STAGE/dist/GLIBC-SHA256SUM"
           (
-            cd dist
+            cd "$COMPILER_STAGE/dist"
             sha256sum --check GLIBC-SHA256SUM
           )
 
-          tar -C compiler -xzf "dist/$ARCHIVE_NAME"
-          compiler_path="$(find compiler -type f -path '*/bin/weavec' -print -quit)"
+          tar -C "$COMPILER_STAGE/compiler" \
+            -xzf "$COMPILER_STAGE/dist/$ARCHIVE_NAME"
+          compiler_path="$(
+            find "$COMPILER_STAGE/compiler" \
+              -type f -path '*/bin/weavec' -print -quit
+          )"
           test -n "$compiler_path"
           test -x "$compiler_path"
           command -v clang
           command -v llvm-as
           file "$compiler_path"
-          printf 'WEAVEC_BIN=%s/%s\n' "$GITHUB_WORKSPACE" "$compiler_path" \
-            >> "$GITHUB_ENV"
+          printf 'WEAVEC_BIN=%s\n' "$compiler_path" >> "$GITHUB_ENV"
 
       - name: Run unified native qualification
         run: bash scripts/qualify.sh native "$QUALIFICATION_DIR"
@@ -119,5 +128,13 @@ jobs:
         with:
           name: jacquard-native-qualification
           path: ${{ env.QUALIFICATION_DIR }}
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload compiler release metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacquard-weavec-release-metadata
+          path: ${{ env.COMPILER_STAGE }}/release-metadata.json
           if-no-files-found: error
           retention-days: 7
