@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import pytest
+
 from weave_frontend.build_cli import _execute, build_parser
 from weave_frontend.database import Database
 
@@ -89,3 +91,25 @@ def test_backup_cli_defaults_store_next_to_database(tmp_path: Path) -> None:
         / created["backup_id"]
         / "backup-manifest.json"
     ).is_file()
+
+
+def test_backup_cli_honors_backup_root_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source.db"
+    backup_root = tmp_path / "env-backups"
+    with Database(source) as database:
+        database.initialize_project("demo")
+
+    monkeypatch.setenv("WEAVE_DATABASE_BACKUP_ROOT", str(backup_root))
+    created = _execute(
+        build_parser().parse_args(["--db", str(source), "db-backup"])
+    )
+
+    assert (
+        backup_root / created["backup_id"] / "backup-manifest.json"
+    ).is_file()
+    assert not (
+        source.parent / ".weave-database-backups" / created["backup_id"]
+    ).exists()

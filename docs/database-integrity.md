@@ -25,19 +25,11 @@ The bounded checker verifies:
 - foreign-key violations;
 - cross-project first and second revision parents;
 - missing branch projects and cross-project branch heads;
-- duplicate operation sequence numbers within one revision;
-- snapshot encoding, decompression, JSON, tree structure, stable IDs, and stored
-  snapshot hashes;
-- revision root hashes reconstructed from ordered snapshots;
-- operation payload JSON;
-- context-document content hashes;
-- revision-document references.
+- duplicate operation sequence numbers within one revision.
 
 At most 20 examples are returned for each issue category. Counts and
 `examples_truncated` preserve the distinction between a bounded response and the
-complete finding set. Large databases are also subject to explicit row, payload,
-and snapshot limits; crossing a limit is reported rather than silently skipping
-content.
+complete finding set.
 
 `db-check` does not create a database, change journal mode, install triggers,
 advance schema version, or repair data.
@@ -114,6 +106,9 @@ evidence. See [verified database backup and restore](database-backup.md).
 
 Database integrity and verified backup still do not provide:
 
+- snapshot JSON/hash recomputation for every revision;
+- root-hash reconstruction across the complete history;
+- operation payload JSON and context-document content-hash recomputation;
 - retained-artifact catalog reconciliation;
 - remote backup replication and verification;
 - backup-store listing, retention, or guarded deletion;

@@ -459,6 +459,8 @@ class DatabaseBackupService(CompilerArtifactMixin):
 
     @staticmethod
     def _connection_identity(connection: sqlite3.Connection) -> dict[str, Any]:
+        # Bind only file-stable SQLite properties. Process library version must
+        # not participate: disaster recovery often runs after a host upgrade.
         return {
             "schema_version": int(
                 connection.execute("PRAGMA user_version").fetchone()[0]
@@ -468,7 +470,6 @@ class DatabaseBackupService(CompilerArtifactMixin):
             "journal_mode": str(
                 connection.execute("PRAGMA journal_mode").fetchone()[0]
             ).lower(),
-            "sqlite_version": sqlite3.sqlite_version,
         }
 
     @classmethod
@@ -501,7 +502,6 @@ class DatabaseBackupService(CompilerArtifactMixin):
             "page_size",
             "page_count",
             "journal_mode",
-            "sqlite_version",
         }
         if require_location:
             required.add("location_id")
@@ -518,8 +518,6 @@ class DatabaseBackupService(CompilerArtifactMixin):
         if value["page_size"] <= 0:
             return False
         if not isinstance(value["journal_mode"], str) or not value["journal_mode"]:
-            return False
-        if not isinstance(value["sqlite_version"], str) or not value["sqlite_version"]:
             return False
         if require_location:
             location = value["location_id"]

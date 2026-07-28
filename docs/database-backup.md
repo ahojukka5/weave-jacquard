@@ -34,17 +34,12 @@ Before publication Jacquard verifies:
 - exact regular-file byte count and SHA-256;
 - SQLite user schema version;
 - page size and page count;
-- journal mode and SQLite library version;
-- `PRAGMA integrity_check`;
-- foreign-key consistency;
-- cross-project revision parents and branch heads;
-- snapshot encoding and decompression;
-- snapshot JSON, node structure, stable IDs, and stored hashes;
-- revision root hashes;
-- operation sequence integrity and operation payload JSON;
-- context-document hashes;
-- revision-document references;
-- database shape and row-scan limits already defined by database integrity.
+- journal mode;
+- the bounded database-integrity checker (`quick_check`, foreign keys, and
+  relational ownership / operation-sequence invariants).
+
+Process SQLite library version is not part of backup identity, so inspection and
+restore remain valid after a host upgrade when the database bytes are unchanged.
 
 The integrity report path is normalized out before retention. Source and backup
 locations are represented by opaque IDs rather than raw paths.
