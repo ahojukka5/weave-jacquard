@@ -43,7 +43,7 @@ class RuntimeIdentityService:
         self.environ = os.environ if environ is None else environ
 
     def report(self) -> dict[str, Any]:
-        """Return one path-redacted content-derived runtime identity report."""
+        """Return one configuration-value-redacted content-derived identity report."""
 
         application = self._application_identity()
         configuration_variables = application["configuration_variables"]
@@ -70,10 +70,14 @@ class RuntimeIdentityService:
                 "schema_version": SCHEMA_VERSION,
                 "busy_timeout_ms": int(self.workspace.db.busy_timeout_ms),
                 "journal_mode": str(
-                    self.workspace.db.connection.execute("PRAGMA journal_mode").fetchone()[0]
+                    self.workspace.db.connection.execute(
+                        "PRAGMA journal_mode"
+                    ).fetchone()[0]
                 ).lower(),
                 "foreign_keys": bool(
-                    self.workspace.db.connection.execute("PRAGMA foreign_keys").fetchone()[0]
+                    self.workspace.db.connection.execute(
+                        "PRAGMA foreign_keys"
+                    ).fetchone()[0]
                 ),
             },
             "compiler": self._compiler_identity(),
@@ -106,13 +110,19 @@ class RuntimeIdentityService:
         if not isinstance(variables, list) or not all(
             isinstance(item, str) and item for item in variables
         ):
-            raise RuntimeError("application manifest configuration variables are invalid")
+            raise RuntimeError(
+                "application manifest configuration variables are invalid"
+            )
         for field in ("application_id", "tool_manifest_id"):
             value = manifest.get(field)
             if not self._valid_sha256(value):
                 raise RuntimeError(f"application manifest {field} is invalid")
         tool_count = manifest.get("tool_count")
-        if isinstance(tool_count, bool) or not isinstance(tool_count, int) or tool_count <= 0:
+        if (
+            isinstance(tool_count, bool)
+            or not isinstance(tool_count, int)
+            or tool_count <= 0
+        ):
             raise RuntimeError("application manifest tool_count is invalid")
         return {
             "application_id": manifest["application_id"],
@@ -130,18 +140,10 @@ class RuntimeIdentityService:
                 "available": False,
                 "binary": None,
                 "version": None,
-                "error": exc.as_dict(),
+                "error": self._redacted_compiler_error(exc),
             }
-        except OSError as exc:
-            return {
-                "available": False,
-                "binary": None,
-                "version": None,
-                "error": {
-                    "code": "WEAVEC_IDENTITY_FAILED",
-                    "message": str(exc),
-                },
-            }
+        except OSError:
+            return self._compiler_identity_failure()
 
         try:
             binary = self._binary_identity(path)
@@ -150,16 +152,8 @@ class RuntimeIdentityService:
                 timeout_seconds=RUNTIME_VERSION_TIMEOUT_SECONDS,
                 max_output_bytes=MAX_RUNTIME_VERSION_BYTES,
             )
-        except (OSError, ValueError) as exc:
-            return {
-                "available": False,
-                "binary": None,
-                "version": None,
-                "error": {
-                    "code": "WEAVEC_IDENTITY_FAILED",
-                    "message": str(exc),
-                },
-            }
+        except (OSError, ValueError):
+            return self._compiler_identity_failure()
 
         output = "\n".join(
             part.strip()
@@ -202,10 +196,36 @@ class RuntimeIdentityService:
             "error": error,
         }
 
+    @staticmethod
+    def _redacted_compiler_error(error: ValidationError) -> dict[str, Any]:
+        messages = {
+            "WEAVEC_NOT_FOUND": (
+                "weavec was not found; configure WEAVEC_BIN or install it on PATH"
+            ),
+            "WEAVEC_NOT_EXECUTABLE": "the configured weavec is not executable",
+        }
+        return {
+            "code": error.code,
+            "message": messages.get(error.code, "weavec identity is unavailable"),
+            "node_id": error.node_id,
+        }
+
+    @staticmethod
+    def _compiler_identity_failure() -> dict[str, Any]:
+        return {
+            "available": False,
+            "binary": None,
+            "version": None,
+            "error": {
+                "code": "WEAVEC_IDENTITY_FAILED",
+                "message": "weavec binary identity or version probing failed",
+            },
+        }
+
     def _sandbox_identity(self) -> dict[str, Any]:
         try:
-            capabilities = self.sandbox.capabilities()
-        except Exception as exc:
+            raw_capabilities = self.sandbox.capabilities()
+        except Exception:
             return {
                 "available": False,
                 "capabilities": None,
@@ -213,11 +233,14 @@ class RuntimeIdentityService:
                 "prlimit_binary": None,
                 "error": {
                     "code": "SANDBOX_IDENTITY_FAILED",
-                    "message": str(exc),
+                    "message": "sandbox capability probing failed",
                 },
             }
-        if not isinstance(capabilities, dict):
+        if not isinstance(raw_capabilities, dict):
             raise RuntimeError("sandbox capabilities are not an object")
+        capabilities = dict(raw_capabilities)
+        if capabilities.get("probe_error") is not None:
+            capabilities["probe_error"] = "sandbox capability probe failed"
         return {
             "available": capabilities.get("available") is True,
             "capabilities": capabilities,
@@ -236,12 +259,12 @@ class RuntimeIdentityService:
             return None
         try:
             return cls._binary_identity(Path(value).resolve())
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError):
             return {
                 "available": False,
                 "bytes": None,
                 "sha256": None,
-                "error": str(exc),
+                "error": "runtime binary identity is unavailable",
             }
 
     @classmethod
