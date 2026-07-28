@@ -4,14 +4,23 @@ import tomllib
 from pathlib import Path
 
 import weave_jacquard
-from weave_frontend import SExpressionWorkspace
+from weave_frontend import SExpressionWorkspace as InternalSExpressionWorkspace
+
 
 ROOT = Path(__file__).parents[1]
 
 
-def test_public_jacquard_namespace_exports_supported_workspace() -> None:
-    assert weave_jacquard.SExpressionWorkspace is SExpressionWorkspace
+def test_public_jacquard_namespace_exports_safe_workspace(tmp_path: Path) -> None:
+    public = weave_jacquard.SExpressionWorkspace
+
+    assert public is not InternalSExpressionWorkspace
+    assert issubclass(public, InternalSExpressionWorkspace)
+    assert not hasattr(public, "checkout")
     assert weave_jacquard.JacquardError is not None
+
+    with public(tmp_path / "public.db") as workspace:
+        assert not hasattr(workspace, "checkout")
+        assert callable(workspace.create_branch_at_revision)
 
 
 def test_distribution_and_entry_points_use_jacquard_name() -> None:
