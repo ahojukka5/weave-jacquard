@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
@@ -34,6 +33,8 @@ def test_online_backup_is_content_derived_and_reverified(tmp_path: Path) -> None
         assert inspected["integrity"]["valid"] is True
         assert inspected["source"]["journal_mode"] == "wal"
         assert inspected["backup_database"]["journal_mode"] == "delete"
+        assert "sqlite_version" not in inspected["source"]
+        assert "sqlite_version" not in inspected["backup_database"]
         assert inspected["artifact_bytes"]["database"] > 0
         assert len(inspected["artifact_sha256"]["database"]) == 64
         directory = backup_root / created["backup_id"]

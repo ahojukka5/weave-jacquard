@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -147,6 +148,9 @@ def build_parser() -> argparse.ArgumentParser:
 def _backup_root(args: argparse.Namespace) -> Path:
     if args.backup_root is not None:
         return args.backup_root
+    env = os.environ.get("WEAVE_DATABASE_BACKUP_ROOT")
+    if env:
+        return Path(env)
     return args.db.parent / ".weave-database-backups"
 
 
