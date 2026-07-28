@@ -72,17 +72,21 @@ The source-map byte offsets, source hash, and retained compiler input remain
 unchanged for accepted documents. Float atoms use the same canonical spelling in
 plain rendering and compiler source maps, including integer-valued floats.
 
-## Retained build metadata
+## Retained metadata
 
 Stored `manifest.json` files used by build cache admission, `build_get`, and
 `build_list_page` are limited to `MAX_BUILD_MANIFEST_BYTES`, currently 4 MiB.
-They are opened through a race-resistant retained-artifact reader that rejects
-symlinks, non-regular files, path replacement during open, invalid UTF-8, invalid
-JSON, and limit overflow before normal manifest and artifact verification runs.
+Retained test-run and test-batch manifests are independently limited to
+`MAX_TEST_RUN_MANIFEST_BYTES` and `MAX_TEST_BATCH_MANIFEST_BYTES`, also 4 MiB.
 
-The accepted manifest schema, build identity, checksum, and public error contract
-remain unchanged. These protections bound metadata decoding; they do not impose a
-total build-root storage quota.
+These files are opened through a race-resistant retained-artifact reader that
+rejects symlinks, non-regular files, path replacement during open, invalid UTF-8,
+invalid JSON, and limit overflow before normal identity, checksum, aggregate, and
+referenced-evidence verification runs.
+
+The accepted manifest schemas and public integrity-error contracts remain
+unchanged. These protections bound metadata decoding; they do not impose total
+build-root, run-root, or batch-root storage quotas.
 
 ## Stable limits and compatibility
 
@@ -103,13 +107,13 @@ command should report such oversized historical content explicitly.
 
 ## Remaining process boundaries
 
-These structural and retained-build-manifest ceilings do not by themselves bound:
+These structural and retained-manifest ceilings do not by themselves bound:
 
 - compiler stdout and stderr;
 - retained WIR size;
 - SQLite database size;
 - aggregate retained build and test artifact storage;
-- test-run, batch, candidate-qualification, and attestation manifest sizes.
+- virtual-candidate qualification and tested-merge attestation manifest sizes.
 
 Compiler process capture and protocol-file bounds are a separate boundary because
 they require explicit truncation/error evidence in build and validation result

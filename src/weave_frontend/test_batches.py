@@ -13,11 +13,16 @@ from typing import Any
 
 from .compiler_artifacts import CompilerArtifactMixin
 from .errors import ArtifactIntegrityError, NotFoundError, ValidationError
+from .retained_artifact_io import (
+    RetainedArtifactReadError,
+    read_bounded_regular_json,
+)
 from .test_targets import TEST_TARGET_NAME
 
 TEST_BATCH_MANIFEST_FORMAT = "weave-test-batch-manifest-v1"
 TEST_BATCH_ID = re.compile(r"^[0-9a-f]{32}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+MAX_TEST_BATCH_MANIFEST_BYTES = 4 * 1024 * 1024
 MAX_TEST_BATCH_TARGETS = 64
 
 
@@ -437,8 +442,11 @@ class TestBatchService(CompilerArtifactMixin):
     @staticmethod
     def _read_json(path: Path) -> dict[str, Any]:
         try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            value = read_bounded_regular_json(
+                path,
+                max_bytes=MAX_TEST_BATCH_MANIFEST_BYTES,
+            )
+        except RetainedArtifactReadError as exc:
             raise ArtifactIntegrityError(f"cannot read test batch manifest: {exc}") from exc
         if not isinstance(value, dict):
             raise ArtifactIntegrityError("test batch manifest root must be an object")
