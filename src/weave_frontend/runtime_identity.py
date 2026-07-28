@@ -18,6 +18,7 @@ from .database import SCHEMA_VERSION
 from .errors import ValidationError
 
 RUNTIME_IDENTITY_FORMAT = "weave-jacquard-runtime-identity-v1"
+CONFIGURATION_VALUE_ID_FORMAT = "weave-jacquard-configuration-value-v1"
 MAX_RUNTIME_VERSION_BYTES = 4_096
 RUNTIME_VERSION_TIMEOUT_SECONDS = 5
 
@@ -47,6 +48,11 @@ class RuntimeIdentityService:
 
         application = self._application_identity()
         configuration_variables = application["configuration_variables"]
+        configured_variables = [
+            name
+            for name in configuration_variables
+            if bool(self.environ.get(name))
+        ]
         payload = {
             "format": RUNTIME_IDENTITY_FORMAT,
             "jacquard": {
@@ -79,16 +85,20 @@ class RuntimeIdentityService:
                         "PRAGMA foreign_keys"
                     ).fetchone()[0]
                 ),
+                "location_id": self._opaque_value_id(
+                    "database_path",
+                    str(Path(self.workspace.db.path).resolve()),
+                ),
             },
             "compiler": self._compiler_identity(),
             "sandbox": self._sandbox_identity(),
             "configuration": {
                 "variables": configuration_variables,
-                "configured_variables": [
-                    name
-                    for name in configuration_variables
-                    if bool(self.environ.get(name))
-                ],
+                "configured_variables": configured_variables,
+                "value_ids": {
+                    name: self._opaque_value_id(name, self.environ[name])
+                    for name in configured_variables
+                },
                 "values_redacted": True,
             },
         }
@@ -322,6 +332,17 @@ class RuntimeIdentityService:
             return None
 
     @staticmethod
+    def _opaque_value_id(name: str, value: str) -> str:
+        encoded = (
+            CONFIGURATION_VALUE_ID_FORMAT.encode("utf-8")
+            + b"\0"
+            + name.encode("utf-8")
+            + b"\0"
+            + value.encode("utf-8")
+        )
+        return hashlib.sha256(encoded).hexdigest()
+
+    @staticmethod
     def _valid_sha256(value: Any) -> bool:
         return (
             isinstance(value, str)
@@ -342,6 +363,7 @@ class RuntimeIdentityService:
 
 
 __all__ = [
+    "CONFIGURATION_VALUE_ID_FORMAT",
     "MAX_RUNTIME_VERSION_BYTES",
     "RUNTIME_IDENTITY_FORMAT",
     "RUNTIME_VERSION_TIMEOUT_SECONDS",
