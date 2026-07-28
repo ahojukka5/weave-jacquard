@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import stat
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -52,20 +52,25 @@ class DatabaseBackupService(_DatabaseBackupService):
 
         missing_stage: ValidationError | None = None
         for temporary in self._quota_stages(final):
-            try:
-                with artifact_quota_admission(
-                    self,
-                    family=self.artifact_quota_family,
-                    temporary=temporary,
-                    final=final,
-                ):
-                    with super()._publication_lock(final):
-                        yield
-                    return
-            except ValidationError as exc:
-                if exc.code != "INVALID_ARTIFACT_QUOTA_PATH":
-                    raise
-                missing_stage = exc
+            with ExitStack() as stack:
+                try:
+                    stack.enter_context(
+                        artifact_quota_admission(
+                            self,
+                            family=self.artifact_quota_family,
+                            temporary=temporary,
+                            final=final,
+                        )
+                    )
+                except ValidationError as exc:
+                    if exc.code != "INVALID_ARTIFACT_QUOTA_PATH":
+                        raise
+                    missing_stage = exc
+                    continue
+
+                with super()._publication_lock(final):
+                    yield
+                return
 
         raise ValidationError(
             "ARTIFACT_STORAGE_STAGE_NOT_FOUND",
