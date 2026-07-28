@@ -13,8 +13,11 @@ from typing import Any
 from uuid import uuid4
 
 from .database_integrity import inspect_connection, require_migration_integrity
+from .errors import DatabaseBusyError
 
 SCHEMA_VERSION = 3
+DEFAULT_DATABASE_BUSY_TIMEOUT_MS = 5_000
+MAX_DATABASE_BUSY_TIMEOUT_MS = 2_147_483_647
 _SNAPSHOT_RAW = b"WJR1"
 _SNAPSHOT_ZLIB = b"WJZ1"
 
@@ -230,12 +233,39 @@ def _decompress_json(value: bytes | bytearray | memoryview) -> str:
     raise ValueError("unsupported snapshot encoding")
 
 
+def _is_database_busy_error(error: sqlite3.OperationalError) -> bool:
+    code = getattr(error, "sqlite_errorcode", None)
+    if isinstance(code, int) and code & 0xFF in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}:
+        return True
+    message = str(error).casefold()
+    return "database is locked" in message or "database table is locked" in message
+
+
 class Database:
-    def __init__(self, path: str | Path) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        busy_timeout_ms: int = DEFAULT_DATABASE_BUSY_TIMEOUT_MS,
+    ) -> None:
+        if (
+            isinstance(busy_timeout_ms, bool)
+            or not isinstance(busy_timeout_ms, int)
+            or not 0 <= busy_timeout_ms <= MAX_DATABASE_BUSY_TIMEOUT_MS
+        ):
+            raise ValueError(
+                "busy_timeout_ms must be an integer between 0 and "
+                f"{MAX_DATABASE_BUSY_TIMEOUT_MS}"
+            )
         self.path = Path(path)
+        self.busy_timeout_ms = busy_timeout_ms
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.connection = sqlite3.connect(self.path)
+        self.connection = sqlite3.connect(
+            self.path,
+            timeout=busy_timeout_ms / 1_000,
+        )
         self.connection.row_factory = sqlite3.Row
+        self.connection.execute(f"PRAGMA busy_timeout = {busy_timeout_ms}")
         self.connection.execute("PRAGMA foreign_keys = ON")
         current_version = int(
             self.connection.execute("PRAGMA user_version").fetchone()[0]
@@ -387,8 +417,17 @@ class Database:
             self.connection.execute("BEGIN IMMEDIATE")
             yield self.connection
             self.connection.commit()
+        except sqlite3.OperationalError as exc:
+            if self.connection.in_transaction:
+                self.connection.rollback()
+            if _is_database_busy_error(exc):
+                raise DatabaseBusyError(
+                    busy_timeout_ms=self.busy_timeout_ms,
+                ) from exc
+            raise
         except Exception:
-            self.connection.rollback()
+            if self.connection.in_transaction:
+                self.connection.rollback()
             raise
 
     @staticmethod
