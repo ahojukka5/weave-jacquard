@@ -5,50 +5,75 @@ agents edit a versioned S-expression tree through structural MCP operations
 instead of repeatedly replacing complete source files.
 
 The name refers to the Jacquard loom: a programmable mechanism that turns a
-stored pattern into coordinated weaving operations. Here, agents modify the
-program pattern, Jacquard preserves its structure and history, and `weavec`
-turns the canonical result into a native executable.
+stored pattern into coordinated weaving operations. Agents modify the program
+pattern, Jacquard preserves structure, history, evidence, and publication rules,
+and `weavec` turns canonical sources into native programs.
 
 Repository and Python distribution: **`weave-jacquard`**  
 Public Python namespace: **`weave_jacquard`**  
 Primary executables: **`weave-mcp`** and **`weave-build`**
 
-## Responsibilities
+## What Jacquard owns
 
-Jacquard owns:
+Jacquard provides:
 
-- single-node and bounded transactional edits with stable node identities;
-- immutable revisions, parallel branches, deterministic one-call merge preflight,
-  revisioned target-authoritative merge policy, directional target impact,
-  complete affected-target compiler gates, race-safe publication, measured branch
-  activity, and bounded stable-node revision diffs;
-- project-, document-, and symbol-scoped context;
-- compiler-corpus-backed grammar help;
-- authoritative validation through `weavec --frontend`;
-- revisioned named build targets and ordered multi-document builds;
-- deterministic canonical sources and per-document node maps;
-- compiler diagnostics mapped back to database nodes and exposed in bounded pages;
-- verified, content-derived native build artifacts and bounded build-ID recovery.
+- stable node identities and bounded structural edits;
+- immutable revisions, parallel branches, and compare-and-set publication;
+- deterministic canonical source and UTF-8 node maps;
+- revisioned design context, merge policy, task contracts, and test definitions;
+- agent checkpoints, timelines, project status, queues, merge-train previews, and
+  resume snapshots;
+- compiler-backed validation and verified committed or virtual-candidate builds;
+- strict sandboxed test runs, explicit batches, and affected-test planning;
+- stable-ID merge preview, impact, qualification, preflight, and publication;
+- tested-merge attestations, revision evidence graphs, and immutable reverts;
+- content-derived MCP tool and application manifests;
+- bounded artifact metadata, grammar-corpus indexing, compiler I/O, and
+  qualification evidence.
 
 Jacquard is not another compiler. The user-facing
 [`weavec`](https://github.com/ahojukka5/weavec) compiler owns the Weave language,
-surface lowering, WIR, LLVM generation, runtime selection, object generation,
-and linking.
+surface lowering, WIR, LLVM generation and optimization, runtime selection,
+target output, object generation, and linking.
 
-## Architecture
+## Architecture in one view
 
-The supported workspace is `SExpressionWorkspace`. It inherits a small internal
-grammar-neutral revision service responsible only for:
+```text
+agent or editor
+      │
+      ▼
+content-derived MCP application contract
+      │
+      ▼
+versioned structural workspace
+      ├── program trees with stable node IDs
+      ├── branches and immutable revisions
+      ├── context, policy, tasks, checkpoints, and tests
+      └── ordered audit operations
+      │
+      ├──────────────► exact virtual merge candidate
+      │                       │
+      ▼                       ▼
+pinned committed build   candidate build and tests
+      │                       │
+      └──────────┬────────────┘
+                 ▼
+       bounded final `weavec`
+                 │
+                 ▼
+     verified artifacts and evidence
+```
 
-- SQLite lifecycle;
-- projects, branches, checkout, and history;
-- immutable state load and commit;
-- common-ancestor discovery;
-- merge preview and publication through workspace-specific stable-ID hooks.
+A branch is the only mutable pointer in the program graph. Existing-branch writes
+recheck the expected head inside the same SQLite transaction that publishes all
+immutable consequences.
 
-Language structure is not duplicated in Python; `weavec` remains authoritative.
-The current implementation package remains internal, while new public imports
-use `weave_jacquard`.
+The supported public workspace is `weave_jacquard.SExpressionWorkspace`. Direct
+historical checkout is intentionally absent. Create a branch at an immutable
+revision or publish an immutable revert instead of destructively moving a branch.
+
+See [the architecture](docs/architecture.md) for the complete ownership and
+publication model.
 
 ## Installation
 
@@ -60,274 +85,178 @@ python -m venv .venv
 python -m pip install -e '.[dev]'
 ```
 
-Configure the workspace and compiler:
-
-```bash
-export WEAVE_DB_PATH="$PWD/weave.db"
-export WEAVE_BUILD_ROOT="$PWD/.weave-build"
-export WEAVEC_BIN="../weavec/build/weavec"
-export WEAVEC_SOURCE_ROOT="../weavec"
-```
-
-`WEAVEC_BIN` is optional when `weavec` is on `PATH`.
-`WEAVEC_SOURCE_ROOT` is required only for compiler-corpus-backed grammar help.
-
-Native builds require `weavec >= 0.3.0`, or another compiler implementing:
-
-- `weavec build`;
-- `weavec-build-manifest-v1`;
-- `weavec-diagnostics-v1`.
-
 Run the stdio MCP server:
 
 ```bash
 weave-mcp
 ```
 
-## Recommended agent workflows
+The public Python API begins with:
 
-A protected project may first publish a strict target-branch policy:
+```python
+from weave_jacquard import SExpressionWorkspace
 
-```text
-merge_policy_set(
-  require_preflight = true,
-  require_affected_validation = true,
-  allow_uncovered_documents = false,
-  max_affected_targets = project-appropriate bound)
+with SExpressionWorkspace("weave.db") as workspace:
+    workspace.initialize("demo")
 ```
 
-Single-document program:
+## Configuration
+
+Common environment variables are:
+
+| Variable | Purpose |
+|---|---|
+| `WEAVE_DB_PATH` | SQLite workspace path |
+| `WEAVEC_BIN` | final `weavec` executable |
+| `WEAVEC_SOURCE_ROOT` | optional correctness corpus for `grammar_help` |
+| `WEAVE_BUILD_ROOT` | committed build artifact root |
+| `WEAVE_MERGE_BUILD_ROOT` | virtual-candidate build root |
+| `WEAVE_TEST_RUN_ROOT` | committed test-run root |
+| `WEAVE_TEST_BATCH_ROOT` | aggregate committed test-batch root |
+| `WEAVE_MERGE_TEST_RUN_ROOT` | virtual-candidate qualification root |
+| `WEAVE_MERGE_ATTESTATION_ROOT` | tested-merge attestation root |
+| `WEAVE_BWRAP` | explicit Bubblewrap executable |
+
+`WEAVEC_BIN` may be omitted when `weavec` is available on `PATH`.
+`WEAVEC_SOURCE_ROOT` affects observational grammar help only; compiler validation
+remains authoritative.
+
+The exact public configuration-variable set is bound into the application
+manifest.
+
+## Structural editing workflow
+
+A normal agent workflow is:
 
 ```text
 project_initialize
-→ program_create / program_import
-→ grammar_help
+→ program_create
+→ grammar_help for unfamiliar forms
+→ node_inspect / node_find
 → single-node edits while exploring
-→ node_apply_batch for a coherent known structure
-→ node_inspect
+→ node_apply_batch for one coherent known structure
 → program_validate
-→ branch_merge_preflight
-→ review policy, ready_for_publication, impact, coverage, and validation_set
-→ branch_merge using returned publication_arguments
-→ branch_activity_summary when measuring the workflow
-→ program_build
-→ build_list_page when the build ID is no longer in context
-→ build_get
-→ build_diagnostics_page when the build failed
-→ node_inspect(revision_id = failed revision) before repair
-→ revision_diff_page(base_revision_id = failed revision) against current head
+→ checkpoint and task evidence
 ```
 
-Multi-document program:
+Every successful single-node edit creates one immutable revision.
+`node_apply_batch` accepts 1–256 flat ordered structural operations, supports
+temporary aliases for nodes created earlier in the request, validates the final
+tree once, and publishes one revision or nothing.
+
+Bulk `program_import` exists for migration and fixtures. It is bounded and parsed
+into the same validated tree representation; normal agents should prefer
+structural operations.
+
+## Build and test workflow
+
+Committed-revision work is pinned to one exact immutable state:
 
 ```text
-program_source_list
-→ build_target_set
-→ structural source edits
+build_target_set / test_target_set
+→ target or test-impact selection
 → build_target_validate
+→ build_target_build or test_run / test_batch_run
+→ bounded diagnostics or output inspection
+→ revision evidence
+```
+
+A successful build binds:
+
+- revision and root hashes;
+- ordered source and node-map hashes;
+- requested target;
+- final compiler binary hash;
+- compiler manifest and diagnostics protocols;
+- every retained artifact path and SHA-256 hash.
+
+Behavioral tests bind a revisioned build target, arguments, standard input,
+expected exit status and streams, and explicit timeout, memory, output, and
+file-size ceilings. Execution requires the canonical Bubblewrap and `prlimit`
+sandbox policy.
+
+## Merge workflow
+
+Protected merge publication is evidence-driven:
+
+```text
+branch_merge_preview
+→ branch_merge_impact
+→ affected target and test selection
+→ virtual-candidate build and sandboxed tests
+→ tested qualification evidence
 → branch_merge_preflight
-→ review target policy, every affected surviving target, and uncovered document
-→ branch_merge using returned publication_arguments
-→ build_target_build
-→ build_list_page when the build ID is no longer in context
-→ build_get
-→ build_diagnostics_page when the build failed
-→ node_inspect(revision_id = failed revision) before repair
-→ revision_diff_page(base_revision_id = failed revision) against current head
+→ review publication arguments
+→ branch_merge
+→ tested_merge_attest
 ```
 
-A target definition and every selected source are resolved from one immutable
-revision or from one exact in-memory merge candidate. The primary document is
-first and additional documents retain their stored order.
+Target-branch policy governs admission. An incoming branch may carry a different
+policy, but it cannot weaken the target.
 
-`node_apply_batch` accepts a flat list of up to 256 existing structural
-operations. Temporary `@aliases` refer to nodes created earlier in the same
-request. The complete batch publishes as one revision or rolls back; existing
-single-node tools remain available for uncertain edits and repairs.
+A structural preview remains in memory and creates no synthetic revision. Explicit
+candidate builds and tests may retain verified artifacts bound to the exact
+virtual subject. After publication, a tested-merge attestation proves that the
+committed two-parent revision exactly matches the qualified candidate state.
 
-For independent branches, `branch_merge_preflight` composes the complete
-non-mutating review sequence:
+Preflight evidence is not a bearer token. Publication recomputes current policy,
+heads, impact, and required qualification, then checks both heads inside the
+write transaction.
+
+## Parallel-agent workflow
+
+Jacquard can represent agent work directly:
 
 ```text
-target-branch merge policy
-+ visible source-branch policy
-+ stable-ID merge preview
-+ directional named-target impact
-+ candidate target coverage
-+ every affected surviving target validated by weavec --frontend
+task contract
+→ scoped branch edits
+→ checkpoints and timeline
+→ project agent status
+→ impact-aware merge queue
+→ selected preflight batch
+→ merge-train preview
+→ publication or immutable revert
+→ resume snapshot
 ```
 
-The response identifies the exact common ancestor and branch heads, prospective
-merged-root hash, bounded affected-target summary, uncovered changed documents,
-complete validation set, and `ready_for_publication`. A ready result includes
-`publication_tool="branch_merge"` and exact `publication_arguments`, including
-its policy-bound `preflight_id`.
+These capabilities bind coordination to exact revisions and evidence. They do not
+replace human review policy; they make the reviewed state reproducible.
 
-The preflight result is evidence rather than a bearer token. Calling the returned
-publication operation recomputes the current policies, impact, coverage, and all
-affected-target frontend validations. Both branch heads are then rechecked in the
-same SQLite write transaction that publishes the immutable two-parent merge.
+## Concurrency and retry behavior
 
-## Revisioned merge policy
+SQLite runs in WAL mode with an explicit 5,000 ms default busy timeout. Exhausted
+writer contention is returned as stable retryable evidence:
 
-`merge_policy_set` publishes an immutable policy revision directly on a selected
-branch. `merge_policy_get` reproduces the effective first-parent policy at a
-branch head or exact historical project revision.
-
-A policy may require:
-
-- exact preflight replay;
-- complete affected-target validation;
-- rejection of uncovered-document overrides;
-- a lower synchronous affected-target validation ceiling.
-
-The current **target branch** policy governs admission. The source branch policy
-is returned for transparency, and `source_policy_ignored=true` reports a
-difference, but the incoming branch cannot weaken its own admission rules. To
-loosen a protected branch, publish `merge_policy_set` directly on that target
-branch. That policy revision changes the branch head and invalidates older
-preview and preflight evidence.
-
-When no policy is configured, Jacquard preserves the existing API and merge
-modes. A configured strict policy may return:
-
-- `MERGE_POLICY_PREFLIGHT_REQUIRED`;
-- `MERGE_POLICY_AFFECTED_VALIDATION_REQUIRED`;
-- `MERGE_POLICY_VIOLATION`;
-- `STALE_MERGE_PREFLIGHT`;
-- `TOO_MANY_AFFECTED_TARGETS`.
-
-Uncovered changed documents block strict preflight before compiler startup.
-Permitting them requires both a target policy that allows the override and an
-explicit `allow_uncovered_documents=true` request; it still does not claim those
-documents were validated.
-
-The lower-level tools remain useful for focused investigation:
-
-- `branch_merge_preview` reports structural conflicts and stable-node
-  consequences;
-- `branch_merge_impact` pages directional named-target consequences;
-- `branch_merge_validate` validates one named target;
-- `branch_merge_validate_affected` returns the complete bounded validation set.
-
-Compiler rejection returns `MERGE_VALIDATION_FAILED`; missing compiler
-availability returns `MERGE_VALIDATION_UNAVAILABLE`; uncovered documents return
-`MERGE_UNCOVERED_DOCUMENTS`; branch advancement returns `STALE_MERGE_PREVIEW`.
-Every failure leaves the target branch unchanged. Direct merge compatibility is
-preserved only where the effective target policy permits it.
-
-For long branches, `branch_history_page` returns bounded first-parent pages with
-an explicit continuation. `revision_operations_page` returns exact immutable
-operation targets and payloads for one revision in sequence-number pages.
-`branch_activity_summary` reports complete revision, operation, merge, author,
-and edit-grouping metrics without changing history.
-
-For failed builds, `build_diagnostics_page` returns exact mapped diagnostics in
-bounded pages after verifying the immutable build and the bytes being read. An
-agent can follow a returned stable `node_id` without opening files on the MCP
-server machine. Passing the returned build `revision_id` to `node_inspect`
-reproduces the exact failing subtree even after the branch has advanced. Without
-`revision_id`, the same tool continues to inspect the current branch head.
-
-`revision_diff_page` then compares the failing revision with the current branch
-head without loading two complete trees. It reports additions, removals, value
-changes, form-head changes, parent and position changes, and child-count changes
-through stable IDs in pages of at most 200 changed nodes.
-
-## Compiler boundary
-
-Validation invokes only the public compiler frontend:
-
-```text
-weavec --frontend output.wir source0.weave source1.weave ...
+```json
+{
+  "code": "DATABASE_BUSY",
+  "message": "database remained busy or locked for the configured timeout",
+  "node_id": null,
+  "retryable": true,
+  "busy_timeout_ms": 5000
+}
 ```
 
-Native builds invoke only the public build command:
+Retry the complete application operation so branch heads and optimistic
+expectations are read again. Do not replay only the final SQL statements.
 
-```text
-weavec build source0.weave source1.weave ... -o program \
-  --manifest-json compiler-manifest.json \
-  --diagnostics-json compiler-diagnostics.json
-```
+## MCP application contract
 
-Jacquard never invokes LLVM tools, a linker, or a runtime archive directly.
+The public server is composed from an ordered capability graph. Composition
+captures complete registered tool contracts and creates:
 
-## Stable node identities
+- one content-derived ID per tool contract;
+- an aggregate tool-manifest ID;
+- an application ID binding capability order, tool-manifest identity, tool count,
+  and configuration variables.
 
-Every list and atom has a stable ID such as `n_3a12cce48fe14f99`. Editing or
-moving an existing node preserves its ID. Branches inherit IDs from their base
-revision, merge compares stable identities rather than line numbers, and
-`revision_diff_page` uses those identities to compare immutable states.
-
-Agent rendering may expose transport wrappers:
-
-```lisp
-(@n_function
-  (fn main
-    (@n_params (params))
-    (@n_returns (returns i32))
-    (@n_body (do (return (const_i32 42))))))
-```
-
-Those wrappers are not Weave syntax. Compiler sources are canonical unannotated
-text. A separate `weave-node-map-v1` records node IDs and UTF-8 source spans.
-
-## Builds and integrity
-
-A successful build contains:
-
-```text
-.weave-build/<build-id>/
-├── sources/
-├── source-maps/
-├── compiler-manifest.json
-├── compiler-diagnostics.json
-├── diagnostics.json
-├── manifest.json
-└── program
-```
-
-The bridge validates both compiler protocol documents before retaining an
-executable. `build_get` and cache admission verify the frontend manifest, build
-ID, path containment, regular-file status, and every SHA-256 hash.
-`build_diagnostics_page` performs the same verified admission and hashes the
-exact diagnostic bytes it decodes before returning mapped entries.
-
-When an agent no longer knows the build ID, `build_list_page` scans at most 200
-lexically ordered catalog members and applies the same stored-build verification
-before returning compact summaries. Valid builds from other projects and
-nonmatching filters are omitted. Malformed or corrupt members are returned only
-as rejected IDs and error codes.
-
-The response carries `catalog_id` and `next_after_build_id`. Replaying the catalog
-identity across pages rejects membership changes with `STALE_BUILD_CATALOG`.
-List responses never expose build directories or artifact paths; select a
-verified ID and call `build_get` for detailed provenance and paths.
-
-`weave-build-key-v4` derives the build ID from the immutable revision, ordered
-source hashes, compiler binary hash, and requested target. Concurrent builds use
-a per-build advisory lock. An existing verified successful build wins; failed
-or incomplete candidates cannot erase it.
-
-The historical protocol identifier `weave-frontend-build-manifest-v2` remains
-unchanged for stored-build compatibility. It names a data format, not the
-current product.
-
-## Revision storage
-
-Each successful single-node write creates one immutable revision. A bounded
-transaction records every ordered sub-operation while publishing one immutable
-revision for the complete batch. Merge policies are immutable context documents
-referenced by operation rows and require no database schema extension. Snapshot
-JSON uses an adaptive, versioned BLOB representation:
-
-- `WJZ1` for zlib-compressed canonical JSON;
-- `WJR1` when raw canonical JSON is smaller.
-
-Legacy databases migrate transactionally. Databases with a newer schema version
-are rejected without modification.
+The generated manifest is the authoritative tool inventory. Documentation groups
+capabilities by workflow and intentionally does not duplicate every live tool
+schema by hand.
 
 ## CLI
+
+`weave-build` exposes revision-pinned target and artifact operations, for example:
 
 ```bash
 weave-build --db weave.db target-set demo application main.weave \
@@ -339,44 +268,54 @@ weave-build --db weave.db get <build-id>
 
 Failures are emitted as structured JSON on stderr with exit status 2.
 
-## MCP tools
+## Qualification
 
-- **Help:** `weave_help`, `grammar_help`
-- **Projects and branches:** `project_initialize`, `branch_create`,
-  `branch_list`, `branch_history`, `branch_history_page`,
-  `revision_operations_page`, `branch_activity_summary`, `merge_policy_get`,
-  `merge_policy_set`, `branch_merge_preflight`, `branch_merge_preview`,
-  `branch_merge_impact`, `branch_merge_validate`,
-  `branch_merge_validate_affected`, `branch_merge`
-- **Programs:** `program_create`, `program_import`, `program_list`,
-  `program_source_list`, `program_render`, `program_validate`, `program_build`
-- **Named targets:** `build_target_set`, `build_target_list`,
-  `build_target_get`, `build_target_delete`, `build_target_validate`,
-  `build_target_build`
-- **Build inspection:** `build_list_page`, `build_get`, `build_diagnostics_page`
-- **Single-node editing:** `node_create_form`, `node_add_atom`, `node_set_atom`,
-  `node_move`, `node_wrap`, `node_delete`
-- **Transactional editing:** `node_apply_batch`
-- **Inspection:** `node_inspect`, `node_find`, `revision_diff_page`
-- **Context:** `context_add`, `context_get`
+Jacquard has one fail-closed qualification runner:
 
-## Further documentation
+```bash
+bash scripts/qualify.sh python
+WEAVEC_BIN=/absolute/path/to/weavec bash scripts/qualify.sh native
+WEAVEC_BIN=/absolute/path/to/weavec bash scripts/qualify.sh full
+```
+
+The runner owns compilation, Ruff, sandbox admission, pytest selection, skip
+rejection, coverage, JUnit validation, protocol and native trace contracts,
+environment identity, binary hashes, completion evidence, and checksums.
+
+`full` is the release-strength gate. A successful evidence directory is published
+only after all selected work and checksums complete.
+
+## Resource safety
+
+Explicit ceilings cover:
+
+- source size, tree depth, node count, and atom payloads;
+- canonical and annotated rendering;
+- compiler process lifetime and captured output;
+- compiler protocol files;
+- retained build, candidate, test, qualification, and attestation manifests;
+- grammar-corpus enumeration, bytes, index size, example rendering, diagnostics,
+  query size, and response fanout;
+- qualification trace count, individual size, and aggregate size.
+
+Unsafe retained files, including symlinks and non-regular files, are rejected
+before JSON decoding or semantic verification.
+
+## Documentation
 
 - [Architecture](docs/architecture.md)
-- [MCP tool reference](docs/mcp.md)
+- [Application composition](docs/application-composition.md)
+- [Qualification](docs/qualification.md)
+- [Structural resource limits](docs/structural-resource-limits.md)
+- [Grammar corpus limits](docs/grammar-corpus-limits.md)
+- [Database concurrency](docs/database-concurrency.md)
+- [Database integrity](docs/database-integrity.md)
+- [Write-concurrency audit](docs/write-concurrency-audit.md)
 - [Transactional structural edits](docs/edit-transactions.md)
-- [Branch activity observability](docs/branch-activity.md)
-- [Revisioned merge admission policy](docs/merge-policy.md)
+- [Revisioned merge policy](docs/merge-policy.md)
 - [One-call merge preflight](docs/merge-preflight.md)
-- [Two-phase merge previews](docs/merge-preview.md)
-- [Merge target impact analysis](docs/merge-impact.md)
-- [Affected-target validation sets](docs/merge-validation-set.md)
 - [Merge candidate validation](docs/merge-validation.md)
 - [Verified stored-build discovery](docs/build-discovery.md)
-- [Build diagnostic inspection](docs/build-diagnostics.md)
-- [Revision-pinned node inspection](docs/revision-node-inspection.md)
-- [Stable-node revision diffs](docs/revision-diff.md)
 - [Compiler bridge](docs/compiler-bridge.md)
 - [Revisioned build targets](docs/build-targets.md)
-- [Target validation](docs/target-validation.md)
 - [Snapshot storage](docs/snapshot-storage.md)

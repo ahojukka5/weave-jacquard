@@ -2,438 +2,396 @@
 
 ## 1. Thesis
 
-A coding agent should not have to emit and maintain a complete source file.
-Instead, it operates on a versioned program tree through a compact tool surface:
+A coding agent should not have to regenerate and reconcile complete source files.
+Jacquard gives agents a versioned structural programming environment:
 
 ```text
-DISCOVER → INSPECT → MUTATE → PREFLIGHT → MERGE → BUILD → TEST
+DISCOVER → INSPECT → MUTATE → CHECKPOINT → PREFLIGHT → BUILD → TEST → MERGE
 ```
 
-Jacquard owns syntax-tree identity, immutable revisions, transactional safety,
-canonical source materialization, target-authoritative merge admission, build
-provenance, and reviewed branch publication. The authoritative language
+Jacquard owns stable syntax-tree identity, immutable revisions, transactional
+publication, agent coordination, canonical source materialization, verified build
+and test evidence, and merge admission. The authoritative Weave language
 implementation and native compiler remains
 [`weavec`](https://github.com/ahojukka5/weavec).
 
-## 2. Program and project structure
+## 2. Authority boundaries
 
-An S-expression is an ordered rooted n-ary tree. The database stores immutable
-snapshots and stable node IDs.
+Jacquard is not a second compiler.
+
+`weavec` owns:
+
+- the accepted surface language;
+- lowering to WIR;
+- LLVM generation and optimization;
+- runtime selection;
+- target selection, object generation, linking, and native output.
+
+Jacquard owns:
+
+- stable node IDs and structural edits;
+- canonical source and source maps;
+- revision, branch, context, task, checkpoint, and policy history;
+- compiler invocation bounds and protocol validation;
+- build, test, candidate, and attestation artifact integrity;
+- optimistic concurrency and merge publication;
+- MCP application composition and exact public tool contracts.
+
+Grammar examples inferred from the `weavec` correctness corpus are observational
+guidance. `program_validate`, target validation, and compiler-backed merge
+qualification remain authoritative.
+
+## 3. Persistent state model
+
+The core persistent graph is:
 
 ```text
-workspace
-└── project
-    ├── program documents
-    ├── revisioned named build targets
-    ├── revisioned merge policy and design context
-    ├── branches
-    ├── immutable revisions and operations
-    └── verified build artifacts
+project
+├── branches ────────────────┐
+├── immutable revisions ◄────┘
+│   ├── parent1
+│   ├── optional parent2
+│   ├── compressed module snapshots
+│   ├── ordered operation rows
+│   └── referenced context documents
+├── revisioned program documents
+├── revisioned build and test definitions
+├── revisioned policy and task context
+└── external verified artifact stores
 ```
 
-Surface Weave, WIR, LLVM IR, bitcode, objects, and native executables are
-derivatives of pinned program revisions. A prospective merge candidate is an
-in-memory validated state, not a temporary revision or persisted artifact.
+A branch is the only mutable pointer in the program graph. Revisions, snapshots,
+operations, and content documents are immutable evidence.
 
-## 3. Agent API
+SQLite schema version 3 enforces project-local parent and branch-head integrity,
+unique operation order, foreign keys, and compressed snapshots. Startup refuses a
+newer unsupported schema and checks existing data before migration.
 
-### Discovery and inspection
+Direct branch checkout remains an internal recovery primitive. It is exposed by
+neither MCP nor the public `weave_jacquard.SExpressionWorkspace` facade. Public
+historical work creates a branch at an immutable revision or publishes an
+immutable revert.
 
-- `weave_help`
-- `grammar_help`
-- `program_list`
-- `program_source_list`
-- `program_render`
-- `node_find`
-- `node_inspect`
-- `revision_diff_page`
-- `merge_policy_get`
-- `branch_merge_preflight`
-- `branch_merge_preview`
-- `branch_merge_impact`
-- `branch_merge_validate`
-- `branch_merge_validate_affected`
-- `context_get`
-- `build_get`
-- `build_diagnostics_page`
+## 4. Public application composition
 
-### Mutation
+The production MCP application is assembled from an ordered dependency graph of
+capabilities. The graph currently covers:
 
-- `program_create`
-- `program_import`
-- `node_create_form`
-- `node_add_atom`
-- `node_set_atom`
-- `node_move`
-- `node_wrap`
-- `node_delete`
-- `node_apply_batch`
-- `context_add`
-- `merge_policy_set`
+- concurrent node, branch, target, and context operations;
+- agent checkpoints and checkpoint timelines;
+- build discovery;
+- test definitions, strict runs, batches, and impact planning;
+- virtual merge-candidate build and test execution;
+- tested-merge attestations and revision evidence;
+- revisioned task contracts and immutable reverts;
+- target-authoritative policy and preflight;
+- project agent status, merge queues, impact queues, and merge-train previews;
+- resume snapshots and bounded revision reads.
 
-### Verification, build, merge, and history
+Composition produces three deterministic snapshots:
 
-- `program_validate`
-- `program_build`
-- `build_target_set`
-- `build_target_list`
-- `build_target_get`
-- `build_target_delete`
-- `build_target_validate`
-- `build_target_build`
-- `branch_create`
-- `branch_list`
-- `branch_history`
-- `branch_history_page`
-- `revision_operations_page`
-- `branch_activity_summary`
-- `branch_merge`
+1. the capability manifest;
+2. the complete MCP tool-contract manifest;
+3. the application manifest binding capabilities, tool-manifest identity, tool
+   count, and public configuration variables.
 
-The MCP server is a transport over the same workspace, policy, preview, impact,
-validation, and compiler-bridge services used internally.
+Every tool contract includes its name, description, input and output schemas,
+annotations, icons, metadata, and a content-derived contract ID. The aggregate
+manifest has its own content-derived identity. This manifest—not a hand-maintained
+list in documentation—is the authoritative public surface.
 
-## 4. Structural write modes
+Application composition currently isolates FastMCP registry access in one module,
+but the underlying SDK registry is still private API. Replacing import-time service
+singletons with an explicit typed runtime container remains architectural work.
 
-### Single-node edits
+## 5. Structural programming model
 
-Use one-node tools while exploring or repairing. Each successful call publishes
-one immutable revision.
+An S-expression is an ordered rooted tree. Every node has a stable ID independent
+of source lines or byte offsets.
 
-### Bounded edit transactions
+Agents normally use bounded local operations:
 
-Use `node_apply_batch` after one coherent local structure is known. A batch is a
-flat ordered list of 1–256 ordinary structural operations and may use temporary
-aliases for nodes created earlier in the request.
+- inspect a local subtree;
+- find nodes by structural properties;
+- create one form or atom;
+- update, move, wrap, or delete one node;
+- apply one coherent bounded edit batch.
 
-A batch:
+A single edit publishes one immutable revision. `node_apply_batch` applies 1–256
+flat ordered operations in memory, validates once, writes one snapshot and ordered
+audit rows, and advances the branch with one compare-and-set.
 
-- pins one document at one branch head;
-- optionally checks an expected revision;
-- applies operations in memory;
-- validates the complete tree once;
-- writes one immutable snapshot and ordered operation rows;
-- compare-and-set advances the branch;
-- rolls back completely on failure.
+Bulk source import exists for migration and fixtures. It is bounded and parsed into
+the same validated tree representation; it is not the normal agent-writing path.
 
-The batch API must never become unbounded nested AST replacement. See
-[`edit-transactions.md`](edit-transactions.md).
+Every structural publication enforces:
 
-## 5. Validation and incomplete programs
-
-Every persisted structural write preserves tree validity:
-
-- legal node shapes and atom values;
-- stable unique node IDs;
+- valid node shapes and atom values;
+- stable unique IDs;
+- bounded depth, node count, and atom payloads;
 - ordered children;
-- no move cycles;
-- deterministic rendering.
+- cycle-free moves;
+- deterministic canonical rendering.
 
-Semantic completeness remains compiler authority:
+Semantic completeness remains compiler authority.
 
-```text
-weavec --frontend output.wir input0.weave input1.weave ...
-```
+## 6. Concurrency and publication
 
-`program_validate` checks one document. `build_target_validate` checks one
-revisioned ordered source set. Merge validation checks named targets from the
-exact clean in-memory candidate.
-
-Jacquard does not maintain a handwritten copy of the complete surface grammar.
-Until `weavec` exposes a machine-readable registry, grammar guidance is inferred
-from its correctness corpus.
-
-## 6. Persistence and publication
-
-The prototype uses SQLite because it is embedded, transactional, portable, and
-supports revision, context, and audit queries.
-
-Core concepts:
+Existing-branch writes follow this pattern:
 
 ```text
-projects
-revisions
-branches
-module snapshots
-operations
-context documents
-revision documents
+read branch head
+→ construct and validate candidate state
+→ BEGIN IMMEDIATE
+→ recheck expected head
+→ publish all immutable consequences
+→ conditional branch-head update
+→ commit
 ```
 
-Snapshots and revisions are immutable. A branch is a named pointer to one
-revision. The operation log explains how each revision was produced.
+No persistent auxiliary rows may survive a failed publication. Context documents,
+operation payloads, revision-document links, snapshots, and branch movement commit
+or roll back together.
 
-Publication modes:
+Merge publication captures and rechecks both source and target heads. It writes one
+two-parent revision and advances only the target branch.
 
-- one-node edits use one transaction each;
-- edit batches use one transaction for all operations and one compare-and-set;
-- policy changes publish one unchanged structural snapshot plus an immutable
-  policy context document reference and `set_merge_policy` audit operation;
-- merge publication rechecks both captured heads, writes the validated merged
-  state, records both parents, and advances only the target.
+SQLite uses WAL mode and an explicit 5,000 ms default busy timeout. Exhausted
+`SQLITE_BUSY` or `SQLITE_LOCKED` waits become stable retryable `DATABASE_BUSY`
+evidence. Jacquard does not replay a mutation inside the database layer: callers
+must restart the application operation so optimistic reads and candidate state are
+recomputed.
 
-Preview, impact, preflight, and candidate compiler validation are outside
-persistence. They use in-memory state and private temporary compiler files and
-retain only bounded response evidence. No preview or validation attempt creates
-a schema row.
-
-Revisioned merge policy reuses existing context-document and operation tables.
-No schema migration is required.
+SQLite remains a single-writer database. Stable contention semantics make multiple
+processes predictable; they do not turn the embedded store into a distributed
+writer system.
 
 ## 7. Compiler and artifact boundary
 
-Pinned-revision compilation:
+Pinned committed-revision builds follow:
 
 ```text
-SQLite revision
-→ canonical .weave sources and node maps
-→ final weavec
-→ validated manifest and diagnostics
-→ verified content-derived artifact store
+immutable revision
+→ canonical ordered .weave inputs and node maps
+→ bounded final weavec process
+→ validated compiler manifest and diagnostics
+→ verified content-derived build directory
 ```
 
-Prospective merge validation:
+A successful build is admitted only when compiler identity, source order, requested
+and reported target, output paths, protocol status, artifact hashes, and build-key
+identity agree.
+
+Virtual merge-candidate builds follow the same compiler and artifact rules but bind
+their identity to:
+
+- project and merge direction;
+- common base and both branch heads;
+- preview ID and merged-root hash;
+- revisioned target definition;
+- canonical candidate sources;
+- compiler identity and output policy.
+
+A structural preview is in memory and creates no synthetic revision. Explicit
+candidate build and test operations may retain verified artifacts outside the
+revision database. They remain bound to an exact virtual subject whose
+`committed_revision_id` is null.
+
+Stored committed-build and candidate-build manifests are admitted through a
+bounded race-resistant regular-file reader before semantic or checksum
+verification.
+
+## 8. Sandboxed behavioral tests
+
+Test definitions are revisioned program metadata. A test binds:
+
+- a named build target;
+- arguments and standard input;
+- expected exit status, stdout, and stderr;
+- timeout, memory, output, and file-size ceilings.
+
+Execution requires the canonical Bubblewrap sandbox and `prlimit`. Sandbox
+admission proves process-creation denial and reports the exact effective policy and
+binary identities. Test runs retain immutable manifests plus hashed stdout and
+stderr bytes. Bounded output-page tools expose retained streams without loading
+them completely.
+
+Explicit batches run a caller-ordered bounded set at one revision. Test-impact
+planning selects tests from changed documents and revisioned target relationships.
+Merge impact can apply the same logic to an exact virtual candidate.
+
+Current sandbox evidence is intentionally explicit about protections not supplied
+by the backend, including stronger aggregate cgroup accounting and a dedicated
+seccomp policy.
+
+## 9. Merge qualification and publication
+
+The merge pipeline is layered:
 
 ```text
-exact in-memory candidate
-→ candidate named targets + ordered sources
-→ weavec --frontend
-→ bounded source/compiler/WIR hash evidence
+stable-ID preview
+→ directional document and target impact
+→ affected target and test selection
+→ compiler and sandbox qualification
+→ target-authoritative policy evaluation
+→ exact preflight identity
+→ transactional publication
 ```
 
-The candidate path creates no revision, executable, build manifest, retained
-diagnostics artifact, or retained WIR.
+A preview binds project, direction, common base, target head, and source head.
+Directional impact compares the target with the prospective merged state, so it
+reports only consequences introduced by the source branch.
 
-`weavec` owns language lowering, WIR, LLVM generation, runtime selection, object
-generation, linking, and native output. Jacquard owns revision pinning, source
-order, canonical materialization, node maps, protocol validation, artifact
-hashing, cache identity, merge policy, and atomic publication.
+Revisioned target policy controls required replay, affected-target coverage,
+uncovered-document overrides, and bounded compiler fanout. Policy lookup follows
+first-parent target history. A source branch can propose a different policy but
+cannot weaken the target.
 
-Build artifacts are admitted only when paths, hashes, compiler manifest,
-diagnostics protocol, source order, target, output, and requested build identity
-all agree. Concurrent candidates are serialized per build ID; an existing
-verified success wins.
+Virtual-candidate tests retain qualification evidence without publishing a merge.
+After publication, a tested-merge attestation proves that the committed revision
+has exactly the qualified candidate root and both qualified parents. The
+attestation does not claim complete semantic coverage, human approval, or
+production readiness.
 
-## 8. Revisioned target-authoritative merge policy
+Both heads are checked again inside the write transaction. A head change before
+replay changes preflight identity; a head change during publication fails the
+conditional update.
 
-A merge policy is an immutable project-scoped context document referenced by a
-`set_merge_policy` operation. It controls:
+## 10. Agent coordination
 
-- whether exact preflight replay is required;
-- whether every affected surviving target must validate;
-- whether uncovered-document overrides are allowed;
-- the maximum affected-target compiler fanout.
+Jacquard treats multi-agent development as revisioned engineering work rather than
+an external conversation convention.
 
-Policy lookup walks first-parent history. This aligns admission authority with
-merge topology:
+The public capability graph includes:
+
+- task contracts with scope and acceptance evidence;
+- scoped edit enforcement;
+- agent checkpoints and timelines;
+- project-wide agent status;
+- merge queues and impact-aware ordering;
+- selected preflight batches;
+- merge-train previews;
+- resume snapshots containing the evidence needed to continue work;
+- immutable reverts rather than destructive branch rewinds.
+
+These objects bind work to exact revisions and tool-produced evidence. They do not
+replace human review policy; they make the state reviewed by humans and agents
+reproducible.
+
+## 11. Revision evidence and recovery
+
+Revision evidence connects immutable program history to external artifacts:
+
+- build identities and compiler hashes;
+- test-run and batch manifests;
+- virtual-candidate qualifications;
+- tested-merge attestations;
+- task contracts and checkpoints;
+- merge and revert operations.
+
+Retained JSON families use explicit byte ceilings and reject symlinks,
+non-regular files, path replacement during open, invalid UTF-8, invalid JSON, and
+limit overflow before normal verification.
+
+Revert is a new immutable revision whose state matches an earlier selected state.
+It preserves intervening history and produces normal publication evidence. Resume
+snapshots summarize pinned work state; they do not mutate branches.
+
+Verified backup and restore, artifact reconciliation, retention, and garbage
+collection remain operator capabilities to implement.
+
+## 12. Resource limits
+
+Jacquard uses explicit ceilings rather than assuming inputs are small.
+
+Structural limits cover:
+
+- imported source bytes;
+- tree depth and node count;
+- one atom and aggregate atom payloads;
+- canonical and annotated rendering.
+
+Compiler limits cover:
+
+- process lifetime;
+- stdout and stderr capture;
+- compiler manifest and diagnostics protocols;
+- retained trace count, individual size, and aggregate size.
+
+Artifact metadata limits cover committed builds, virtual-candidate builds, test
+runs, test batches, virtual-candidate qualifications, and tested-merge
+attestations.
+
+Grammar guidance independently bounds directory enumeration, corpus files and
+bytes, forms, relationships, example rendering, diagnostics, query size, and
+response fanout. Truncation is returned as evidence and never changes compiler
+language authority.
+
+Aggregate artifact-store quotas and SQLite file-size policy remain separate
+operator work.
+
+## 13. Qualification
+
+The repository has one fail-closed qualification entry point:
 
 ```text
-merge revision
-├── parent1: current target head  ← authoritative policy history
-└── parent2: incoming source head ← visible, non-authoritative policy history
+scripts/qualify.sh python
+scripts/qualify.sh native
+scripts/qualify.sh full
 ```
 
-A source branch may publish a permissive policy, but it cannot weaken the target.
-Preflight and merge results expose both policies and set
-`source_policy_ignored=true` when hashes differ.
+The runner owns compilation, Ruff, sandbox admission, pytest selection, skip
+rejection, coverage, JUnit validation, trace contracts, environment identity,
+compiler and sandbox binary hashes, completion evidence, and checksums.
 
-To loosen a protected target, publish `merge_policy_set` directly on that target.
-The policy revision advances the target head and invalidates old preview and
-preflight identities.
+GitHub workflows only acquire prerequisites, invoke the same runner, and upload the
+completed evidence directory. Evidence is staged and published atomically; a
+partial or failed run does not appear as a successful qualification directory.
 
-When no policy is configured, legacy direct, one-target, and all-target merge
-modes remain available. See [`merge-policy.md`](merge-policy.md).
+`full` is the release-strength gate. It requires the final `weavec`, the complete
+MCP environment, the strict sandbox, zero skipped tests, and all required protocol
+and native traces.
 
-## 9. Parallel agents and merge admission
+## 14. Determinism
 
-Every agent receives:
-
-- a base revision;
-- a private branch;
-- an edit scope;
-- pinned interfaces and context;
-- tests and acceptance criteria.
-
-Three-way stable-ID merge rules:
-
-- one branch changed an identity and the other did not: take the change;
-- both produced identical content: take either;
-- both changed the same identity differently: conflict;
-- independent changes: merge automatically.
-
-### Structural preview
-
-`branch_merge_preview` computes the stable-ID merge without publication.
-`weave-merge-preview-v1` binds project, merge direction, common ancestor, target
-head, and source head. Clean previews return compact consequences; conflicts
-return exact paths.
-
-### Directional impact
-
-`branch_merge_impact` compares the current target with the prospective merged
-state. It reports only changes introduced by the source, maps those changes to
-revisioned named targets, and exposes changed documents with no surviving target
-coverage.
-
-### One-target and all-target validation
-
-`branch_merge_validate` validates one candidate target.
-
-`branch_merge_validate_affected` validates every affected target surviving in the
-candidate, in deterministic name order. It skips removed targets, aggregates all
-failures, and performs zero compiler work when uncovered documents block the
-candidate. Its validation-set identity binds the effective fanout ceiling.
-
-### One-call preflight
-
-`branch_merge_preflight` composes:
-
-```text
-target policy + source policy visibility
-+ preview
-+ directional impact
-+ coverage
-+ complete affected-target validation
-```
-
-`weave-merge-preflight-v1` binds both policy hashes, source-policy disposition,
-preview and merged root, impact summary, validation-set identity, and uncovered
-policy. It returns exact `branch_merge` publication arguments including
-`preflight_id`.
-
-Preflight is evidence, not authorization. Policy-aware publication recomputes
-preflight against current policy and heads, compares exact identity, enforces
-readiness, and then publishes using its validated preview. The recomputed
-validation set is reused; Jacquard does not perform a redundant second compiler
-fanout for the identical candidate.
-
-Both heads are finally checked in the same `BEGIN IMMEDIATE` transaction that
-writes the two-parent merge revision. A change before replay changes preflight
-identity; a change during or after validation fails the transactional head check.
-
-See [`merge-preflight.md`](merge-preflight.md),
-[`merge-validation-set.md`](merge-validation-set.md), and
-[`merge-preview.md`](merge-preview.md).
-
-## 10. Versioned design context
-
-Contracts, architecture notes, and policies are immutable context objects. They
-may apply to project, document, module, symbol, interface, test, or task.
-
-An agent should receive the relevant context closure:
-
-```text
-project invariants and target policy
-+ module design
-+ symbol contract
-+ imported interfaces
-+ directly relevant tests
-```
-
-Because context is pinned to revisions, review can reproduce the rules and policy
-seen by the agent.
-
-## 11. Determinism
-
-The same validated program, language version, compiler identity, target, and
-options produce byte-identical canonical inputs and the same build key.
+The same validated state, compiler identity, target, and options produce the same
+canonical inputs and content-derived build key.
 
 Merge identities are layered:
 
-- same branch direction and heads → same preview ID;
-- same preview and target graph → same impact;
-- same target/source/compiler hashes → same validation IDs;
-- same effective fanout and complete target set → same validation-set ID;
-- same policies, candidate, impact, validation set, and uncovered policy → same
-  preflight ID.
+- same merge direction and heads → same preview ID;
+- same preview and target graph → same impact identity;
+- same candidate, targets, compiler, and policy → same validation evidence;
+- same policies and complete qualification set → same preflight identity;
+- same qualified candidate and committed two-parent state → same attestation input.
 
 Only final user-facing `weavec` is part of the public compiler contract. Bootstrap
 stages must not leak into Jacquard's API.
 
-## 12. Measured editing and review results
+## 15. Remaining boundaries and next milestones
 
-Real stdio MCP qualification has constructed, compiled, and executed:
+The highest-value remaining work is:
 
-- loop-carried arithmetic;
-- multi-function call chains;
-- heap-backed pointer and memory flows;
-- a 354-node binary-search workload;
-- a 418-node batch workload with exit status 80;
-- exact candidate merge validation and native execution;
-- all-affected-target pass/fail and coverage aggregation;
-- one-call merge preflight with ready, invalid, uncovered, and override outcomes;
-- target-authoritative revisioned merge policy.
+1. **Runtime composition** — introduce typed immutable configuration, an explicit
+   service container, deterministic lifecycle management, and a compatibility
+   adapter around FastMCP private registry access.
+2. **Database operations** — verified online backup and restore, complete snapshot
+   and root-hash reconstruction, artifact reconciliation, retention, and guarded
+   garbage collection.
+3. **Storage policy** — aggregate quotas and bounded catalog statistics for build,
+   test, candidate, attestation, and qualification roots.
+4. **Compiler capability contract** — consume a machine-readable grammar,
+   capability, target, and language-version registry from `weavec` and remove
+   observational corpus dependence.
+5. **Module interfaces and incremental compilation** — define revisioned interface
+   objects and dependency hashes, then measure real multi-module workloads before
+   introducing module caches.
+6. **Sandbox strengthening** — add platform-supported aggregate cgroup and seccomp
+   evidence without weakening the canonical fail-closed sandbox contract.
+7. **Scale** — evaluate storage deduplication and a database architecture beyond
+   SQLite only after measured workloads justify the complexity.
 
-The bounded batch reduced write calls by more than 99% and reachable revision
-count by more than 98% for its generated case while preserving ordered audit
-rows.
-
-Policy qualification proved:
-
-- strict target policy required exact preflight replay;
-- a permissive incoming policy was visible but ignored;
-- protected merges built and executed with exit statuses 30 and 31;
-- a target fanout ceiling of one rejected two affected targets before compilation;
-- only a direct target policy revision could relax the ceiling;
-- the relaxed protected merge built and executed with exit status 32;
-- historical policy lookup reproduced the earlier ceiling.
-
-The review path also qualifies compiler-guided stable-node repair, historical
-inspection, forward/reverse revision diffs, stale preview rejection, and
-non-mutating conflict handling.
-
-## 13. Incremental compilation
-
-Future module cache keys should include:
-
-```text
-module implementation hash
-+ dependency interface hashes
-+ compiler identity
-+ target triple
-+ optimization settings
-```
-
-Changing private implementation may preserve an interface hash; changing public
-signature invalidates dependents. This should wait for real multi-module
-workloads and explicit interface objects.
-
-## 14. Remaining boundaries
-
-Major omissions include:
-
-- a formal machine-readable grammar and capability registry from `weavec`;
-- revisioned module-interface objects and dependency hashes;
-- affected-test selection and preview consequences;
-- sandboxed program execution tools;
-- content-addressed node deduplication;
-- distributed writers;
-- ownership, borrow, and effect modeling beyond compiler support.
-
-## 15. Next milestones
-
-### M1 — measured agent ergonomics
-
-- retain tool-order, failure, repair, policy, validation, and review traces;
-- compare single-edit and coherent-batch workflows on real agents;
-- improve bounded inspection and grammar guidance from observed failures.
-
-### M2 — compiler capability contract
-
-- consume a machine-readable capability and grammar registry from `weavec`;
-- replace corpus inference without changing MCP workflow;
-- report compiler, language, target, manifest, and diagnostics compatibility.
-
-### M3 — robust parallel development
-
-- retain target-authoritative revisioned policy and exact preflight replay;
-- add explicit interface objects and versions;
-- add edit scopes and affected-test selection;
-- attach affected-test consequences to preflight evidence;
-- retain merge admission hashes in immutable audit evidence.
-
-### M4 — execution and scale
-
-- sandboxed `build_run` assertions;
-- module-level incremental compilation;
-- database integrity, backup, and artifact-retention operations;
-- compact snapshots only when measurements justify them.
+More MCP convenience tools are not the current priority. Jacquard already has a
+broad public capability graph; the next phase is to make runtime composition,
+operations, storage, and compiler integration as explicit as its revision and
+qualification contracts.
