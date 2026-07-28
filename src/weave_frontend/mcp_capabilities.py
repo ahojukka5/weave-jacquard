@@ -153,7 +153,12 @@ PUBLIC_CAPABILITIES: tuple[Capability, ...] = (
     Capability(
         "artifact_storage",
         "weave_frontend.mcp_artifact_storage",
-        ("build_discovery", "test_batches", "tested_merge_attestations"),
+        (
+            "build_discovery",
+            "test_batches",
+            "tested_merge_attestations",
+            "database_backup",
+        ),
     ),
     Capability(
         "runtime_identity",
