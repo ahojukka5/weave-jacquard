@@ -11,6 +11,18 @@ from .database_backup import (
 )
 from .mcp_server import _result, mcp, workspace
 
+DATABASE_BACKUP_ROOT_ENV = "WEAVE_DATABASE_BACKUP_ROOT"
+
+
+def _install_configuration_contract() -> None:
+    """Bind backup-root configuration before application manifest finalization."""
+
+    from . import application
+
+    names = set(application.PUBLIC_CONFIGURATION_VARIABLES)
+    names.add(DATABASE_BACKUP_ROOT_ENV)
+    application.PUBLIC_CONFIGURATION_VARIABLES = tuple(sorted(names))
+
 
 @lru_cache(maxsize=1)
 def database_backups() -> DatabaseBackupService:
@@ -20,8 +32,9 @@ def database_backups() -> DatabaseBackupService:
 
 
 def install_capability() -> None:
-    """Discard stale backup-root composition during application reinstallation."""
+    """Install configuration identity and discard stale backup-root composition."""
 
+    _install_configuration_contract()
     database_backups.cache_clear()
 
 
