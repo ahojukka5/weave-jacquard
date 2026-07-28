@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from .artifact_quota import artifact_quota_admission
+from .artifact_quota import ArtifactQuotaService, artifact_quota_admission
 from .database_backup import DatabaseBackupService as _DatabaseBackupService
 from .errors import ArtifactIntegrityError, ValidationError
 
@@ -42,23 +42,38 @@ class DatabaseBackupService(_DatabaseBackupService):
     def _publication_lock(self, final: Path) -> Iterator[None]:
         """Acquire aggregate quota admission before the per-backup publication lock."""
 
-        if getattr(self, "artifact_quota", None) is None:
+        quota = getattr(self, "artifact_quota", None)
+        if quota is not None and not isinstance(quota, ArtifactQuotaService):
+            raise RuntimeError("attached artifact_quota has an unsupported type")
+        if quota is None or quota.max_bytes is None:
             with super()._publication_lock(final):
                 yield
             return
 
-        temporary = self._quota_stage(final)
-        with artifact_quota_admission(
-            self,
-            family=self.artifact_quota_family,
-            temporary=temporary,
-            final=final,
-        ):
-            with super()._publication_lock(final):
-                yield
+        missing_stage: ValidationError | None = None
+        for temporary in self._quota_stages(final):
+            try:
+                with artifact_quota_admission(
+                    self,
+                    family=self.artifact_quota_family,
+                    temporary=temporary,
+                    final=final,
+                ):
+                    with super()._publication_lock(final):
+                        yield
+                    return
+            except ValidationError as exc:
+                if exc.code != "INVALID_ARTIFACT_QUOTA_PATH":
+                    raise
+                missing_stage = exc
 
-    def _quota_stage(self, final: Path) -> Path:
-        """Locate a bounded verified stage whose manifest binds the final backup ID."""
+        raise ValidationError(
+            "ARTIFACT_STORAGE_STAGE_NOT_FOUND",
+            "database backup publication has no available verified matching stage",
+        ) from missing_stage
+
+    def _quota_stages(self, final: Path) -> tuple[Path, ...]:
+        """Locate bounded verified stages whose manifests bind the final backup ID."""
 
         matches: list[Path] = []
         try:
@@ -116,7 +131,7 @@ class DatabaseBackupService(_DatabaseBackupService):
                 "ARTIFACT_STORAGE_STAGE_NOT_FOUND",
                 "database backup publication has no verified matching stage",
             )
-        return min(matches, key=lambda path: path.name)
+        return tuple(sorted(matches, key=lambda path: path.name))
 
     @staticmethod
     def _verify_directory_layout(directory: Path) -> None:
