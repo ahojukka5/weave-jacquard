@@ -68,7 +68,7 @@ _STORAGE_TOPIC: dict[str, Any] = {
     "tool": "artifact_storage_report",
     "purpose": (
         "Measure complete logical bytes and entry counts across committed builds, virtual "
-        "candidate builds, test evidence, qualifications, and attestations."
+        "candidate builds, test evidence, qualifications, attestations, and database backups."
     ),
     "redaction": (
         "Storage paths are replaced by content-derived root and lock IDs. Family names, "
@@ -80,11 +80,11 @@ _STORAGE_TOPIC: dict[str, Any] = {
     ),
     "quota": (
         "WEAVE_ARTIFACT_MAX_BYTES enables one interprocess logical-byte admission ceiling "
-        "across all six production artifact publishers."
+        "across all seven production artifact publishers, including database backups."
     ),
     "boundary": (
         "Quota refusal prevents new retained publication but does not implement retention, "
-        "garbage collection, physical-block limits, or database-size policy."
+        "garbage collection, physical-block limits, or live database-size policy."
     ),
 }
 
@@ -98,13 +98,17 @@ _BACKUP_TOPIC: dict[str, Any] = {
         "Call database_backup_create, retain the returned backup_id externally, and use "
         "database_backup_get to reverify the backup before planned recovery operations."
     ),
+    "quota": (
+        "When WEAVE_ARTIFACT_MAX_BYTES is configured, backup creation is admitted through "
+        "the same aggregate retained-artifact quota as builds, tests, and attestations."
+    ),
     "restore": (
         "Restore is intentionally an offline weave-build CLI operation. It publishes only "
         "to a new destination and never replaces the database used by the running server."
     ),
     "boundary": (
-        "Database backup covers SQLite program state only. Artifact roots, qualification "
-        "evidence, retention policy, and remote replication require separate operations."
+        "Database backup covers SQLite program state only. Other artifact roots, qualification "
+        "evidence, retention policy, and remote replication require separate recovery operations."
     ),
 }
 
