@@ -34,12 +34,13 @@ The aggregate ceiling covers completed logical regular-file bytes in:
 - committed test runs;
 - committed test batches;
 - virtual-candidate test qualifications;
-- tested-merge attestations.
+- tested-merge attestations;
+- verified database backups.
 
-All six production publishers receive the same `ArtifactQuotaService` instance and
-use a lock file in the active database directory. Processes using the same database
-therefore serialize quota admission even when artifact roots are configured outside
-that directory.
+All seven production publishers receive the same `ArtifactQuotaService` instance
+and use a lock file in the active database directory. Processes using the same
+database therefore serialize quota admission even when artifact roots are
+configured outside that directory.
 
 Processes using different database directories do not share a quota lock. An
 operator who points separate Jacquard databases at overlapping artifact roots has
@@ -79,6 +80,14 @@ directories created by the existing publication implementation. Matching-stage
 discovery is bounded to 65,536 direct family-root entries and 16 duplicate staged
 directories. When duplicate stages exist for the same content-derived final ID,
 Jacquard uses the largest matching stage for conservative admission.
+
+Database backup staging predates the final backup ID in its directory name. The
+backup publisher therefore locates stages by reading the bounded manifest,
+requiring the manifest ID to equal the final directory ID, reverifying the complete
+backup, and requiring exactly `backup-manifest.json` and `database.sqlite3` as
+regular files. Discovery uses the same 65,536-entry and 16-match ceilings. Multiple
+valid stages with one backup ID are byte-identical because the ID binds the database
+bytes, SQLite identity, source identity, and exact two-file layout.
 
 Unrelated concurrent temporary directories are excluded from retained usage. Once
 one publisher commits, the next process observes its completed final directory
@@ -166,5 +175,5 @@ operator capabilities include:
 - explicit dry-run deletion plans;
 - guarded garbage collection and quarantine recovery;
 - temporary staging and physical-block limits;
-- SQLite file and backup-storage policy;
+- live SQLite database-size policy;
 - a typed runtime container that removes the current cached-service adaptation.
