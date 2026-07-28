@@ -8,6 +8,7 @@ from typing import Any
 
 from weave_frontend.errors import ValidationError
 from weave_frontend.mcp_capabilities import PUBLIC_CAPABILITIES
+from weave_frontend.mcp_revert_guidance import weave_help
 from weave_frontend.runtime_identity import (
     RUNTIME_IDENTITY_FORMAT,
     RuntimeIdentityService,
@@ -169,7 +170,10 @@ def test_runtime_identity_changes_with_redacted_configuration_value() -> None:
             environ={"WEAVEC_BIN": "/second/compiler"},
         ).report()
 
-        assert first["configuration"]["value_ids"] != second["configuration"]["value_ids"]
+        assert (
+            first["configuration"]["value_ids"]
+            != second["configuration"]["value_ids"]
+        )
         assert first["runtime_id"] != second["runtime_id"]
     finally:
         first_workspace.db.connection.close()
@@ -200,6 +204,15 @@ def test_runtime_identity_capability_is_last_and_explicit() -> None:
     assert capability.name == "runtime_identity"
     assert capability.module == "weave_frontend.mcp_runtime_identity"
     assert capability.depends_on == ("revision_reads", "test_runs")
+
+
+def test_runtime_identity_has_dedicated_help_topic() -> None:
+    response = weave_help("runtime")
+
+    assert response["ok"] is True
+    assert response["topic"] == "runtime"
+    assert response["help"]["tool"] == "runtime_identity"
+    assert "not proof" in response["help"]["boundary"]
 
 
 def test_public_application_manifest_contains_runtime_identity() -> None:
