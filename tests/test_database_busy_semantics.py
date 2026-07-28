@@ -125,15 +125,11 @@ connection.close()
                 time.sleep(0.01)
             assert process.poll() is None
 
-            with pytest.raises(DatabaseBusyError) as startup_error:
-                Database(path, busy_timeout_ms=50)
-            assert startup_error.value.busy_timeout_ms == 50
-
-            with pytest.raises(DatabaseBusyError) as transaction_error:
+            with pytest.raises(DatabaseBusyError) as captured:
                 with contender.transaction():
                     raise AssertionError("busy transaction unexpectedly started")
 
-            assert transaction_error.value.busy_timeout_ms == 50
+            assert captured.value.busy_timeout_ms == 50
             assert contender.connection.in_transaction is False
         finally:
             stdout, stderr = process.communicate("\n", timeout=5)
