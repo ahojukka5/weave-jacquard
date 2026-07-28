@@ -146,9 +146,14 @@ PUBLIC_CAPABILITIES: tuple[Capability, ...] = (
         ("concurrent_nodes",),
     ),
     Capability(
+        "artifact_storage",
+        "weave_frontend.mcp_artifact_storage",
+        ("build_discovery", "test_batches", "tested_merge_attestations"),
+    ),
+    Capability(
         "runtime_identity",
         "weave_frontend.mcp_runtime_identity",
-        ("revision_reads", "test_runs"),
+        ("revision_reads", "artifact_storage"),
     ),
 )
 
@@ -229,8 +234,8 @@ def install_public_capabilities(
             "merge trains, test definitions, strict test runs, explicit test batches, test "
             "impact plans, virtual candidate qualification, tested-merge attestations, "
             "revision evidence graphs, revisioned task contracts, scoped edits, immutable "
-            "reverts, selected preflight, resume, validation, build, and runtime identity "
-            "workflows."
+            "reverts, selected preflight, resume, validation, build, artifact storage, and "
+            "runtime identity workflows."
         ),
     )
     return capability_manifest(ordered)
