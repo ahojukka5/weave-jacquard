@@ -40,6 +40,41 @@ class DatabaseBusyError(ValidationError):
         }
 
 
+class ArtifactQuotaExceededError(ValidationError):
+    """Raised when one publication would exceed the configured artifact quota."""
+
+    def __init__(
+        self,
+        *,
+        family: str,
+        quota_bytes: int,
+        current_bytes: int,
+        staged_bytes: int,
+        projected_bytes: int,
+    ) -> None:
+        super().__init__(
+            "ARTIFACT_STORAGE_QUOTA_EXCEEDED",
+            "artifact publication would exceed the configured logical-byte quota",
+        )
+        self.family = family
+        self.quota_bytes = quota_bytes
+        self.current_bytes = current_bytes
+        self.staged_bytes = staged_bytes
+        self.projected_bytes = projected_bytes
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            **super().as_dict(),
+            "retryable": False,
+            "requires_operator_action": True,
+            "family": self.family,
+            "quota_bytes": self.quota_bytes,
+            "current_bytes": self.current_bytes,
+            "staged_bytes": self.staged_bytes,
+            "projected_bytes": self.projected_bytes,
+        }
+
+
 class ArtifactIntegrityError(WeaveFrontendError):
     """Raised when immutable retained artifact evidence cannot be verified."""
 

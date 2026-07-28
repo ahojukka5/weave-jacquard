@@ -1,6 +1,7 @@
 """Jacquard, the agent-native programming environment for Weave."""
 
 from weave_frontend import (
+    ArtifactQuotaExceededError,
     CompilerBridge,
     ConflictError,
     DatabaseBusyError,
@@ -17,6 +18,7 @@ from .workspace import SExpressionWorkspace
 JacquardError = WeaveFrontendError
 
 __all__ = [
+    "ArtifactQuotaExceededError",
     "CompilerBridge",
     "ConflictError",
     "DatabaseBusyError",

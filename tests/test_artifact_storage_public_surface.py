@@ -9,7 +9,8 @@ def test_artifact_storage_has_dedicated_help_topic() -> None:
     assert response["ok"] is True
     assert response["topic"] == "storage"
     assert response["help"]["tool"] == "artifact_storage_report"
-    assert "not retention" in response["help"]["boundary"]
+    assert "WEAVE_ARTIFACT_MAX_BYTES" in response["help"]["quota"]
+    assert "does not implement retention" in response["help"]["boundary"]
 
 
 def test_public_application_manifest_contains_artifact_storage() -> None:

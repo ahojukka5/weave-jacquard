@@ -1,4 +1,4 @@
-"""Final integrity rules for virtual merge-candidate test qualifications."""
+"""Final integrity and quota rules for virtual candidate test qualifications."""
 
 from __future__ import annotations
 
@@ -9,10 +9,16 @@ from .errors import ValidationError
 from .merge_candidate_test_runs import (
     MergeCandidateTestBatchService as _BaseMergeCandidateTestBatchService,
 )
+from .quota_publication import QuotaPublicationLockMixin
 
 
-class MergeCandidateTestBatchService(_BaseMergeCandidateTestBatchService):
-    """Allow artifact-free aggregates only when no selected test executed."""
+class MergeCandidateTestBatchService(
+    QuotaPublicationLockMixin,
+    _BaseMergeCandidateTestBatchService,
+):
+    """Verify artifact-free errors and enforce aggregate qualification storage."""
+
+    artifact_quota_family = "candidate_test_qualifications"
 
     @classmethod
     def _verify_artifacts(

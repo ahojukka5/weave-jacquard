@@ -6,7 +6,7 @@ import hashlib
 import json
 import os
 import stat
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -42,20 +42,39 @@ class ArtifactStorageService:
     def report(self) -> dict[str, Any]:
         """Return one complete path-redacted logical storage snapshot."""
 
+        return self._report(excluded_paths=(), exclude_internal_entries=False)
+
+    def _report(
+        self,
+        *,
+        excluded_paths: Iterable[str | Path],
+        exclude_internal_entries: bool = False,
+    ) -> dict[str, Any]:
+        """Return complete accounting with optional internal-publication exclusion."""
+
         self._validate_distinct_roots()
+        internal_exclusions = {Path(path).resolve() for path in excluded_paths}
         entries_remaining = MAX_ARTIFACT_SCAN_ENTRIES
         families: list[dict[str, Any]] = []
         for name in sorted(self.roots):
             path = self.roots[name]
-            excluded = {
+            nested = {
                 other_name: other_path
                 for other_name, other_path in self.roots.items()
                 if other_name != name and self._is_descendant(other_path, path)
             }
+            skipped_paths = set(nested.values())
+            skipped_paths.update(
+                candidate
+                for candidate in internal_exclusions
+                if self._is_descendant(candidate, path)
+            )
             family, entries_remaining = self._scan_root(
                 name,
                 path,
-                excluded,
+                nested_root_names=sorted(nested),
+                skipped_paths=skipped_paths,
+                exclude_internal_entries=exclude_internal_entries,
                 entries_remaining=entries_remaining,
             )
             families.append(family)
@@ -103,8 +122,10 @@ class ArtifactStorageService:
         self,
         name: str,
         root: Path,
-        excluded: Mapping[str, Path],
         *,
+        nested_root_names: list[str],
+        skipped_paths: set[Path],
+        exclude_internal_entries: bool,
         entries_remaining: int,
     ) -> tuple[dict[str, Any], int]:
         try:
@@ -120,7 +141,6 @@ class ArtifactStorageService:
                 f"artifact storage root {name!r} must be a non-symlink directory",
             )
 
-        excluded_paths = set(excluded.values())
         logical_bytes = 0
         regular_files = 0
         directories = 1
@@ -144,7 +164,13 @@ class ArtifactStorageService:
                         entries_remaining -= 1
                         entries_scanned += 1
                         entry_path = Path(entry.path)
-                        if entry_path in excluded_paths:
+                        if entry_path in skipped_paths:
+                            continue
+                        if (
+                            exclude_internal_entries
+                            and depth == 0
+                            and entry.name.startswith(".")
+                        ):
                             continue
                         try:
                             entry_stat = entry.stat(follow_symlinks=False)
@@ -193,7 +219,7 @@ class ArtifactStorageService:
                 "special_entries": special_entries,
                 "entries_scanned": entries_scanned,
                 "largest_file_bytes": largest_file_bytes,
-                "nested_roots": sorted(excluded),
+                "nested_roots": nested_root_names,
             },
             entries_remaining,
         )
