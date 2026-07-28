@@ -8,6 +8,7 @@ and existing implementation modules retain compatibility.
 from .compiler_bridge import CompilerBridge
 from .concurrent_workspace import SExpressionWorkspace
 from .errors import (
+    ArtifactQuotaExceededError,
     ConflictError,
     DatabaseBusyError,
     NotFoundError,
@@ -18,6 +19,7 @@ from .service import MergeResult
 from .source_map import render_with_node_map, smallest_node_for_span
 
 __all__ = [
+    "ArtifactQuotaExceededError",
     "CompilerBridge",
     "ConflictError",
     "DatabaseBusyError",
