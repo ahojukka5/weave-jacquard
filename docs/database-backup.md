@@ -37,12 +37,14 @@ Before publication Jacquard verifies:
 - journal mode;
 - the bounded database-integrity checker (`quick_check`, foreign keys, and
   relational ownership / operation-sequence invariants);
+- the exact manifest field set and canonical JSON encoding;
 - an exact two-file directory layout containing only `backup-manifest.json` and
   `database.sqlite3` as regular files.
 
-The exact layout rule prevents unbound files from being retained outside the
-content-derived backup identity and makes concurrent stages for one backup ID
-byte-equivalent for quota admission.
+These manifest and layout rules prevent unbound data from being retained outside
+the verified backup contract. Together with the database bytes and source identity
+bound by `backup_id`, they also make valid concurrent stages for one backup ID have
+the same retained logical size for quota admission.
 
 Process SQLite library version is not part of backup identity, so inspection and
 restore remain valid after a host upgrade when the database bytes are unchanged.
