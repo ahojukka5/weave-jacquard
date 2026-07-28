@@ -7,6 +7,7 @@ from weave_frontend.application import (
     ApplicationCompositionError,
     JacquardApp,
     build_tool_manifest,
+    registered_tool_contracts,
     registered_tool_names,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     "ApplicationCompositionError",
     "JacquardApp",
     "build_tool_manifest",
+    "registered_tool_contracts",
     "registered_tool_names",
 ]
