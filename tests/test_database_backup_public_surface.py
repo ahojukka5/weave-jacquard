@@ -13,6 +13,7 @@ def test_database_backup_has_dedicated_help_topic() -> None:
         "database_backup_create",
         "database_backup_get",
     ]
+    assert "aggregate retained-artifact quota" in response["help"]["quota"]
     assert "offline" in response["help"]["restore"]
 
 
