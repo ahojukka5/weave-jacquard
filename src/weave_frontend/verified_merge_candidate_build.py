@@ -1,10 +1,11 @@
-"""Final retained-metadata admission for virtual merge-candidate builds."""
+"""Final retained-metadata and quota admission for merge-candidate builds."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
+from .artifact_quota import artifact_quota_admission
 from .bounded_merge_candidate_build import (
     MergeCandidateBuildService as _BoundedMergeCandidateBuildService,
 )
@@ -18,7 +19,7 @@ MAX_MERGE_CANDIDATE_BUILD_MANIFEST_BYTES = 4 * 1024 * 1024
 
 
 class MergeCandidateBuildService(_BoundedMergeCandidateBuildService):
-    """Admit candidate-build manifests through one bounded regular-file boundary."""
+    """Verify manifests and enforce aggregate candidate-build storage admission."""
 
     @staticmethod
     def _read_manifest(path: Path) -> dict[str, Any]:
@@ -36,6 +37,15 @@ class MergeCandidateBuildService(_BoundedMergeCandidateBuildService):
                 "merge candidate build manifest root must be an object"
             )
         return value
+
+    def _publish(self, temporary: Path, final: Path, build_id: str) -> None:
+        with artifact_quota_admission(
+            self,
+            family="candidate_builds",
+            temporary=temporary,
+            final=final,
+        ):
+            super()._publish(temporary, final, build_id)
 
 
 __all__ = [
