@@ -42,16 +42,6 @@ def _artifact_roots() -> dict[str, Path]:
     }
 
 
-def _install_configuration_contract() -> None:
-    """Bind the quota variable into the application manifest before composition ends."""
-
-    from . import application
-
-    names = set(application.PUBLIC_CONFIGURATION_VARIABLES)
-    names.add(ARTIFACT_QUOTA_ENV)
-    application.PUBLIC_CONFIGURATION_VARIABLES = tuple(sorted(names))
-
-
 @lru_cache(maxsize=1)
 def artifact_storage() -> ArtifactStorageService:
     """Return bounded accounting for all live retained-artifact roots."""
@@ -84,7 +74,6 @@ def artifact_quota() -> ArtifactQuotaService:
 def install_capability() -> None:
     """Recompose root accounting and attach one quota guard to every publisher."""
 
-    _install_configuration_contract()
     artifact_quota.cache_clear()
     artifact_storage.cache_clear()
     artifact_quota()
