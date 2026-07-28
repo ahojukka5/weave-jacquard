@@ -6,7 +6,9 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any
 
+from .errors import ValidationError
 from .sexpr import JsonObject, validate_tree
+from .structural_limits import MAX_RENDERED_SOURCE_BYTES
 
 
 @dataclass(frozen=True)
@@ -28,8 +30,15 @@ class _Writer:
         return SourcePosition(self.byte, self.line, self.column)
 
     def append(self, text: str) -> None:
+        encoded_bytes = len(text.encode("utf-8"))
+        next_byte = self.byte + encoded_bytes
+        if next_byte > MAX_RENDERED_SOURCE_BYTES:
+            raise ValidationError(
+                "RENDERED_SOURCE_TOO_LARGE",
+                f"rendered source exceeds {MAX_RENDERED_SOURCE_BYTES} UTF-8 bytes",
+            )
         self.parts.append(text)
-        self.byte += len(text.encode("utf-8"))
+        self.byte = next_byte
         if "\n" in text:
             lines = text.split("\n")
             self.line += len(lines) - 1
@@ -67,6 +76,8 @@ def _render_atom(node: JsonObject) -> str:
         return f'"{escaped}"'
     if kind == "boolean":
         return "true" if value else "false"
+    if kind == "float":
+        return repr(float(value))
     return str(value)
 
 
@@ -138,7 +149,8 @@ def render_with_node_map(
     validate_tree(root)
     writer = _Writer()
     _render(root, writer, indent=0)
-    source = writer.text() + "\n"
+    writer.append("\n")
+    source = writer.text()
     source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
     node_map: dict[str, Any] = {
         "format": "weave-node-map-v1",
