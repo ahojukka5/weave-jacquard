@@ -27,6 +27,8 @@ Jacquard provides:
 - strict sandboxed test runs, explicit batches, and affected-test planning;
 - stable-ID merge preview, impact, qualification, preflight, and publication;
 - tested-merge attestations, revision evidence graphs, and immutable reverts;
+- verified online SQLite backups and non-destructive offline restore;
+- aggregate retained-artifact accounting and publication quota admission;
 - content-derived MCP tool and application manifests;
 - bounded artifact metadata, grammar-corpus indexing, compiler I/O, and
   qualification evidence.
@@ -115,11 +117,14 @@ Common environment variables are:
 | `WEAVE_TEST_BATCH_ROOT` | aggregate committed test-batch root |
 | `WEAVE_MERGE_TEST_RUN_ROOT` | virtual-candidate qualification root |
 | `WEAVE_MERGE_ATTESTATION_ROOT` | tested-merge attestation root |
+| `WEAVE_DATABASE_BACKUP_ROOT` | verified SQLite backup root |
+| `WEAVE_ARTIFACT_MAX_BYTES` | aggregate retained-artifact logical-byte ceiling |
 | `WEAVE_BWRAP` | explicit Bubblewrap executable |
 
 `WEAVEC_BIN` may be omitted when `weavec` is available on `PATH`.
 `WEAVEC_SOURCE_ROOT` affects observational grammar help only; compiler validation
-remains authoritative.
+remains authoritative. An absent or empty `WEAVE_ARTIFACT_MAX_BYTES` disables quota
+admission without removing storage accounting.
 
 The exact public configuration-variable set is bound into the application
 manifest.
@@ -256,7 +261,8 @@ schema by hand.
 
 ## CLI
 
-`weave-build` exposes revision-pinned target and artifact operations, for example:
+`weave-build` exposes revision-pinned target, artifact, and offline database
+operations, for example:
 
 ```bash
 weave-build --db weave.db target-set demo application main.weave \
@@ -264,6 +270,9 @@ weave-build --db weave.db target-set demo application main.weave \
 weave-build --db weave.db target-validate demo application
 weave-build --db weave.db target-build demo application
 weave-build --db weave.db get <build-id>
+weave-build --db weave.db --backup-root /backups db-backup
+weave-build --db missing.db --backup-root /backups \
+  db-restore <backup-id> /new/location/restored.db
 ```
 
 Failures are emitted as structured JSON on stderr with exit status 2.
@@ -293,7 +302,9 @@ Explicit ceilings cover:
 - canonical and annotated rendering;
 - compiler process lifetime and captured output;
 - compiler protocol files;
-- retained build, candidate, test, qualification, and attestation manifests;
+- retained build, candidate, test, qualification, attestation, and database-backup
+  manifests;
+- aggregate retained-artifact logical bytes across all seven production publishers;
 - grammar-corpus enumeration, bytes, index size, example rendering, diagnostics,
   query size, and response fanout;
 - qualification trace count, individual size, and aggregate size.
@@ -310,6 +321,9 @@ before JSON decoding or semantic verification.
 - [Grammar corpus limits](docs/grammar-corpus-limits.md)
 - [Database concurrency](docs/database-concurrency.md)
 - [Database integrity](docs/database-integrity.md)
+- [Database backup and restore](docs/database-backup.md)
+- [Artifact storage accounting](docs/artifact-storage.md)
+- [Aggregate artifact quota](docs/artifact-quota.md)
 - [Write-concurrency audit](docs/write-concurrency-audit.md)
 - [Transactional structural edits](docs/edit-transactions.md)
 - [Revisioned merge policy](docs/merge-policy.md)
