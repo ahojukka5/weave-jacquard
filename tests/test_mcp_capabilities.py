@@ -64,6 +64,7 @@ def test_public_capabilities_have_unique_dependency_order() -> None:
         "revert",
         "resume_snapshot",
         "selected_merge_train_preview",
+        "artifact_storage",
         "runtime_identity",
     ):
         assert capability in names
@@ -85,8 +86,11 @@ def test_public_capabilities_have_unique_dependency_order() -> None:
     assert names.index("task_contracts") < names.index("revert")
     assert names.index("tested_merge_attestations") < names.index("policy")
     assert names.index("task_contracts") < names.index("policy")
+    assert names.index("build_discovery") < names.index("artifact_storage")
+    assert names.index("test_batches") < names.index("artifact_storage")
+    assert names.index("tested_merge_attestations") < names.index("artifact_storage")
     assert names.index("revision_reads") < names.index("runtime_identity")
-    assert names.index("test_runs") < names.index("runtime_identity")
+    assert names.index("artifact_storage") < names.index("runtime_identity")
 
 
 def test_capability_manifest_is_json_ready_and_ordered() -> None:
