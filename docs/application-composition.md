@@ -87,7 +87,8 @@ The application manifest intentionally excludes live component values. The publi
 - database schema and connection policy;
 - final compiler binary hash and bounded version evidence;
 - sandbox policy and Bubblewrap and `prlimit` binary hashes;
-- which public configuration variables are set, without revealing their values.
+- which public configuration variables are set and domain-separated opaque IDs for
+  their values, without revealing the values themselves.
 
 The runtime identity tool is itself part of the tool manifest. Its function reads
 the completed public application manifest lazily only when called. There is no
@@ -105,12 +106,17 @@ Production startup follows one explicit sequence:
 ```text
 base decorated server
 → ordered capability installation
+→ artifact-root composition and optional quota attachment
 → final guidance installation
 → one registered tool-registry snapshot
 → schema and required-tool validation
 → content-derived application manifest snapshot
 → stdio transport
 ```
+
+Artifact quota configuration is parsed during capability installation. An invalid
+`WEAVE_ARTIFACT_MAX_BYTES` therefore fails startup before the server advertises a
+tool contract it cannot enforce.
 
 Composition fails before serving requests when:
 
@@ -124,7 +130,8 @@ Composition fails before serving requests when:
 - a supplied contract contains unknown fields;
 - contract metadata cannot be represented canonically as JSON;
 - configuration-variable names are empty or duplicated;
-- the capability graph is invalid.
+- the capability graph is invalid;
+- aggregate artifact quota configuration is malformed.
 
 ## Current migration boundary
 
@@ -139,6 +146,13 @@ registry. Jacquard currently supports its mapping-backed `_tools` shape and the
 mapping-backed fake-server shape used by composition tests. This remains an SDK
 compatibility boundary even though the extracted fields correspond directly to
 the protocol `tools/list` contract.
+
+The existing compiler bridge is cached before artifact quota composition because
+many earlier capabilities depend on it. The storage capability upgrades that exact
+plain Python instance to its quota-aware subclass rather than rebuilding the graph
+and invalidating dependent services. This compatibility adapter is intentionally
+narrow and is covered by identity and publication tests. The planned typed runtime
+container should remove the need for in-place adaptation.
 
 During migration:
 
@@ -162,6 +176,7 @@ runtime variables:
 
 - `WEAVEC_BIN`;
 - `WEAVEC_SOURCE_ROOT`;
+- `WEAVE_ARTIFACT_MAX_BYTES`;
 - `WEAVE_BUILD_ROOT`;
 - `WEAVE_BWRAP`;
 - `WEAVE_DB_PATH`;
@@ -173,9 +188,10 @@ runtime variables:
 
 The names are validated as a unique lexical set before the application identity is
 computed. Paths and secrets are intentionally absent from public composition
-metadata. Runtime identity reports only the subset of variable names whose values
-are non-empty. Runtime artifact manifests continue to bind exact compiler,
-executable, sandbox, and content hashes where those identities matter.
+metadata. Runtime identity reports the subset of variable names whose values are
+non-empty and opaque matching IDs for those values. Runtime artifact manifests
+continue to bind exact compiler, executable, sandbox, and content hashes where
+those identities matter.
 
 ## Contributor rules
 
