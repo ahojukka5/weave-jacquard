@@ -1,0 +1,38 @@
+{
+  "format": "weave-jacquard-qualification-traces-v1",
+  "protocol": [
+    "revision-reads-trace.json",
+    "single-node-concurrency-trace.json",
+    "program-target-concurrency-trace.json",
+    "context-policy-concurrency-trace.json",
+    "reproducible-branch-create-trace.json",
+    "resume-snapshot-trace.json",
+    "agent-checkpoint-trace.json",
+    "agent-checkpoint-timeline-trace.json",
+    "project-agent-status-trace.json",
+    "project-merge-queue-trace.json",
+    "project-merge-impact-queue-trace.json",
+    "selected-merge-preflight-batch-trace.json",
+    "selected-merge-train-preview-trace.json",
+    "test-targets-trace.json",
+    "test-runs-trace.json",
+    "test-batches-trace.json",
+    "test-impact-trace.json",
+    "merge-test-impact-trace.json",
+    "merge-candidate-test-runs-trace.json",
+    "task-contracts-trace.json",
+    "revision-evidence-trace.json",
+    "immutable-revert-trace.json"
+  ],
+  "native": [
+    "revision-inspection-trace.json",
+    "revision-diff-trace.json",
+    "merge-preview-trace.json",
+    "merge-validation-trace.json",
+    "merge-impact-trace.json",
+    "validate-affected-trace.json",
+    "merge-preflight-trace.json",
+    "merge-policy-trace.json",
+    "build-discovery-trace.json"
+  ]
+}
