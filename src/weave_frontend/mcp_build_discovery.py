@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from .build_discovery import BuildDiscoveryService
 from .mcp_build import compiler_bridge
 from .mcp_server import _result, mcp
+from .verified_build_discovery import BuildDiscoveryService
 
 
 @lru_cache(maxsize=1)
