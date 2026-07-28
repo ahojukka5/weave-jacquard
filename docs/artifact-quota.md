@@ -86,8 +86,9 @@ backup publisher therefore locates stages by reading the bounded manifest,
 requiring the manifest ID to equal the final directory ID, reverifying the complete
 backup, and requiring exactly `backup-manifest.json` and `database.sqlite3` as
 regular files. Discovery uses the same 65,536-entry and 16-match ceilings. Multiple
-valid stages with one backup ID are byte-identical because the ID binds the database
-bytes, SQLite identity, source identity, and exact two-file layout.
+valid stages with one backup ID have identical retained bytes because verification
+requires one exact manifest field set, canonical manifest encoding, the exact
+two-file layout, and database bytes bound by the backup ID.
 
 Unrelated concurrent temporary directories are excluded from retained usage. Once
 one publisher commits, the next process observes its completed final directory
