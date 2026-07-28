@@ -19,7 +19,7 @@ run compiler validation, behavioral tests, merge policy admission, or human revi
 
 INSTRUCTIONS = f"{_base.INSTRUCTIONS}\n{_REVERT_INSTRUCTION}"
 
-_TOPIC: dict[str, Any] = {
+_REVERT_TOPIC: dict[str, Any] = {
     "workflow": (
         "Select one revision from the current branch's first-parent history, call "
         "branch_revert_preview, inspect conflicts and document_changes, then call "
@@ -44,12 +44,34 @@ _TOPIC: dict[str, Any] = {
     ),
 }
 
+_RUNTIME_TOPIC: dict[str, Any] = {
+    "tool": "runtime_identity",
+    "purpose": (
+        "Correlate one live server with its application contract, package and SDK versions, "
+        "database policy, compiler identity, and strict sandbox identity."
+    ),
+    "redaction": (
+        "Configuration values and configured executable paths are not returned. The report "
+        "lists only public variable names and which names are set."
+    ),
+    "stability": (
+        "Repeated calls against an unchanged process return the same content-derived "
+        "runtime_id because the report contains no timestamp or random value."
+    ),
+    "boundary": (
+        "Runtime identity is diagnostic evidence, not proof that the server passed full "
+        "qualification."
+    ),
+}
+
 
 def weave_help(topic: str = "workflow") -> dict[str, Any]:
-    """Extend runtime help with immutable revert guidance."""
+    """Extend runtime help with immutable revert and runtime identity guidance."""
 
     if topic == "revert":
-        return {"ok": True, "topic": topic, "help": deepcopy(_TOPIC)}
+        return {"ok": True, "topic": topic, "help": deepcopy(_REVERT_TOPIC)}
+    if topic == "runtime":
+        return {"ok": True, "topic": topic, "help": deepcopy(_RUNTIME_TOPIC)}
 
     response = _base.weave_help(topic)
     help_value = deepcopy(response["help"])
@@ -60,5 +82,10 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
         )
         tools["branch_revert"] = (
             "Publish the exact reviewed inverse as a new immutable revision."
+        )
+    if topic in {"workflow", "read"}:
+        tools = help_value.setdefault("tools", {})
+        tools["runtime_identity"] = (
+            "Report the exact live application, compiler, database, and sandbox identity."
         )
     return {**response, "help": help_value}

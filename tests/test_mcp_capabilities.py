@@ -49,7 +49,7 @@ def test_public_capabilities_have_unique_dependency_order() -> None:
     names = [capability.name for capability in PUBLIC_CAPABILITIES]
 
     assert names[0] == "concurrent_nodes"
-    assert names[-1] == "revision_reads"
+    assert names[-1] == "runtime_identity"
     assert len(names) == len(set(names))
     for capability in (
         "test_targets",
@@ -64,6 +64,7 @@ def test_public_capabilities_have_unique_dependency_order() -> None:
         "revert",
         "resume_snapshot",
         "selected_merge_train_preview",
+        "runtime_identity",
     ):
         assert capability in names
     assert names.index("concurrent_targets") < names.index("test_targets")
@@ -84,6 +85,8 @@ def test_public_capabilities_have_unique_dependency_order() -> None:
     assert names.index("task_contracts") < names.index("revert")
     assert names.index("tested_merge_attestations") < names.index("policy")
     assert names.index("task_contracts") < names.index("policy")
+    assert names.index("revision_reads") < names.index("runtime_identity")
+    assert names.index("test_runs") < names.index("runtime_identity")
 
 
 def test_capability_manifest_is_json_ready_and_ordered() -> None:
