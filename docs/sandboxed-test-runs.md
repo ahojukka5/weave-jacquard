@@ -33,7 +33,7 @@ Every run binds all of the following evidence:
 - retained compiler `build_id` and build revision hash;
 - compiler and executable SHA-256 hashes;
 - sandbox backend, reported policy, and `policy_hash`;
-- exact resource limits;
+- exact resource limits, including the fixed one-process ceiling;
 - expected exit status and output hashes;
 - observed termination, output sizes, and output hashes;
 - each individual behavioral assertion and the final pass status.
@@ -45,7 +45,7 @@ test-definition metadata.
 ## Isolation contract
 
 The initial backend is Linux Bubblewrap. `sandbox_capabilities` is authoritative:
-execution is allowed only when its real isolation probe returns
+execution is allowed only when its real isolation probes return
 `available = true`.
 
 The backend currently enforces:
@@ -61,15 +61,21 @@ The backend currently enforces:
 - address-space and CPU-time limits;
 - generated-file-size, open-file, and core-dump limits;
 - a combined bounded stdout and stderr capture limit;
+- one tested process through an inner `prlimit --nproc=1:1` boundary;
 - process-group termination on timeout or excess output.
 
-The current backend reports both `seccomp = false` and
-`resource_limits.process_count = false`. It has no valid per-sandbox process
-controller yet; applying `RLIMIT_NPROC` before namespace creation would count
-unrelated host processes for the same user and is therefore not claimed as an
-enforced boundary. Callers must not infer syscall filtering, process-count
-control, stronger kernel hardening, or any protection not explicitly present in
-the capability response.
+The process limit is applied after Bubblewrap creates its namespaces. Applying
+`RLIMIT_NPROC` in Jacquard's Python `preexec_fn` would constrain Bubblewrap
+itself rather than only the tested program. The capability probe therefore
+launches the target through `prlimit` inside the clean namespace command and
+proves that an attempted subshell is rejected.
+
+The backend reports `resource_limits.process_count = true` only after that probe
+passes. It also reports `aggregate_memory = false` and `seccomp = false`.
+`RLIMIT_AS` and `RLIMIT_CPU` are inherited POSIX per-process limits, not cgroup
+accounting. Callers must not infer aggregate cgroup quotas, syscall filtering,
+or protections absent from the capability response. See
+[`sandbox-process-policy.md`](sandbox-process-policy.md).
 
 ## Refusal versus behavioral failure
 
@@ -122,12 +128,15 @@ retained evidence.
 
 ## Operational requirements
 
-- Install Bubblewrap on Linux hosts that are permitted to execute tests.
+- Install Bubblewrap and `prlimit` from util-linux on Linux hosts permitted to
+  execute tests.
 - The host kernel and security policy must permit the user and network namespaces
   reported by `sandbox_capabilities`. Ubuntu AppArmor policies can deliberately
   restrict unprivileged user namespaces; in that configuration the probe refuses
   execution until an administrator explicitly permits the required namespaces.
-- Do not weaken the sandbox or share the host network merely to make the probe
+- The execution user must not bypass `RLIMIT_NPROC`; the process-policy probe
+  rejects unsuitable privilege contexts rather than claiming enforcement.
+- Do not weaken the sandbox or share the host network merely to make a probe
   pass. A host that cannot create the declared isolation boundary is unsupported.
 - Call `sandbox_capabilities` before relying on execution availability.
 - Pin `revision_id` when testing reviewed or merge-candidate work.

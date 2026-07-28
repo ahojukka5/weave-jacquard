@@ -25,6 +25,7 @@ SANDBOX_CAPABILITIES_FORMAT = "weave-sandbox-capabilities-v1"
 SANDBOX_RESULT_FORMAT = "weave-sandbox-result-v1"
 MAX_SANDBOX_VERSION_BYTES = 4096
 _READ_CHUNK = 65_536
+_SINGLE_PROCESS_LIMIT = 1
 
 
 @dataclass(frozen=True)
@@ -34,12 +35,27 @@ class SandboxLimits:
     max_output_bytes: int
     max_file_bytes: int
 
+    def __post_init__(self) -> None:
+        for name in (
+            "timeout_ms",
+            "max_memory_bytes",
+            "max_output_bytes",
+            "max_file_bytes",
+        ):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValidationError(
+                    "INVALID_SANDBOX_LIMIT",
+                    f"{name} must be a positive integer",
+                )
+
     def as_dict(self) -> dict[str, int]:
         return {
             "timeout_ms": self.timeout_ms,
             "max_memory_bytes": self.max_memory_bytes,
             "max_output_bytes": self.max_output_bytes,
             "max_file_bytes": self.max_file_bytes,
+            "max_processes": _SINGLE_PROCESS_LIMIT,
         }
 
 
@@ -90,9 +106,16 @@ class BubblewrapSandbox:
     the script or expression through ``arguments`` or ``stdin``.
     """
 
-    def __init__(self, executable: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        executable: str | Path | None = None,
+        *,
+        prlimit: str | Path | None = None,
+    ) -> None:
         configured = executable or os.environ.get("WEAVE_BWRAP") or shutil.which("bwrap")
+        configured_prlimit = prlimit or shutil.which("prlimit")
         self.executable = Path(configured).resolve() if configured else None
+        self.prlimit = Path(configured_prlimit).resolve() if configured_prlimit else None
         self._capabilities: dict[str, Any] | None = None
 
     def capabilities(self) -> dict[str, Any]:
@@ -108,6 +131,10 @@ class BubblewrapSandbox:
             error = "bubblewrap executable was not found"
         elif not self.executable.is_file() or not os.access(self.executable, os.X_OK):
             error = "configured bubblewrap path is not an executable file"
+        elif self.prlimit is None:
+            error = "prlimit executable was not found"
+        elif not self.prlimit.is_file() or not os.access(self.prlimit, os.X_OK):
+            error = "configured prlimit path is not an executable file"
         else:
             try:
                 completed = subprocess.run(
@@ -123,7 +150,7 @@ class BubblewrapSandbox:
                 if completed.returncode != 0:
                     error = f"bubblewrap version probe exited {completed.returncode}"
                 else:
-                    probe = subprocess.run(
+                    isolation_probe = subprocess.run(
                         self._command(Path("/usr/bin/true"), []),
                         stdin=subprocess.DEVNULL,
                         stdout=subprocess.PIPE,
@@ -131,16 +158,40 @@ class BubblewrapSandbox:
                         check=False,
                         timeout=5,
                     )
-                    if probe.returncode == 0:
-                        available = True
-                    else:
-                        message = probe.stdout[:MAX_SANDBOX_VERSION_BYTES].decode(
+                    if isolation_probe.returncode != 0:
+                        message = isolation_probe.stdout[:MAX_SANDBOX_VERSION_BYTES].decode(
                             "utf-8", errors="replace"
                         ).strip()
                         error = (
-                            f"bubblewrap isolation probe exited {probe.returncode}"
+                            f"bubblewrap isolation probe exited {isolation_probe.returncode}"
                             + (f": {message}" if message else "")
                         )
+                    else:
+                        process_probe = subprocess.run(
+                            self._command(
+                                Path("/bin/sh").resolve(),
+                                [
+                                    "-c",
+                                    "if ( : ) 2>/dev/null; then exit 91; fi; exit 0",
+                                ],
+                            ),
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            check=False,
+                            timeout=5,
+                        )
+                        if process_probe.returncode == 0:
+                            available = True
+                        else:
+                            message = process_probe.stdout[
+                                :MAX_SANDBOX_VERSION_BYTES
+                            ].decode("utf-8", errors="replace").strip()
+                            error = (
+                                "single-process policy probe exited "
+                                f"{process_probe.returncode}"
+                                + (f": {message}" if message else "")
+                            )
             except (OSError, subprocess.TimeoutExpired) as exc:
                 error = f"bubblewrap isolation probe failed: {exc}"
 
@@ -152,6 +203,9 @@ class BubblewrapSandbox:
             "writable_paths": ["/tmp", "/work"],
             "writable_storage": "ephemeral-tmpfs",
             "capabilities": "drop-all",
+            "process_creation": "deny",
+            "max_processes": _SINGLE_PROCESS_LIMIT,
+            "process_limit_backend": "prlimit-RLIMIT_NPROC",
             "new_user_namespace": True,
             "new_mount_namespace": True,
             "new_pid_namespace": True,
@@ -180,7 +234,8 @@ class BubblewrapSandbox:
                 "captured_output": True,
                 "core_dump": True,
                 "open_files": True,
-                "process_count": False,
+                "process_count": True,
+                "aggregate_memory": False,
             },
         }
         return dict(self._capabilities)
@@ -252,7 +307,7 @@ class BubblewrapSandbox:
         )
 
     def _command(self, executable: Path, arguments: list[str]) -> list[str]:
-        if self.executable is None:
+        if self.executable is None or self.prlimit is None:
             return []
         command = [
             str(self.executable),
@@ -288,6 +343,9 @@ class BubblewrapSandbox:
                 "LANG=C",
                 "LC_ALL=C",
                 "TMPDIR=/tmp",
+                str(self.prlimit),
+                f"--nproc={_SINGLE_PROCESS_LIMIT}:{_SINGLE_PROCESS_LIMIT}",
+                "--",
                 "/app/program",
                 *arguments,
             ]

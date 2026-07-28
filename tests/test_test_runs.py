@@ -239,6 +239,7 @@ def test_passed_run_binds_exact_inputs_and_verifies_outputs(tmp_path: Path) -> N
         "max_memory_bytes": 32 * 1024 * 1024,
         "max_output_bytes": 8_192,
         "max_file_bytes": 4_096,
+        "max_processes": 1,
     }
 
 
