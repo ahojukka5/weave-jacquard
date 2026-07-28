@@ -17,10 +17,13 @@ env:
   WEAVEC_RELEASE: v0.3.0
 
 jobs:
-  native-e2e:
-    name: Real MCP to packaged weavec
+  native-qualification:
+    name: Packaged compiler qualification
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
+    env:
+      QUALIFICATION_DIR: ${{ runner.temp }}/jacquard-native-qualification
+      COMPILER_STAGE: ${{ runner.temp }}/jacquard-weavec-release
 
     steps:
       - name: Check out Jacquard
@@ -31,16 +34,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Jacquard and test tools
+      - name: Install Jacquard qualification environment
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .
-          python -m pip install pytest
+          python -m pip install -e '.[dev]'
 
-      - name: Install native verification tools
+      - name: Install native and sandbox runtimes
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang file llvm
+          sudo apt-get install -y bubblewrap clang file llvm
+          if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          if [[ -e /proc/sys/kernel/unprivileged_userns_clone ]]; then
+            sudo sysctl -w kernel.unprivileged_userns_clone=1
+          fi
 
       - name: Resolve immutable weavec release assets
         id: release
@@ -48,15 +56,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          mkdir -p "$COMPILER_STAGE"
           gh api "repos/ahojukka5/weavec/releases/tags/$WEAVEC_RELEASE" \
-            > release-metadata.json
+            > "$COMPILER_STAGE/release-metadata.json"
 
           python - <<'PY'
           import json
           import os
           from pathlib import Path
 
-          release = json.loads(Path("release-metadata.json").read_text(encoding="utf-8"))
+          stage = Path(os.environ["COMPILER_STAGE"])
+          release = json.loads(
+              (stage / "release-metadata.json").read_text(encoding="utf-8")
+          )
           assets = release.get("assets", [])
           archives = [
               asset
@@ -67,15 +79,10 @@ jobs:
           assert len(archives) == 1, [asset["name"] for asset in assets]
           assert len(checksums) == 1, [asset["name"] for asset in assets]
 
-          output = Path(os.environ["GITHUB_OUTPUT"])
-          with output.open("a", encoding="utf-8") as stream:
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
               stream.write(f"archive_name={archives[0]['name']}\n")
               stream.write(f"archive_url={archives[0]['browser_download_url']}\n")
               stream.write(f"checksum_url={checksums[0]['browser_download_url']}\n")
-
-          print("release:", release["tag_name"])
-          print("archive:", archives[0]["name"], archives[0]["size"])
-          print("checksum:", checksums[0]["name"], checksums[0]["size"])
           PY
 
       - name: Download and verify packaged weavec
@@ -85,387 +92,49 @@ jobs:
           CHECKSUM_URL: ${{ steps.release.outputs.checksum_url }}
         run: |
           set -euo pipefail
-          mkdir -p dist compiler
+          mkdir -p "$COMPILER_STAGE/dist" "$COMPILER_STAGE/compiler"
           curl --fail --location --retry 3 \
             "$ARCHIVE_URL" \
-            --output "dist/$ARCHIVE_NAME"
+            --output "$COMPILER_STAGE/dist/$ARCHIVE_NAME"
           curl --fail --location --retry 3 \
             "$CHECKSUM_URL" \
-            --output dist/SHA256SUMS
+            --output "$COMPILER_STAGE/dist/SHA256SUMS"
 
-          grep -F " $ARCHIVE_NAME" dist/SHA256SUMS > dist/GLIBC-SHA256SUM
+          grep -F " $ARCHIVE_NAME" "$COMPILER_STAGE/dist/SHA256SUMS" \
+            > "$COMPILER_STAGE/dist/GLIBC-SHA256SUM"
           (
-            cd dist
+            cd "$COMPILER_STAGE/dist"
             sha256sum --check GLIBC-SHA256SUM
           )
 
-          tar -C compiler -xzf "dist/$ARCHIVE_NAME"
-          compiler_path="$(find compiler -type f -path '*/bin/weavec' -print -quit)"
+          tar -C "$COMPILER_STAGE/compiler" \
+            -xzf "$COMPILER_STAGE/dist/$ARCHIVE_NAME"
+          compiler_path="$(
+            find "$COMPILER_STAGE/compiler" \
+              -type f -path '*/bin/weavec' -print -quit
+          )"
           test -n "$compiler_path"
           test -x "$compiler_path"
           command -v clang
           command -v llvm-as
           file "$compiler_path"
-          printf 'WEAVEC_BIN=%s/%s\n' "$GITHUB_WORKSPACE" "$compiler_path" \
-            >> "$GITHUB_ENV"
+          printf 'WEAVEC_BIN=%s\n' "$compiler_path" >> "$GITHUB_ENV"
 
-      - name: Build and run complex programs through real MCP
-        run: |
-          set -euo pipefail
-          base="$RUNNER_TEMP/jacquard-native-e2e"
-          python -m pytest \
-            -m real_e2e \
-            tests/e2e/test_real_mcp.py \
-            tests/e2e/test_real_mcp_program_matrix.py \
-            tests/e2e/test_real_mcp_algorithmic_stress.py \
-            tests/e2e/test_real_mcp_batch_edit.py \
-            tests/e2e/test_real_mcp_workflow_equivalence.py \
-            tests/e2e/test_real_mcp_compiler_repair.py \
-            tests/e2e/test_real_mcp_revision_inspection.py \
-            tests/e2e/test_real_mcp_revision_diff.py \
-            tests/e2e/test_real_mcp_merge_preview.py \
-            tests/e2e/test_real_mcp_merge_validation.py \
-            tests/e2e/test_real_mcp_merge_impact.py \
-            tests/e2e/test_real_mcp_validate_affected.py \
-            tests/e2e/test_real_mcp_merge_preflight.py \
-            tests/e2e/test_real_mcp_merge_policy.py \
-            tests/e2e/test_real_mcp_build_discovery.py \
-            --basetemp "$base" \
-            --junitxml qualification-pytest.xml
-
-          mkdir -p qualification
-          cp release-metadata.json qualification/weavec-release.json
-          cp qualification-pytest.xml qualification/
-          cp -a "$base" qualification/pytest-temp
-
-          BASE="$base" python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          base = Path(os.environ["BASE"])
-          summaries = [
-              json.loads(path.read_text(encoding="utf-8"))
-              for path in sorted(base.rglob("qualification-summary.json"))
-          ]
-          by_name = {summary["case"]: summary for summary in summaries}
-          assert set(by_name) == {
-              "while-accumulator",
-              "multi-function-chain",
-              "memory-flow",
-              "binary-search-batch16",
-              "batched-sum80",
-              "atomic-batch-equivalence-sum32",
-              "compiler-guided-repair",
-          }, by_name
-          assert by_name["while-accumulator"]["actual_exit"] == 42
-          assert by_name["multi-function-chain"]["actual_exit"] == 35
-          assert by_name["memory-flow"]["actual_exit"] == 100
-          assert by_name["binary-search-batch16"]["actual_exit"] == 26
-          assert by_name["batched-sum80"]["actual_exit"] == 80
-          assert by_name["batched-sum80"]["write_call_reduction_ratio"] > 0.99
-          assert by_name["batched-sum80"]["revision_reduction_ratio"] > 0.98
-          equivalence = by_name["atomic-batch-equivalence-sum32"]
-          assert equivalence["actual_exit"] == 32
-          assert equivalence["write_call_reduction_ratio"] > 0.99
-          assert equivalence["revision_reduction_ratio"] > 0.95
-          assert equivalence["source_identical"] is True
-          assert equivalence["wir_identical"] is True
-          assert equivalence["llvm_identical"] is True
-          assert equivalence["bitcode_identical"] is True
-          repair = by_name["compiler-guided-repair"]
-          assert repair["actual_exit"] == 0
-          assert repair["diagnostic_code"] == "backend.unknown-expression-operator"
-          assert repair["diagnostic_node_id"] == repair["repaired_node_id"]
-          assert repair["failed_build_retained"] is True
-          assert repair["failed_build_published_executable"] is False
-          assert all(summary["llvm_bytes"] > 0 for summary in summaries)
-          assert all(summary["bitcode_bytes"] > 0 for summary in summaries)
-
-          traces = list(base.rglob("revision-inspection-trace.json"))
-          assert len(traces) == 1, traces
-          trace = json.loads(traces[0].read_text(encoding="utf-8"))
-          inspections = [entry for entry in trace if entry["tool"] == "node_inspect"]
-          assert len(inspections) == 2
-          assert inspections[0]["payload"]["result"]["revision_is_branch_head"] is True
-          assert inspections[1]["payload"]["result"]["revision_is_branch_head"] is False
-          assert inspections[0]["payload"]["result"]["subtree"]["value"] == "after"
-          assert inspections[1]["payload"]["result"]["subtree"]["value"] == "before"
-
-          diff_traces = list(base.rglob("revision-diff-trace.json"))
-          assert len(diff_traces) == 1, diff_traces
-          diff_trace = json.loads(diff_traces[0].read_text(encoding="utf-8"))
-          diff_pages = [
-              entry for entry in diff_trace if entry["tool"] == "revision_diff_page"
-          ]
-          assert len(diff_pages) == 4
-          assert [
-              entry["payload"]["result"]["returned_count"]
-              for entry in diff_pages[:3]
-          ] == [2, 2, 1]
-          assert diff_pages[0]["payload"]["result"]["total_change_count"] == 5
-          assert diff_pages[0]["payload"]["result"]["target_revision_is_branch_head"] is True
-          assert diff_pages[3]["payload"]["result"]["target_revision_is_branch_head"] is False
-
-          preview_traces = list(base.rglob("merge-preview-trace.json"))
-          assert len(preview_traces) == 1, preview_traces
-          preview_trace = json.loads(preview_traces[0].read_text(encoding="utf-8"))
-          previews = [
-              entry for entry in preview_trace if entry["tool"] == "branch_merge_preview"
-          ]
-          merges = [
-              entry for entry in preview_trace if entry["tool"] == "branch_merge"
-          ]
-          assert len(previews) == 3
-          assert len(merges) == 3
-          assert previews[0]["payload"]["result"]["mergeable"] is True
-          assert previews[0]["payload"]["result"]["document_changes"][0][
-              "changed_node_count"
-          ] == 3
-          assert merges[0]["payload"]["result"]["preview_enforced"] is True
-          assert merges[1]["payload"]["error"]["code"] == "STALE_MERGE_PREVIEW"
-          assert previews[2]["payload"]["result"]["mergeable"] is False
-          assert merges[2]["payload"]["error"]["code"] == "MERGE_CONFLICT"
-
-          validation_traces = list(base.rglob("merge-validation-trace.json"))
-          assert len(validation_traces) == 1, validation_traces
-          validation_trace = json.loads(
-              validation_traces[0].read_text(encoding="utf-8")
-          )
-          validations = [
-              entry
-              for entry in validation_trace
-              if entry["tool"] == "branch_merge_validate"
-          ]
-          validated_merges = [
-              entry
-              for entry in validation_trace
-              if entry["tool"] == "branch_merge"
-          ]
-          assert len(validations) == 2
-          assert validations[0]["payload"]["result"]["valid"] is True
-          assert validations[0]["payload"]["result"]["wir_bytes"] > 0
-          assert validations[1]["payload"]["result"]["valid"] is False
-          assert validated_merges[0]["payload"]["result"]["validation_enforced"] is True
-          assert validated_merges[0]["payload"]["result"]["merge_validation"][
-              "valid"
-          ] is True
-          assert validated_merges[1]["payload"]["error"]["code"] == (
-              "MERGE_VALIDATION_FAILED"
-          )
-
-          impact_traces = list(base.rglob("merge-impact-trace.json"))
-          assert len(impact_traces) == 1, impact_traces
-          impact_trace = json.loads(impact_traces[0].read_text(encoding="utf-8"))
-          impact_pages = [
-              entry for entry in impact_trace if entry["tool"] == "branch_merge_impact"
-          ]
-          assert len(impact_pages) == 2
-          assert [
-              entry["payload"]["result"]["returned_count"] for entry in impact_pages
-          ] == [1, 1]
-          assert impact_pages[0]["payload"]["result"][
-              "total_affected_target_count"
-          ] == 2
-          assert impact_pages[0]["payload"]["result"]["unaffected_target_count"] == 1
-          assert impact_pages[0]["payload"]["result"][
-              "uncovered_changed_documents"
-          ] == ["orphan.weave"]
-          assert impact_pages[0]["payload"]["result"]["affected_targets"][0][
-              "name"
-          ] == "application"
-          assert impact_pages[1]["payload"]["result"]["affected_targets"][0][
-              "name"
-          ] == "main-only"
-
-          affected_traces = list(base.rglob("validate-affected-trace.json"))
-          assert len(affected_traces) == 1, affected_traces
-          affected_trace = json.loads(
-              affected_traces[0].read_text(encoding="utf-8")
-          )
-          validation_sets = [
-              entry
-              for entry in affected_trace
-              if entry["tool"] == "branch_merge_validate_affected"
-          ]
-          affected_merges = [
-              entry for entry in affected_trace if entry["tool"] == "branch_merge"
-          ]
-          assert len(validation_sets) == 4
-          assert validation_sets[0]["payload"]["result"]["passed_targets"] == [
-              "application",
-              "mirror",
-          ]
-          assert validation_sets[0]["payload"]["result"][
-              "ready_for_publication"
-          ] is True
-          assert validation_sets[1]["payload"]["result"]["failed_targets"] == [
-              "application",
-              "mirror",
-          ]
-          assert validation_sets[2]["payload"]["result"]["coverage_passed"] is False
-          assert validation_sets[2]["payload"]["result"][
-              "validated_target_count"
-          ] == 0
-          assert validation_sets[3]["payload"]["result"][
-              "allow_uncovered_documents"
-          ] is True
-          assert affected_merges[0]["payload"]["result"][
-              "affected_validation_enforced"
-          ] is True
-          assert affected_merges[1]["payload"]["error"]["code"] == (
-              "MERGE_VALIDATION_FAILED"
-          )
-          assert affected_merges[2]["payload"]["error"]["code"] == (
-              "MERGE_UNCOVERED_DOCUMENTS"
-          )
-          assert affected_merges[3]["payload"]["result"][
-              "allow_uncovered_documents"
-          ] is True
-
-          preflight_traces = list(base.rglob("merge-preflight-trace.json"))
-          assert len(preflight_traces) == 1, preflight_traces
-          preflight_trace = json.loads(
-              preflight_traces[0].read_text(encoding="utf-8")
-          )
-          preflights = [
-              entry
-              for entry in preflight_trace
-              if entry["tool"] == "branch_merge_preflight"
-          ]
-          preflight_merges = [
-              entry for entry in preflight_trace if entry["tool"] == "branch_merge"
-          ]
-          assert len(preflights) == 4
-          assert preflights[0]["payload"]["result"]["ready_for_publication"] is True
-          assert preflights[0]["payload"]["result"]["validation_set"][
-              "passed_targets"
-          ] == ["application", "mirror"]
-          assert preflights[0]["payload"]["result"]["publication_arguments"][
-              "validate_affected_targets"
-          ] is True
-          assert preflights[1]["payload"]["result"]["validation_set"][
-              "failed_targets"
-          ] == ["application", "mirror"]
-          assert preflights[2]["payload"]["result"]["validation_set"][
-              "coverage_passed"
-          ] is False
-          assert preflights[2]["payload"]["result"]["validation_set"][
-              "validated_target_count"
-          ] == 0
-          assert preflights[3]["payload"]["result"][
-              "allow_uncovered_documents"
-          ] is True
-          assert len(preflight_merges) == 3
-          assert preflight_merges[0]["payload"]["result"][
-              "affected_validation_enforced"
-          ] is True
-          assert preflight_merges[1]["payload"]["error"]["code"] == (
-              "MERGE_VALIDATION_FAILED"
-          )
-          assert preflight_merges[2]["payload"]["result"][
-              "allow_uncovered_documents"
-          ] is True
-
-          policy_traces = list(base.rglob("merge-policy-trace.json"))
-          assert len(policy_traces) == 1, policy_traces
-          policy_trace = json.loads(policy_traces[0].read_text(encoding="utf-8"))
-          policy_sets = [
-              entry for entry in policy_trace if entry["tool"] == "merge_policy_set"
-          ]
-          policy_preflights = [
-              entry
-              for entry in policy_trace
-              if entry["tool"] == "branch_merge_preflight"
-          ]
-          policy_merges = [
-              entry for entry in policy_trace if entry["tool"] == "branch_merge"
-          ]
-          assert len(policy_sets) == 4
-          assert len(policy_preflights) == 5
-          assert policy_preflights[0]["payload"]["result"][
-              "ready_for_publication"
-          ] is True
-          assert policy_preflights[1]["payload"]["error"]["code"] == (
-              "MERGE_POLICY_VIOLATION"
-          )
-          assert policy_preflights[2]["payload"]["result"][
-              "source_policy_ignored"
-          ] is True
-          assert policy_preflights[3]["payload"]["error"]["code"] == (
-              "TOO_MANY_AFFECTED_TARGETS"
-          )
-          assert policy_preflights[4]["payload"]["result"][
-              "ready_for_publication"
-          ] is True
-          assert policy_merges[0]["payload"]["error"]["code"] == (
-              "MERGE_POLICY_PREFLIGHT_REQUIRED"
-          )
-          assert policy_merges[1]["payload"]["result"]["preflight_enforced"] is True
-          assert policy_merges[2]["payload"]["result"][
-              "source_policy_ignored"
-          ] is True
-          assert policy_merges[3]["payload"]["result"]["preflight_enforced"] is True
-
-          discovery_traces = list(base.rglob("build-discovery-trace.json"))
-          assert len(discovery_traces) == 1, discovery_traces
-          discovery_trace = json.loads(
-              discovery_traces[0].read_text(encoding="utf-8")
-          )
-          discovery_pages = [
-              entry for entry in discovery_trace if entry["tool"] == "build_list_page"
-          ]
-          assert len(discovery_pages) == 7
-          catalog_pages = discovery_pages[:5]
-          assert sum(
-              entry["payload"]["result"]["scanned_count"]
-              for entry in catalog_pages
-          ) == 5
-          assert sum(
-              entry["payload"]["result"]["returned_count"]
-              for entry in catalog_pages
-          ) == 3
-          assert sum(
-              entry["payload"]["result"]["filtered_count"]
-              for entry in catalog_pages
-          ) == 1
-          assert sum(
-              entry["payload"]["result"]["rejected_count"]
-              for entry in catalog_pages
-          ) == 1
-          assert discovery_pages[5]["payload"]["result"]["returned_count"] == 1
-          assert discovery_pages[5]["payload"]["result"]["builds"][0][
-              "status"
-          ] == "failed"
-          assert discovery_pages[6]["payload"]["error"]["code"] == (
-              "STALE_BUILD_CATALOG"
-          )
-
-          output = Path("qualification/program-matrix-summary.json")
-          output.write_text(
-              json.dumps(summaries, indent=2, sort_keys=True) + "\n",
-              encoding="utf-8",
-          )
-          for summary in summaries:
-              print(json.dumps(summary, sort_keys=True))
-          PY
-
-      - name: Upload native failure evidence
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: jacquard-packaged-weavec-failure
-          path: |
-            qualification-pytest.xml
-            release-metadata.json
-            ${{ runner.temp }}/jacquard-native-e2e
-          if-no-files-found: warn
-          retention-days: 7
+      - name: Run unified native qualification
+        run: bash scripts/qualify.sh native "$QUALIFICATION_DIR"
 
       - name: Upload qualification evidence
         uses: actions/upload-artifact@v4
         with:
-          name: jacquard-packaged-weavec-qualification
-          path: qualification
+          name: jacquard-native-qualification
+          path: ${{ env.QUALIFICATION_DIR }}
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7
+
+      - name: Upload compiler release metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacquard-weavec-release-metadata
+          path: ${{ env.COMPILER_STAGE }}/release-metadata.json
+          if-no-files-found: error
+          retention-days: 7
