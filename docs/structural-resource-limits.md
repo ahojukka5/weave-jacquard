@@ -72,6 +72,18 @@ The source-map byte offsets, source hash, and retained compiler input remain
 unchanged for accepted documents. Float atoms use the same canonical spelling in
 plain rendering and compiler source maps, including integer-valued floats.
 
+## Retained build metadata
+
+Stored `manifest.json` files used by build cache admission, `build_get`, and
+`build_list_page` are limited to `MAX_BUILD_MANIFEST_BYTES`, currently 4 MiB.
+They are opened through a race-resistant retained-artifact reader that rejects
+symlinks, non-regular files, path replacement during open, invalid UTF-8, invalid
+JSON, and limit overflow before normal manifest and artifact verification runs.
+
+The accepted manifest schema, build identity, checksum, and public error contract
+remain unchanged. These protections bound metadata decoding; they do not impose a
+total build-root storage quota.
+
 ## Stable limits and compatibility
 
 Limit changes can alter whether an existing but unusually large document remains
@@ -91,15 +103,16 @@ command should report such oversized historical content explicitly.
 
 ## Remaining process boundaries
 
-These structural ceilings do not by themselves bound:
+These structural and retained-build-manifest ceilings do not by themselves bound:
 
 - compiler stdout and stderr;
 - retained WIR size;
-- compiler manifest or diagnostics file size;
 - SQLite database size;
-- retained build and test artifact totals.
+- aggregate retained build and test artifact storage;
+- test-run, batch, candidate-qualification, and attestation manifest sizes.
 
 Compiler process capture and protocol-file bounds are a separate boundary because
 they require explicit truncation/error evidence in build and validation result
-formats. Artifact retention and database quotas require their own operator
-policies rather than being inferred from structural source limits.
+formats. Remaining retained-manifest families, artifact quotas, and database
+quotas require explicit operator policies rather than being inferred from
+structural source limits.
