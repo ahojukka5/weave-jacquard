@@ -14,6 +14,10 @@ from typing import Any
 
 from .compiler_artifacts import CompilerArtifactMixin
 from .errors import ArtifactIntegrityError, ConflictError, NotFoundError, ValidationError
+from .retained_artifact_io import (
+    RetainedArtifactReadError,
+    read_bounded_regular_json,
+)
 from .sandbox import BubblewrapSandbox, SandboxBackend, SandboxLimits
 from .test_targets import TEST_TARGET_NAME
 
@@ -22,6 +26,7 @@ MERGE_CANDIDATE_TEST_OUTPUT_PAGE_FORMAT = (
     "weave-merge-candidate-test-output-page-v1"
 )
 MERGE_CANDIDATE_TEST_BATCH_ID = re.compile(r"^[0-9a-f]{32}$")
+MAX_MERGE_CANDIDATE_TEST_MANIFEST_BYTES = 4 * 1024 * 1024
 MAX_MERGE_CANDIDATE_TESTS = 64
 DEFAULT_OUTPUT_PAGE_BYTES = 16_384
 MAX_OUTPUT_PAGE_BYTES = 65_536
@@ -621,8 +626,11 @@ class MergeCandidateTestBatchService(CompilerArtifactMixin):
     @staticmethod
     def _read_manifest(path: Path) -> dict[str, Any]:
         try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            value = read_bounded_regular_json(
+                path,
+                max_bytes=MAX_MERGE_CANDIDATE_TEST_MANIFEST_BYTES,
+            )
+        except RetainedArtifactReadError as exc:
             raise ArtifactIntegrityError(
                 f"cannot read merge candidate qualification manifest: {exc}"
             ) from exc
