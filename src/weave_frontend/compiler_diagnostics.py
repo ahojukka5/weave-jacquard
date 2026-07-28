@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .compiler_io import CompilerFileTooLarge, read_bounded_json
+from .compiler_limits import MAX_COMPILER_OUTPUT_BYTES, MAX_COMPILER_PROTOCOL_BYTES
 from .source_map import smallest_node_for_span
 
 COMPILER_DIAGNOSTICS_FORMAT = "weavec-diagnostics-v1"
@@ -18,11 +20,13 @@ def collect_build_diagnostics(
     *,
     returncode: int | None,
     timed_out: bool,
+    output_limited: bool = False,
     stdout: str,
     stderr: str,
     canonical_sources: list[tuple[Path, dict[str, Any]]] | None = None,
     node_map: dict[str, Any] | None = None,
     canonical_source_path: Path | None = None,
+    compiler_output_limit_bytes: int = MAX_COMPILER_OUTPUT_BYTES,
 ) -> tuple[dict[str, Any], bool]:
     """Return mapped bridge diagnostics and compiler-protocol validity.
 
@@ -40,15 +44,26 @@ def collect_build_diagnostics(
     protocol_errors: list[str] = []
     entries: list[dict[str, Any]] = []
 
+    if output_limited:
+        protocol_errors.append("compiler output exceeded the configured byte limit")
+    if timed_out:
+        protocol_errors.append("compiler timed out before completing")
+
     if compiler_diagnostics_path.is_file():
         try:
-            value = json.loads(compiler_diagnostics_path.read_text(encoding="utf-8"))
+            value = read_bounded_json(
+                compiler_diagnostics_path,
+                max_bytes=MAX_COMPILER_PROTOCOL_BYTES,
+            )
+        except CompilerFileTooLarge as exc:
+            protocol_errors.append(str(exc))
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             protocol_errors.append(f"cannot read compiler diagnostics: {exc}")
         else:
             if isinstance(value, dict):
                 compiler_document = value
-                protocol_errors.extend(_validate_document(value, returncode=returncode))
+                validation_errors = _validate_document(value, returncode=returncode)
+                protocol_errors.extend(validation_errors)
                 if not protocol_errors:
                     entries = [
                         _map_entry(entry, canonical_sources=sources)
@@ -56,11 +71,9 @@ def collect_build_diagnostics(
                     ]
             else:
                 protocol_errors.append("compiler diagnostics root must be an object")
-    elif timed_out:
-        protocol_errors.append("compiler timed out before writing diagnostics")
-    elif returncode is None:
+    elif not timed_out and not output_limited and returncode is None:
         protocol_errors.append("compiler process did not start")
-    else:
+    elif not timed_out and not output_limited:
         protocol_errors.append("compiler did not write diagnostics")
 
     protocol_valid = not protocol_errors
@@ -69,6 +82,7 @@ def collect_build_diagnostics(
             _bridge_protocol_entry(
                 protocol_errors,
                 timed_out=timed_out,
+                output_limited=output_limited,
                 returncode=returncode,
             )
         )
@@ -90,6 +104,9 @@ def collect_build_diagnostics(
         "format": BUILD_DIAGNOSTICS_FORMAT,
         "returncode": returncode,
         "timed_out": timed_out,
+        "output_limited": output_limited,
+        "compiler_output_limit_bytes": compiler_output_limit_bytes,
+        "compiler_protocol_limit_bytes": MAX_COMPILER_PROTOCOL_BYTES,
         "stdout": stdout,
         "stderr": stderr,
         "compiler": compiler_summary,
@@ -303,9 +320,13 @@ def _bridge_protocol_entry(
     errors: list[str],
     *,
     timed_out: bool,
+    output_limited: bool,
     returncode: int | None,
 ) -> dict[str, Any]:
-    if timed_out:
+    if output_limited:
+        code = "bridge.compiler-output-limit"
+        message = "weavec build exceeded the configured output limit"
+    elif timed_out:
         code = "bridge.compiler-timeout"
         message = "weavec build timed out before producing valid diagnostics"
     elif returncode is None:
