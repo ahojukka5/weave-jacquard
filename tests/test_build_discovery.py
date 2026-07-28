@@ -159,6 +159,7 @@ def _current_manifest(
         "revision_id": revision_id,
         "documents": key_documents,
         "compiler_sha256": "b" * 64,
+        "compiler_output_limit_bytes": 4 * 1024 * 1024,
         "target": target,
     }
     build_id = hashlib.sha256(
@@ -180,6 +181,9 @@ def _current_manifest(
             "source_sha256": key_documents[0]["source_sha256"],
             "sources": source_entries,
             "artifact_sha256": artifact_hashes,
+            "compiler_output_limit_bytes": 4 * 1024 * 1024,
+            "timed_out": False,
+            "output_limited": False,
         }
     )
     return build_id, manifest

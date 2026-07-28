@@ -323,12 +323,24 @@ class BuildDiscoveryService:
                 "primary source hash does not match the first ordered source",
             )
 
+        output_limit = manifest.get("compiler_output_limit_bytes")
+        if (
+            isinstance(output_limit, bool)
+            or not isinstance(output_limit, int)
+            or output_limit <= 0
+        ):
+            raise ValidationError(
+                "BUILD_SOURCE_METADATA_MISMATCH",
+                "current build key requires a positive compiler output limit",
+            )
+
         payload = {
             "format": BUILD_KEY_FORMAT,
             "revision_hash": revision_hash,
             "revision_id": revision_id,
             "documents": key_documents,
             "compiler_sha256": compiler_sha256,
+            "compiler_output_limit_bytes": output_limit,
             "target": target,
         }
         expected_build_id = hashlib.sha256(

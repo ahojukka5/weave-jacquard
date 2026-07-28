@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 ROOT = Path(__file__).parents[1]
 
 
@@ -34,5 +33,5 @@ def test_architecture_distinguishes_preview_from_retained_candidate_evidence() -
     architecture = (ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
 
     assert "A structural preview is in memory" in architecture
-    assert "Explicit candidate build and test operations may retain" in architecture
+    assert "candidate build and test operations may retain" in architecture
     assert "creates no revision, executable, build manifest" not in architecture

@@ -13,13 +13,13 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from .compiler_limits import BUILD_KEY_FORMAT
 from .errors import ValidationError
 from .retained_artifact_io import (
     RetainedArtifactReadError,
     read_bounded_regular_json,
 )
 
-BUILD_KEY_FORMAT = "weave-build-key-v4"
 MAX_BUILD_MANIFEST_BYTES = 4 * 1024 * 1024
 
 

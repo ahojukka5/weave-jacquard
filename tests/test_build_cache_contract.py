@@ -5,10 +5,15 @@ import json
 from pathlib import Path
 
 from weave_frontend.compiler_bridge import BUILD_KEY_FORMAT, CompilerBridge
+from weave_frontend.compiler_limits import MAX_COMPILER_OUTPUT_BYTES
 
 
 def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _canonical(value: dict[str, object]) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
 
 
 def _write_cached_build(
@@ -23,7 +28,19 @@ def _write_cached_build(
 ) -> None:
     directory.mkdir()
     (directory / "program").write_text("executable", encoding="utf-8")
-    (directory / "diagnostics.json").write_text("{}\n", encoding="utf-8")
+    diagnostics = {
+        "format": "weave-build-diagnostics-v1",
+        "returncode": 0,
+        "timed_out": False,
+        "output_limited": False,
+        "compiler_output_limit_bytes": MAX_COMPILER_OUTPUT_BYTES,
+        "protocol_valid": diagnostics_valid,
+        "protocol_errors": [],
+        "entries": [],
+    }
+    (directory / "diagnostics.json").write_text(
+        json.dumps(diagnostics) + "\n", encoding="utf-8"
+    )
     artifacts: dict[str, object] = {
         "source": "sources/000-main.weave" if include_sources else None,
         "node_map": (
@@ -50,23 +67,64 @@ def _write_cached_build(
         (directory / "compiler-diagnostics.json").write_text(
             '{"format":"weavec-diagnostics-v1"}\n', encoding="utf-8"
         )
+    source_sha256 = None
+    sources_meta: list[dict[str, str]] = []
     if include_sources:
         (directory / "sources").mkdir()
         (directory / "source-maps").mkdir()
+        source_text = "(program)\n"
         (directory / "sources/000-main.weave").write_text(
-            "(program)\n", encoding="utf-8"
+            source_text, encoding="utf-8"
         )
         (directory / "source-maps/000-main.weave.map.json").write_text(
             '{"format":"weave-node-map-v1"}\n', encoding="utf-8"
         )
+        source_sha256 = hashlib.sha256(source_text.encode()).hexdigest()
+        sources_meta = [
+            {
+                "document": "main.weave",
+                "source": "sources/000-main.weave",
+                "node_map": "source-maps/000-main.weave.map.json",
+                "source_sha256": source_sha256,
+            }
+        ]
 
     references = set(CompilerBridge._artifact_references(artifacts))
+    revision_hash = "a" * 64
+    revision_id = "revision-1"
+    compiler_sha256 = "b" * 64
+    target = "native"
+    cache_payload = {
+        "format": build_key_format,
+        "revision_hash": revision_hash,
+        "revision_id": revision_id,
+        "documents": (
+            [{"document": "main.weave", "source_sha256": source_sha256}]
+            if source_sha256 is not None
+            else []
+        ),
+        "compiler_sha256": compiler_sha256,
+        "compiler_output_limit_bytes": MAX_COMPILER_OUTPUT_BYTES,
+        "target": target,
+    }
+    build_id = hashlib.sha256(_canonical(cache_payload)).hexdigest()[:32]
     manifest = {
         "format": "weave-frontend-build-manifest-v2",
         "build_key_format": build_key_format,
-        "build_id": "a" * 32,
+        "build_id": build_id,
         "status": "succeeded",
         "returncode": 0,
+        "timed_out": False,
+        "output_limited": False,
+        "compiler_output_limit_bytes": MAX_COMPILER_OUTPUT_BYTES,
+        "revision_id": revision_id,
+        "revision_hash": revision_hash,
+        "documents": ["main.weave"] if include_sources else [],
+        "document": "main.weave" if include_sources else None,
+        "sources": sources_meta,
+        "source_sha256": source_sha256,
+        "compiler_sha256": compiler_sha256,
+        "target": target,
         "compiler_diagnostics_protocol_valid": diagnostics_valid,
         "compiler_manifest_protocol_valid": manifest_valid,
         "artifacts": artifacts,

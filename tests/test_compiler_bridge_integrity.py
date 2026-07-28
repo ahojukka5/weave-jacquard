@@ -18,7 +18,7 @@ class _Row(dict[str, str]):
 
 class _Cursor:
     def fetchone(self) -> _Row:
-        return _Row(root_hash="root-hash")
+        return _Row(root_hash="a" * 64)
 
 
 class _Connection:
@@ -66,6 +66,11 @@ def _collect(path: Path, **kwargs: Any):
         "format": "weave-build-diagnostics-v1",
         "returncode": kwargs["returncode"],
         "timed_out": kwargs["timed_out"],
+        "output_limited": kwargs.get("output_limited", False),
+        "compiler_output_limit_bytes": kwargs.get(
+            "compiler_output_limit_bytes",
+            4 * 1024 * 1024,
+        ),
         "stdout": kwargs["stdout"],
         "stderr": kwargs["stderr"],
         "compiler": {

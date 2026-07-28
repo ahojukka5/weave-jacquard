@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 
 from weave_frontend import SExpressionWorkspace
-from weave_frontend.database import Database
+from weave_frontend.database import SCHEMA_VERSION, Database
 from weave_frontend.sexpr import make_atom, make_form
 
 
@@ -99,7 +99,10 @@ def test_new_snapshots_are_transparently_compressed_and_reopen(tmp_path):
         assert object_type == "view"
         assert bytes(prefix) == b"WJZ1"
         assert stored_size < raw_size // 4
-        assert workspace.db.connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert (
+            workspace.db.connection.execute("PRAGMA user_version").fetchone()[0]
+            == SCHEMA_VERSION
+        )
 
     with SExpressionWorkspace(path) as reopened:
         assert reopened.render("demo", "main", "main.weave") == canonical
@@ -160,7 +163,10 @@ def test_legacy_snapshot_table_migrates_without_changing_history(tmp_path):
         assert workspace.db.connection.execute(
             "SELECT count(*) FROM sqlite_master WHERE name = 'module_snapshots_legacy'"
         ).fetchone()[0] == 0
-        assert workspace.db.connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert (
+            workspace.db.connection.execute("PRAGMA user_version").fetchone()[0]
+            == SCHEMA_VERSION
+        )
 
 
 def test_snapshot_view_preserves_transactional_insert_update_delete(tmp_path):

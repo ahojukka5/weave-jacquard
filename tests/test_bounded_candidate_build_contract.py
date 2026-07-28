@@ -7,8 +7,11 @@ from types import ModuleType
 
 import pytest
 
-from weave_frontend.bounded_merge_candidate_build import MergeCandidateBuildService
+from weave_frontend.bounded_merge_candidate_build import (
+    MergeCandidateBuildService as BoundedMergeCandidateBuildService,
+)
 from weave_frontend.errors import ArtifactIntegrityError
+from weave_frontend.verified_merge_candidate_build import MergeCandidateBuildService
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -22,7 +25,7 @@ def _candidate_test_module() -> ModuleType:
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    module.MergeCandidateBuildService = MergeCandidateBuildService
+    module.MergeCandidateBuildService = BoundedMergeCandidateBuildService
     return module
 
 
@@ -35,7 +38,7 @@ def test_production_mcp_routes_candidate_builds_through_bounded_service() -> Non
 def test_candidate_output_limit_changes_build_identity(tmp_path: Path) -> None:
     fixture = _candidate_test_module()
     builds, _, previews, _ = fixture._services(tmp_path)
-    assert isinstance(builds, MergeCandidateBuildService)
+    assert isinstance(builds, BoundedMergeCandidateBuildService)
     preview = previews.candidate("demo", "main", "feature")
 
     builds.compiler.max_output_bytes = 1_024

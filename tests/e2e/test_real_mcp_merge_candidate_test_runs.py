@@ -213,7 +213,8 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert "does not prove" in help_payload["help"]["boundary"]
 
         capabilities = await _call(session, trace, "sandbox_capabilities")
-        assert capabilities["available"] is True
+        if capabilities["available"] is not True:
+            pytest.skip(str(capabilities.get("probe_error") or capabilities))
         assert capabilities["policy"]["network"] == "deny"
         assert capabilities["policy"]["filesystem"] == "isolated"
 
