@@ -78,8 +78,9 @@ Stored `manifest.json` files used by build cache admission, `build_get`, and
 `build_list_page` are limited to `MAX_BUILD_MANIFEST_BYTES`, currently 4 MiB.
 Retained test-run and test-batch manifests are independently limited to
 `MAX_TEST_RUN_MANIFEST_BYTES` and `MAX_TEST_BATCH_MANIFEST_BYTES`, also 4 MiB.
-Tested-merge attestations use `MAX_TESTED_MERGE_ATTESTATION_BYTES`, likewise 4
-MiB.
+Virtual-candidate qualifications use
+`MAX_MERGE_CANDIDATE_TEST_MANIFEST_BYTES`, and tested-merge attestations use
+`MAX_TESTED_MERGE_ATTESTATION_BYTES`; both are likewise 4 MiB.
 
 These files are opened through a race-resistant retained-artifact reader that
 rejects symlinks, non-regular files, path replacement during open, invalid UTF-8,
@@ -88,7 +89,8 @@ referenced-evidence verification runs.
 
 The accepted manifest schemas and public integrity-error contracts remain
 unchanged. These protections bound metadata decoding; they do not impose total
-build-root, run-root, batch-root, or attestation-root storage quotas.
+build-root, run-root, batch-root, candidate-root, or attestation-root storage
+quotas.
 
 ## Stable limits and compatibility
 
@@ -114,11 +116,9 @@ These structural and retained-manifest ceilings do not by themselves bound:
 - compiler stdout and stderr;
 - retained WIR size;
 - SQLite database size;
-- aggregate retained build and test artifact storage;
-- virtual-candidate qualification manifest size.
+- aggregate retained build and test artifact storage.
 
 Compiler process capture and protocol-file bounds are a separate boundary because
 they require explicit truncation/error evidence in build and validation result
-formats. The remaining virtual-candidate manifest family, artifact quotas, and
-database quotas require explicit operator policies rather than being inferred
-from structural source limits.
+formats. Artifact quotas and database quotas require explicit operator policies
+rather than being inferred from structural source limits.
