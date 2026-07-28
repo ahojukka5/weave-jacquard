@@ -39,6 +39,30 @@ def parse_artifact_quota(value: str | None) -> int | None:
     return parsed
 
 
+@contextmanager
+def artifact_quota_admission(
+    owner: Any,
+    *,
+    family: str,
+    temporary: Path,
+    final: Path,
+) -> Iterator[dict[str, Any] | None]:
+    """Apply an attached production quota guard while preserving direct-service use."""
+
+    quota = getattr(owner, "artifact_quota", None)
+    if quota is None:
+        yield None
+        return
+    if not isinstance(quota, ArtifactQuotaService):
+        raise RuntimeError("attached artifact_quota has an unsupported type")
+    with quota.admit(
+        family=family,
+        temporary=temporary,
+        final=final,
+    ) as evidence:
+        yield evidence
+
+
 class ArtifactQuotaService:
     """Serialize publication admission against one complete configured root graph."""
 
@@ -215,5 +239,6 @@ __all__ = [
     "ARTIFACT_QUOTA_REPORT_FORMAT",
     "MAX_ARTIFACT_QUOTA_BYTES",
     "ArtifactQuotaService",
+    "artifact_quota_admission",
     "parse_artifact_quota",
 ]
