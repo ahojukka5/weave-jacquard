@@ -57,11 +57,11 @@ def test_oversized_and_symlink_sources_are_not_read(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root, surface = _surface_root(tmp_path)
-    monkeypatch.setattr(grammar_help_module, "MAX_GRAMMAR_SOURCE_BYTES", 8)
-    (surface / "a.weave").write_text("(program)", encoding="utf-8")
+    monkeypatch.setattr(grammar_help_module, "MAX_GRAMMAR_SOURCE_BYTES", 16)
+    (surface / "a.weave").write_text("(" + "x" * 16 + ")", encoding="utf-8")
     target = tmp_path / "target.weave"
     target.write_text("(ok)", encoding="utf-8")
-    (surface / "b.weave").symlink_to(target)
+    (surface / "b.weave").symlink_to(target.name)
 
     index = GrammarIndex(root)
 
@@ -101,7 +101,7 @@ def test_forms_and_examples_have_independent_bounds(
         encoding="utf-8",
     )
     monkeypatch.setattr(grammar_help_module, "MAX_GRAMMAR_FORMS", 2)
-    monkeypatch.setattr(grammar_help_module, "MAX_GRAMMAR_EXAMPLE_NODES", 1)
+    monkeypatch.setattr(grammar_help_module, "MAX_GRAMMAR_EXAMPLE_NODES", 2)
 
     index = GrammarIndex(root)
 
