@@ -14,8 +14,13 @@ from typing import Any
 from uuid import uuid4
 
 from .errors import ValidationError
+from .retained_artifact_io import (
+    RetainedArtifactReadError,
+    read_bounded_regular_json,
+)
 
 BUILD_KEY_FORMAT = "weave-build-key-v4"
+MAX_BUILD_MANIFEST_BYTES = 4 * 1024 * 1024
 
 
 class CompilerArtifactMixin:
@@ -233,8 +238,11 @@ class CompilerArtifactMixin:
     ) -> dict[str, Any]:
         manifest_path = directory / "manifest.json"
         try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            manifest = read_bounded_regular_json(
+                manifest_path,
+                max_bytes=MAX_BUILD_MANIFEST_BYTES,
+            )
+        except RetainedArtifactReadError as exc:
             raise ValidationError(
                 "INVALID_BUILD_MANIFEST",
                 f"cannot read build manifest: {exc}",
