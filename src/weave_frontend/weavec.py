@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
+
+from .bounded_process import run_bounded_process
+from .compiler_io import CompilerFileTooLarge, read_bounded_text
+from .compiler_limits import MAX_COMPILER_OUTPUT_BYTES, MAX_WIR_BYTES
 
 
 class WeavecValidator:
@@ -19,10 +22,22 @@ class WeavecValidator:
         source_root: str | Path | None = None,
         *,
         timeout_seconds: int = 30,
+        max_output_bytes: int = MAX_COMPILER_OUTPUT_BYTES,
+        max_wir_bytes: int = MAX_WIR_BYTES,
     ) -> None:
+        if timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be positive")
+        for name, value in (
+            ("max_output_bytes", max_output_bytes),
+            ("max_wir_bytes", max_wir_bytes),
+        ):
+            if isinstance(value, bool) or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
         self.source_root = Path(source_root).resolve() if source_root else None
         self.binary = self._resolve_binary(binary)
         self.timeout_seconds = timeout_seconds
+        self.max_output_bytes = max_output_bytes
+        self.max_wir_bytes = max_wir_bytes
 
     def _resolve_binary(self, binary: str | Path | None) -> Path | None:
         configured = binary or os.environ.get("WEAVEC_BIN")
@@ -105,27 +120,11 @@ class WeavecValidator:
                 *(str(path) for path in source_paths),
             ]
             try:
-                completed = subprocess.run(
+                completed = run_bounded_process(
                     command,
-                    text=True,
-                    capture_output=True,
-                    timeout=self.timeout_seconds,
-                    check=False,
+                    timeout_seconds=self.timeout_seconds,
+                    max_output_bytes=self.max_output_bytes,
                 )
-            except subprocess.TimeoutExpired as exc:
-                stdout = self._text(exc.stdout)
-                stderr = self._text(exc.stderr)
-                diagnostic = f"weavec validation timed out after {exc.timeout} seconds"
-                return {
-                    "available": True,
-                    "valid": False,
-                    "returncode": None,
-                    "stdout": stdout,
-                    "stderr": stderr,
-                    "diagnostic": diagnostic,
-                    "timed_out": True,
-                    "documents": documents,
-                }
             except OSError as exc:
                 return {
                     "available": False,
@@ -135,27 +134,75 @@ class WeavecValidator:
                     "stderr": f"weavec validation could not start: {exc}\n",
                     "diagnostic": f"weavec validation could not start: {exc}",
                     "timed_out": False,
+                    "output_limited": False,
                     "documents": documents,
                 }
 
+            if completed.timed_out:
+                return {
+                    "available": True,
+                    "valid": False,
+                    "returncode": None,
+                    "stdout": completed.stdout,
+                    "stderr": completed.stderr,
+                    "diagnostic": (
+                        f"weavec validation timed out after {self.timeout_seconds} seconds"
+                    ),
+                    "timed_out": True,
+                    "output_limited": False,
+                    "compiler_output_limit_bytes": self.max_output_bytes,
+                    "documents": documents,
+                }
+            if completed.output_limited:
+                return {
+                    "available": True,
+                    "valid": False,
+                    "returncode": None,
+                    "stdout": completed.stdout,
+                    "stderr": completed.stderr,
+                    "diagnostic": (
+                        "weavec validation exceeded the combined stdout/stderr limit "
+                        f"of {self.max_output_bytes} bytes"
+                    ),
+                    "timed_out": False,
+                    "output_limited": True,
+                    "compiler_output_limit_bytes": self.max_output_bytes,
+                    "documents": documents,
+                }
+
+            wir: str | None = None
+            wir_too_large = False
+            wir_error: str | None = None
+            if wir_path.is_file():
+                try:
+                    wir = read_bounded_text(wir_path, max_bytes=self.max_wir_bytes)
+                except CompilerFileTooLarge as exc:
+                    wir_too_large = True
+                    wir_error = str(exc)
+                except (OSError, UnicodeError) as exc:
+                    wir_error = f"cannot read generated WIR: {exc}"
+
+            valid = completed.returncode == 0 and wir_error is None
+            diagnostic = wir_error
+            if completed.returncode == 0 and not wir_path.is_file():
+                valid = False
+                diagnostic = "weavec validation succeeded without writing WIR"
+
             return {
                 "available": True,
-                "valid": completed.returncode == 0,
+                "valid": valid,
                 "returncode": completed.returncode,
                 "stdout": completed.stdout,
                 "stderr": completed.stderr,
-                "wir": wir_path.read_text(encoding="utf-8") if wir_path.exists() else None,
+                "wir": wir,
                 "timed_out": False,
+                "output_limited": False,
+                "compiler_output_limit_bytes": self.max_output_bytes,
+                "wir_limit_bytes": self.max_wir_bytes,
+                "wir_too_large": wir_too_large,
+                "diagnostic": diagnostic,
                 "documents": documents,
             }
-
-    @staticmethod
-    def _text(value: str | bytes | None) -> str:
-        if value is None:
-            return ""
-        if isinstance(value, bytes):
-            return value.decode(errors="replace")
-        return value
 
     @staticmethod
     def _safe_basename(document: str) -> str:

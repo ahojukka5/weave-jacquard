@@ -3,15 +3,22 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
 
-from .compiler_artifacts import BUILD_KEY_FORMAT, CompilerArtifactMixin
+from .bounded_process import BoundedProcessResult, run_bounded_process
+from .compiler_artifacts import CompilerArtifactMixin
 from .compiler_diagnostics import collect_build_diagnostics
 from .compiler_inputs import CompilerInputMixin, RenderedSource
+from .compiler_io import CompilerFileTooLarge, read_bounded_json
+from .compiler_limits import (
+    BUILD_KEY_FORMAT,
+    MAX_COMPILER_OUTPUT_BYTES,
+    MAX_COMPILER_PROTOCOL_BYTES,
+)
 from .compiler_manifest import validate_compiler_manifest
 from .errors import NotFoundError, ValidationError
 
@@ -26,7 +33,12 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         compiler: str | Path | None = None,
         build_root: str | Path | None = None,
         timeout_seconds: int = 120,
+        max_output_bytes: int = MAX_COMPILER_OUTPUT_BYTES,
     ) -> None:
+        if timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be positive")
+        if isinstance(max_output_bytes, bool) or max_output_bytes <= 0:
+            raise ValueError("max_output_bytes must be a positive integer")
         self.workspace = workspace
         self._configured_compiler = compiler
         self._compiler: Path | None = None
@@ -35,6 +47,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         self.build_root = Path(configured_root or default_root).resolve()
         self.build_root.mkdir(parents=True, exist_ok=True)
         self.timeout_seconds = timeout_seconds
+        self.max_output_bytes = max_output_bytes
 
     def build(
         self,
@@ -46,12 +59,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         revision_id: str | None = None,
         target: str | None = None,
     ) -> dict[str, Any]:
-        """Build an ordered document set from one exact immutable revision.
-
-        ``document`` is the primary source and remains the legacy single-document
-        API. ``additional_documents`` are passed to ``weavec build`` in the exact
-        order supplied after the primary document.
-        """
+        """Build an ordered document set from one exact immutable revision."""
 
         documents = self._ordered_documents(document, additional_documents)
         revision = revision_id or self.workspace.branch_head(project, branch)
@@ -77,6 +85,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
                 for item in rendered_sources
             ],
             "compiler_sha256": compiler_hash,
+            "compiler_output_limit_bytes": self.max_output_bytes,
             "target": target or "native",
         }
         build_id = hashlib.sha256(
@@ -117,8 +126,6 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
 
     @staticmethod
     def _canonical_cache_payload(value: dict[str, Any]) -> bytes:
-        import json
-
         return json.dumps(
             value,
             sort_keys=True,
@@ -166,16 +173,18 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         if target:
             command.extend(["--target", target])
 
-        returncode, timed_out, stdout, stderr = self._run_compiler(command)
+        process = self._run_compiler(command)
         diagnostics, diagnostics_valid = collect_build_diagnostics(
             compiler_diagnostics_path,
             canonical_sources=[
                 (item.source_path, item.node_map) for item in materialized_sources
             ],
-            returncode=returncode,
-            timed_out=timed_out,
-            stdout=stdout,
-            stderr=stderr,
+            returncode=process.returncode,
+            timed_out=process.timed_out,
+            output_limited=process.output_limited,
+            stdout=process.stdout,
+            stderr=process.stderr,
+            compiler_output_limit_bytes=self.max_output_bytes,
         )
         compiler_summary = diagnostics.get("compiler")
         diagnostics_status = (
@@ -188,7 +197,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
             expected_sources=[item.source_path for item in materialized_sources],
             expected_output=executable_path,
             requested_target=target,
-            returncode=returncode,
+            returncode=process.returncode,
             diagnostics_status=diagnostics_status,
         )
         compiler_manifest_valid = not compiler_manifest_errors
@@ -201,7 +210,9 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         status = (
             "succeeded"
             if (
-                returncode == 0
+                process.returncode == 0
+                and not process.timed_out
+                and not process.output_limited
                 and executable_path.is_file()
                 and diagnostics_valid
                 and compiler_manifest_valid
@@ -211,6 +222,8 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         if status == "failed":
             executable_path.unlink(missing_ok=True)
 
+        self._discard_oversized_protocol_file(compiler_manifest_path)
+        self._discard_oversized_protocol_file(compiler_diagnostics_path)
         if compiler_manifest_path.is_file() and compiler_manifest_valid:
             self._relativize_json_file(compiler_manifest_path, temporary_directory)
         if compiler_diagnostics_path.is_file() and diagnostics_valid:
@@ -251,6 +264,9 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
             "source_sha256": primary["source_sha256"],
             "compiler": str(compiler),
             "compiler_sha256": compiler_hash,
+            "compiler_output_limit_bytes": self.max_output_bytes,
+            "timed_out": process.timed_out,
+            "output_limited": process.output_limited,
             "compiler_diagnostics_protocol_valid": diagnostics_valid,
             "compiler_manifest_protocol_valid": compiler_manifest_valid,
             "compiler_manifest_errors": list(compiler_manifest_errors),
@@ -261,7 +277,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
                 else None
             ),
             "command": self._relative_command(command, temporary_directory),
-            "returncode": returncode,
+            "returncode": process.returncode,
             "artifacts": {
                 "source": primary["source"],
                 "node_map": primary["node_map"],
@@ -284,31 +300,50 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         self._publish_directory(temporary_directory, final_directory)
         return self.get(build_id)
 
-    def _run_compiler(
-        self,
-        command: list[str],
-    ) -> tuple[int | None, bool, str, str]:
-        timed_out = False
+    def _run_compiler(self, command: list[str]) -> BoundedProcessResult:
         try:
-            completed = subprocess.run(
+            result = run_bounded_process(
                 command,
-                text=True,
-                capture_output=True,
-                timeout=self.timeout_seconds,
-                check=False,
+                timeout_seconds=self.timeout_seconds,
+                max_output_bytes=self.max_output_bytes,
             )
-            return completed.returncode, timed_out, completed.stdout, completed.stderr
-        except subprocess.TimeoutExpired as exc:
-            stdout = exc.stdout or ""
-            stderr = exc.stderr or ""
-            if isinstance(stdout, bytes):
-                stdout = stdout.decode(errors="replace")
-            if isinstance(stderr, bytes):
-                stderr = stderr.decode(errors="replace")
-            stderr += f"\nweavec build timed out after {exc.timeout} seconds\n"
-            return None, True, stdout, stderr
         except OSError as exc:
-            return None, False, "", f"weavec build could not start: {exc}\n"
+            return BoundedProcessResult(
+                returncode=None,
+                timed_out=False,
+                output_limited=False,
+                stdout="",
+                stderr=f"weavec build could not start: {exc}\n",
+            )
+
+        stderr = result.stderr
+        if result.timed_out:
+            stderr += f"\nweavec build timed out after {self.timeout_seconds} seconds\n"
+        if result.output_limited:
+            stderr += (
+                "\nweavec build exceeded the combined stdout/stderr limit of "
+                f"{self.max_output_bytes} bytes\n"
+            )
+        return BoundedProcessResult(
+            returncode=(
+                None
+                if result.timed_out or result.output_limited
+                else result.returncode
+            ),
+            timed_out=result.timed_out,
+            output_limited=result.output_limited,
+            stdout=result.stdout,
+            stderr=stderr,
+        )
+
+    @staticmethod
+    def _discard_oversized_protocol_file(path: Path) -> None:
+        try:
+            oversized = path.is_file() and path.stat().st_size > MAX_COMPILER_PROTOCOL_BYTES
+        except OSError:
+            return
+        if oversized:
+            path.unlink(missing_ok=True)
 
     @staticmethod
     def _attach_compiler_manifest_diagnostics(
@@ -343,6 +378,255 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
                     "details": list(errors),
                 }
             )
+
+    @classmethod
+    def _read_verified_manifest(
+        cls,
+        directory: Path,
+        *,
+        expected_build_id: str | None = None,
+    ) -> dict[str, Any]:
+        manifest = super()._read_verified_manifest(
+            directory,
+            expected_build_id=expected_build_id,
+        )
+        if manifest.get("build_key_format") == BUILD_KEY_FORMAT:
+            cls._verify_current_policy(manifest, directory)
+            cls._verify_current_build_key(manifest)
+        return manifest
+
+    @classmethod
+    def _verify_current_policy(
+        cls,
+        manifest: dict[str, Any],
+        directory: Path,
+    ) -> None:
+        output_limit = manifest.get("compiler_output_limit_bytes")
+        if (
+            isinstance(output_limit, bool)
+            or not isinstance(output_limit, int)
+            or output_limit <= 0
+        ):
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "compiler output limit must be a positive integer",
+            )
+        for field in ("timed_out", "output_limited"):
+            if not isinstance(manifest.get(field), bool):
+                raise ValidationError(
+                    "INVALID_BUILD_MANIFEST",
+                    f"build manifest {field} must be boolean",
+                )
+        if not isinstance(manifest.get("compiler_manifest_protocol_valid"), bool):
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "compiler manifest protocol validity must be boolean",
+            )
+        if (manifest["timed_out"] or manifest["output_limited"]) and manifest.get(
+            "returncode"
+        ) is not None:
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "limit-terminated compiler runs must have a null return code",
+            )
+        if manifest.get("status") == "succeeded" and (
+            manifest.get("returncode") != 0
+            or manifest["timed_out"]
+            or manifest["output_limited"]
+            or manifest.get("compiler_diagnostics_protocol_valid") is not True
+            or manifest.get("compiler_manifest_protocol_valid") is not True
+        ):
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "successful build evidence disagrees with compiler termination policy",
+            )
+
+        diagnostics_relative = manifest.get("artifacts", {}).get("diagnostics")
+        diagnostics_path = cls._artifact_path(directory, diagnostics_relative)
+        if diagnostics_path is None:
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "build diagnostics path is invalid",
+            )
+        try:
+            diagnostics = read_bounded_json(
+                diagnostics_path,
+                max_bytes=MAX_COMPILER_PROTOCOL_BYTES,
+            )
+        except CompilerFileTooLarge as exc:
+            raise ValidationError("INVALID_BUILD_MANIFEST", str(exc)) from exc
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                f"cannot read retained build diagnostics: {exc}",
+            ) from exc
+        if not isinstance(diagnostics, dict):
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "retained build diagnostics root must be an object",
+            )
+        for field in ("timed_out", "output_limited"):
+            if diagnostics.get(field) is not manifest.get(field):
+                raise ValidationError(
+                    "INVALID_BUILD_MANIFEST",
+                    f"retained diagnostics {field} disagrees with build manifest",
+                )
+        if diagnostics.get("compiler_output_limit_bytes") != output_limit:
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "retained diagnostics output limit disagrees with build manifest",
+            )
+        if diagnostics.get("protocol_valid") is not manifest.get(
+            "compiler_diagnostics_protocol_valid"
+        ):
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "retained diagnostics protocol status disagrees with build manifest",
+            )
+
+    @classmethod
+    def _verify_current_build_key(cls, manifest: dict[str, Any]) -> None:
+        revision_hash = manifest.get("revision_hash")
+        compiler_sha256 = manifest.get("compiler_sha256")
+        revision_id = manifest.get("revision_id")
+        target = manifest.get("target")
+        documents = manifest.get("documents")
+        sources = manifest.get("sources")
+        artifact_hashes = manifest.get("artifact_sha256")
+        if not cls._valid_sha256(revision_hash) or not cls._valid_sha256(
+            compiler_sha256
+        ):
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "current build key requires revision and compiler SHA-256 values",
+            )
+        if not isinstance(revision_id, str) or not revision_id:
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "current build key requires a revision ID",
+            )
+        if not isinstance(target, str) or not target:
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "current build key requires a target",
+            )
+        if (
+            not isinstance(documents, list)
+            or not documents
+            or any(not isinstance(item, str) or not item for item in documents)
+        ):
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "current build key requires ordered document names",
+            )
+        if not isinstance(sources, list) or len(sources) != len(documents):
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "current build key requires one source record per document",
+            )
+        if not isinstance(artifact_hashes, dict):
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "current build key requires artifact hashes",
+            )
+
+        key_documents: list[dict[str, str]] = []
+        for index, (document, source) in enumerate(zip(documents, sources, strict=True)):
+            if not isinstance(source, dict) or source.get("document") != document:
+                raise ValidationError(
+                    "INVALID_BUILD_MANIFEST",
+                    f"source record {index} disagrees with document order",
+                )
+            relative = source.get("source")
+            source_sha256 = source.get("source_sha256")
+            if not isinstance(relative, str) or not relative:
+                raise ValidationError(
+                    "INVALID_BUILD_MANIFEST",
+                    f"source record {index} has no artifact path",
+                )
+            if not cls._valid_sha256(source_sha256):
+                raise ValidationError(
+                    "INVALID_BUILD_MANIFEST",
+                    f"source record {index} has an invalid SHA-256 value",
+                )
+            if artifact_hashes.get(relative) != source_sha256:
+                raise ValidationError(
+                    "INVALID_BUILD_MANIFEST",
+                    f"source record {index} hash disagrees with artifact evidence",
+                )
+            key_documents.append(
+                {"document": document, "source_sha256": str(source_sha256)}
+            )
+        if manifest.get("source_sha256") != key_documents[0]["source_sha256"]:
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "primary source hash disagrees with ordered source evidence",
+            )
+
+        payload = {
+            "format": BUILD_KEY_FORMAT,
+            "revision_hash": revision_hash,
+            "revision_id": revision_id,
+            "documents": key_documents,
+            "compiler_sha256": compiler_sha256,
+            "compiler_output_limit_bytes": manifest["compiler_output_limit_bytes"],
+            "target": target,
+        }
+        expected_build_id = hashlib.sha256(
+            cls._canonical_cache_payload(payload)
+        ).hexdigest()[:32]
+        if manifest.get("build_id") != expected_build_id:
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "bounded build inputs do not reproduce the stored build ID",
+            )
+
+    @classmethod
+    def _read_successful_manifest(
+        cls,
+        directory: Path,
+        *,
+        expected_build_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        if not (directory / "manifest.json").is_file():
+            return None
+        try:
+            manifest = cls._read_verified_manifest(
+                directory,
+                expected_build_id=expected_build_id,
+            )
+            artifacts = manifest.get("artifacts")
+            if not isinstance(artifacts, dict):
+                return None
+            sources = artifacts.get("sources")
+            node_maps = artifacts.get("node_maps")
+            if manifest.get("status") != "succeeded":
+                return None
+            if manifest.get("returncode") != 0:
+                return None
+            if manifest.get("build_key_format") != BUILD_KEY_FORMAT:
+                return None
+            if manifest.get("timed_out") is not False:
+                return None
+            if manifest.get("output_limited") is not False:
+                return None
+            if manifest.get("compiler_diagnostics_protocol_valid") is not True:
+                return None
+            if manifest.get("compiler_manifest_protocol_valid") is not True:
+                return None
+            if artifacts.get("executable") != "program":
+                return None
+            if artifacts.get("compiler_manifest") != "compiler-manifest.json":
+                return None
+            if artifacts.get("compiler_diagnostics") != "compiler-diagnostics.json":
+                return None
+            if not isinstance(sources, list) or not sources:
+                return None
+            if not isinstance(node_maps, list) or len(node_maps) != len(sources):
+                return None
+            return cls._with_artifact_paths(manifest, directory)
+        except (ValidationError, TypeError):
+            return None
 
     def get(self, build_id: str) -> dict[str, Any]:
         """Return a verified stored build manifest with absolute artifact paths."""

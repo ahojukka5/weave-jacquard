@@ -6,6 +6,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .compiler_io import CompilerFileTooLarge, read_bounded_json
+from .compiler_limits import MAX_COMPILER_PROTOCOL_BYTES
+
 COMPILER_MANIFEST_FORMAT = "weavec-build-manifest-v1"
 
 
@@ -25,7 +28,9 @@ def validate_compiler_manifest(
         return None, ["compiler did not write a build manifest"]
 
     try:
-        document = json.loads(path.read_text(encoding="utf-8"))
+        document = read_bounded_json(path, max_bytes=MAX_COMPILER_PROTOCOL_BYTES)
+    except CompilerFileTooLarge as exc:
+        return None, [str(exc)]
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         return None, [f"cannot read compiler build manifest: {exc}"]
     if not isinstance(document, dict):
