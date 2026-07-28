@@ -21,7 +21,10 @@ def test_architecture_does_not_list_completed_capabilities_as_omissions() -> Non
 
     assert "affected-test selection and preview consequences" not in architecture
     assert "sandboxed program execution tools" not in architecture
-    assert "database integrity, backup, and artifact-retention operations" not in architecture
+    assert (
+        "database integrity, backup, and artifact-retention operations"
+        not in architecture
+    )
     assert "Runtime composition" in architecture
     assert "Database operations" in architecture
     assert "Storage policy" in architecture
