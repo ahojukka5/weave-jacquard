@@ -5,11 +5,9 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any
 
-from .database_backup import (
-    DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS,
-    DatabaseBackupService,
-)
+from .database_backup import DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS
 from .mcp_server import _result, mcp, workspace
+from .verified_database_backup import DatabaseBackupService
 
 DATABASE_BACKUP_ROOT_ENV = "WEAVE_DATABASE_BACKUP_ROOT"
 
