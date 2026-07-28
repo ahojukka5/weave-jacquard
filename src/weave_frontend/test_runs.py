@@ -14,12 +14,17 @@ from typing import Any
 
 from .compiler_artifacts import CompilerArtifactMixin
 from .errors import ArtifactIntegrityError, NotFoundError, ValidationError
+from .retained_artifact_io import (
+    RetainedArtifactReadError,
+    read_bounded_regular_json,
+)
 from .sandbox import BubblewrapSandbox, SandboxBackend, SandboxLimits
 from .test_target_views import VerifiedTestTargetRegistry
 
 TEST_RUN_MANIFEST_FORMAT = "weave-test-run-manifest-v1"
 TEST_RUN_OUTPUT_PAGE_FORMAT = "weave-test-run-output-page-v1"
 TEST_RUN_ID = re.compile(r"^[0-9a-f]{32}$")
+MAX_TEST_RUN_MANIFEST_BYTES = 4 * 1024 * 1024
 MAX_TEST_RUN_OUTPUT_PAGE_BYTES = 65_536
 DEFAULT_TEST_RUN_OUTPUT_PAGE_BYTES = 16_384
 
@@ -339,8 +344,11 @@ class TestRunService(CompilerArtifactMixin):
     @staticmethod
     def _read_json(path: Path) -> dict[str, Any]:
         try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            value = read_bounded_regular_json(
+                path,
+                max_bytes=MAX_TEST_RUN_MANIFEST_BYTES,
+            )
+        except RetainedArtifactReadError as exc:
             raise ArtifactIntegrityError(f"cannot read test run manifest: {exc}") from exc
         if not isinstance(value, dict):
             raise ArtifactIntegrityError("test run manifest root must be an object")
