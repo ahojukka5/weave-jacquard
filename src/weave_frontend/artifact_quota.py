@@ -108,8 +108,11 @@ class ArtifactQuotaService:
                 "max_bytes must be null or an integer between 0 and "
                 f"{MAX_ARTIFACT_QUOTA_BYTES}"
             )
+        raw_lock_path = Path(lock_path)
+        if raw_lock_path.name in {"", ".", ".."}:
+            raise ValueError("lock_path must identify a file")
         self.accounting = accounting
-        self.lock_path = Path(lock_path).resolve()
+        self.lock_path = raw_lock_path.parent.resolve() / raw_lock_path.name
         self.max_bytes = max_bytes
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -167,8 +170,18 @@ class ArtifactQuotaService:
             return
 
         root = self._family_root(family)
-        temporary_path = self._contained_path(temporary, root, subject="temporary")
-        final_path = self._contained_path(final, root, subject="final")
+        temporary_path = self._contained_path(
+            temporary,
+            root,
+            subject="temporary",
+            require_directory=True,
+        )
+        final_path = self._contained_path(
+            final,
+            root,
+            subject="final",
+            require_directory=False,
+        )
         if temporary_path == final_path:
             raise RuntimeError("temporary and final artifact directories must differ")
 
@@ -208,7 +221,12 @@ class ArtifactQuotaService:
             return
 
         root = self._family_root(family)
-        final_path = self._contained_path(final, root, subject="final")
+        final_path = self._contained_path(
+            final,
+            root,
+            subject="final",
+            require_directory=False,
+        )
         prefix = f".{final_path.name}-"
         with self._lock():
             staged = self._staged_directories(root, prefix=prefix)
@@ -262,7 +280,7 @@ class ArtifactQuotaService:
                         metadata.st_mode
                     ):
                         continue
-                    result.append(Path(entry.path).resolve())
+                    result.append(Path(entry.path))
                     if len(result) > MAX_ARTIFACT_STAGED_CANDIDATES:
                         raise ValidationError(
                             "ARTIFACT_STORAGE_STAGE_LIMIT_EXCEEDED",
@@ -326,21 +344,40 @@ class ArtifactQuotaService:
         }
 
     @staticmethod
-    def _contained_path(path: Path, root: Path, *, subject: str) -> Path:
+    def _contained_path(
+        path: Path,
+        root: Path,
+        *,
+        subject: str,
+        require_directory: bool,
+    ) -> Path:
         try:
-            resolved = path.resolve()
-            resolved.relative_to(root)
-        except (OSError, ValueError) as exc:
+            parent = path.parent.resolve()
+        except OSError as exc:
             raise ValidationError(
                 "INVALID_ARTIFACT_QUOTA_PATH",
-                f"{subject} artifact directory escapes its configured family root",
+                f"cannot resolve the {subject} artifact directory parent",
             ) from exc
-        if resolved == root:
+        if parent != root or path.name in {"", ".", ".."}:
             raise ValidationError(
                 "INVALID_ARTIFACT_QUOTA_PATH",
-                f"{subject} artifact directory cannot equal its family root",
+                f"{subject} artifact directory must be a direct child of its family root",
             )
-        return resolved
+        candidate = root / path.name
+        if require_directory:
+            try:
+                metadata = candidate.lstat()
+            except OSError as exc:
+                raise ValidationError(
+                    "INVALID_ARTIFACT_QUOTA_PATH",
+                    f"{subject} artifact directory is unavailable",
+                ) from exc
+            if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+                raise ValidationError(
+                    "INVALID_ARTIFACT_QUOTA_PATH",
+                    f"{subject} artifact path must be a non-symlink directory",
+                )
+        return candidate
 
     @contextmanager
     def _lock(self) -> Iterator[None]:
@@ -349,12 +386,27 @@ class ArtifactQuotaService:
             flags |= os.O_CLOEXEC
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
-        descriptor = os.open(self.lock_path, flags, 0o600)
+        try:
+            descriptor = os.open(self.lock_path, flags, 0o600)
+        except OSError as exc:
+            raise ValidationError(
+                "ARTIFACT_STORAGE_QUOTA_LOCK_UNAVAILABLE",
+                "cannot open the artifact quota lock",
+            ) from exc
         try:
             metadata = os.fstat(descriptor)
             if not stat.S_ISREG(metadata.st_mode):
-                raise RuntimeError("artifact quota lock must be a regular file")
-            fcntl.flock(descriptor, fcntl.LOCK_EX)
+                raise ValidationError(
+                    "ARTIFACT_STORAGE_QUOTA_LOCK_UNAVAILABLE",
+                    "artifact quota lock must be a regular file",
+                )
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX)
+            except OSError as exc:
+                raise ValidationError(
+                    "ARTIFACT_STORAGE_QUOTA_LOCK_UNAVAILABLE",
+                    "cannot acquire the artifact quota lock",
+                ) from exc
             try:
                 yield
             finally:
