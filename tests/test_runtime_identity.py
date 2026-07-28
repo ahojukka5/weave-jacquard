@@ -161,3 +161,20 @@ def test_runtime_identity_capability_is_last_and_explicit() -> None:
     assert capability.name == "runtime_identity"
     assert capability.module == "weave_frontend.mcp_runtime_identity"
     assert capability.depends_on == ("revision_reads", "test_runs")
+
+
+def test_public_application_manifest_contains_runtime_identity() -> None:
+    from weave_jacquard.mcp_build import (
+        PUBLIC_APPLICATION_MANIFEST,
+        PUBLIC_TOOL_MANIFEST,
+    )
+
+    assert "runtime_identity" in PUBLIC_TOOL_MANIFEST["tool_names"]
+    assert (
+        PUBLIC_APPLICATION_MANIFEST["tool_count"]
+        == len(PUBLIC_TOOL_MANIFEST["tool_names"])
+    )
+    assert (
+        PUBLIC_APPLICATION_MANIFEST["tool_manifest_id"]
+        == PUBLIC_TOOL_MANIFEST["tool_manifest_id"]
+    )
