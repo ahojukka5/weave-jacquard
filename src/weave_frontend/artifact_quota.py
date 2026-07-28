@@ -47,20 +47,44 @@ def artifact_quota_admission(
     temporary: Path,
     final: Path,
 ) -> Iterator[dict[str, Any] | None]:
-    """Apply an attached production quota guard while preserving direct-service use."""
+    """Admit an exact staged directory for a service with an attached quota guard."""
 
-    quota = getattr(owner, "artifact_quota", None)
+    quota = _attached_quota(owner)
     if quota is None:
         yield None
         return
-    if not isinstance(quota, ArtifactQuotaService):
-        raise RuntimeError("attached artifact_quota has an unsupported type")
     with quota.admit(
         family=family,
         temporary=temporary,
         final=final,
     ) as evidence:
         yield evidence
+
+
+@contextmanager
+def artifact_quota_publication_lock(
+    owner: Any,
+    *,
+    family: str,
+    final: Path,
+) -> Iterator[dict[str, Any] | None]:
+    """Admit already-staged root content and hold the global lock through publication."""
+
+    quota = _attached_quota(owner)
+    if quota is None:
+        yield None
+        return
+    with quota.admit_staged_root(family=family, final=final) as evidence:
+        yield evidence
+
+
+def _attached_quota(owner: Any) -> ArtifactQuotaService | None:
+    quota = getattr(owner, "artifact_quota", None)
+    if quota is None:
+        return None
+    if not isinstance(quota, ArtifactQuotaService):
+        raise RuntimeError("attached artifact_quota has an unsupported type")
+    return quota
 
 
 class ArtifactQuotaService:
@@ -140,9 +164,7 @@ class ArtifactQuotaService:
             yield None
             return
 
-        root = self.accounting.roots.get(family)
-        if root is None:
-            raise RuntimeError(f"unknown artifact quota family {family!r}")
+        root = self._family_root(family)
         temporary_path = self._contained_path(temporary, root, subject="temporary")
         final_path = self._contained_path(final, root, subject="final")
         if temporary_path == final_path:
@@ -158,22 +180,98 @@ class ArtifactQuotaService:
             current_bytes = int(current_report["aggregate"]["logical_bytes"])
             staged_bytes = int(staged_report["aggregate"]["logical_bytes"])
             projected_bytes = current_bytes + staged_bytes
-            if projected_bytes > self.max_bytes:
-                raise ArtifactQuotaExceededError(
-                    family=family,
-                    quota_bytes=self.max_bytes,
-                    current_bytes=current_bytes,
-                    staged_bytes=staged_bytes,
-                    projected_bytes=projected_bytes,
-                )
-            yield {
-                "family": family,
-                "quota_bytes": self.max_bytes,
-                "current_bytes": current_bytes,
-                "staged_bytes": staged_bytes,
-                "projected_bytes": projected_bytes,
-                "storage_snapshot_id": current_report["storage_snapshot_id"],
-            }
+            self._require_within_quota(
+                family=family,
+                current_bytes=current_bytes,
+                staged_bytes=staged_bytes,
+                projected_bytes=projected_bytes,
+            )
+            yield self._admission_evidence(
+                family=family,
+                current_bytes=current_bytes,
+                staged_bytes=staged_bytes,
+                projected_bytes=projected_bytes,
+                storage_snapshot_id=current_report["storage_snapshot_id"],
+            )
+
+    @contextmanager
+    def admit_staged_root(
+        self,
+        *,
+        family: str,
+        final: Path,
+    ) -> Iterator[dict[str, Any] | None]:
+        """Admit when staging already resides under an accounted family root."""
+
+        if self.max_bytes is None:
+            yield None
+            return
+
+        root = self._family_root(family)
+        final_path = self._contained_path(final, root, subject="final")
+        with self._lock():
+            projected_report = self.accounting._report(excluded_paths=(final_path,))
+            projected_bytes = int(projected_report["aggregate"]["logical_bytes"])
+            current_report = self.accounting._report(excluded_paths=())
+            current_bytes = int(current_report["aggregate"]["logical_bytes"])
+            replaced_bytes = max(0, current_bytes - projected_bytes)
+            staged_bytes = max(0, projected_bytes - (current_bytes - replaced_bytes))
+            self._require_within_quota(
+                family=family,
+                current_bytes=current_bytes - replaced_bytes,
+                staged_bytes=staged_bytes,
+                projected_bytes=projected_bytes,
+            )
+            yield self._admission_evidence(
+                family=family,
+                current_bytes=current_bytes - replaced_bytes,
+                staged_bytes=staged_bytes,
+                projected_bytes=projected_bytes,
+                storage_snapshot_id=projected_report["storage_snapshot_id"],
+            )
+
+    def _family_root(self, family: str) -> Path:
+        root = self.accounting.roots.get(family)
+        if root is None:
+            raise RuntimeError(f"unknown artifact quota family {family!r}")
+        return root
+
+    def _require_within_quota(
+        self,
+        *,
+        family: str,
+        current_bytes: int,
+        staged_bytes: int,
+        projected_bytes: int,
+    ) -> None:
+        assert self.max_bytes is not None
+        if projected_bytes > self.max_bytes:
+            raise ArtifactQuotaExceededError(
+                family=family,
+                quota_bytes=self.max_bytes,
+                current_bytes=current_bytes,
+                staged_bytes=staged_bytes,
+                projected_bytes=projected_bytes,
+            )
+
+    def _admission_evidence(
+        self,
+        *,
+        family: str,
+        current_bytes: int,
+        staged_bytes: int,
+        projected_bytes: int,
+        storage_snapshot_id: str,
+    ) -> dict[str, Any]:
+        assert self.max_bytes is not None
+        return {
+            "family": family,
+            "quota_bytes": self.max_bytes,
+            "current_bytes": current_bytes,
+            "staged_bytes": staged_bytes,
+            "projected_bytes": projected_bytes,
+            "storage_snapshot_id": storage_snapshot_id,
+        }
 
     @staticmethod
     def _contained_path(path: Path, root: Path, *, subject: str) -> Path:
@@ -240,5 +338,6 @@ __all__ = [
     "MAX_ARTIFACT_QUOTA_BYTES",
     "ArtifactQuotaService",
     "artifact_quota_admission",
+    "artifact_quota_publication_lock",
     "parse_artifact_quota",
 ]
