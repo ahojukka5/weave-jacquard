@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Iterable, Iterator
 from typing import Any
@@ -69,8 +70,16 @@ def validate_node(node: Any) -> None:
         raise ValidationError("INVALID_VALUE", f"{kind} value must be a string", node_id=node_id)
     if kind == "integer" and (not isinstance(value, int) or isinstance(value, bool)):
         raise ValidationError("INVALID_VALUE", "integer value must be an integer", node_id=node_id)
-    if kind == "float" and not isinstance(value, (int, float)):
-        raise ValidationError("INVALID_VALUE", "float value must be numeric", node_id=node_id)
+    if kind == "float" and (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+    ):
+        raise ValidationError(
+            "INVALID_VALUE",
+            "float value must be a finite number other than boolean",
+            node_id=node_id,
+        )
     if kind == "boolean" and not isinstance(value, bool):
         raise ValidationError(
             "INVALID_VALUE",
@@ -249,6 +258,8 @@ def _render_atom(node: JsonObject) -> str:
         return f'"{escaped}"'
     if kind == "boolean":
         return "true" if value else "false"
+    if kind == "float":
+        return repr(float(value))
     return str(value)
 
 
@@ -319,7 +330,10 @@ def _parse_atom(value: str) -> JsonObject:
         return make_atom("boolean", False)
     if re.fullmatch(r"[-+]?\d+", value):
         return make_atom("integer", int(value))
-    if re.fullmatch(r"[-+]?(?:\d+\.\d*|\d*\.\d+)(?:[eE][-+]?\d+)?", value):
+    if re.fullmatch(
+        r"[-+]?(?:(?:\d+\.\d*|\d*\.\d+)(?:[eE][-+]?\d+)?|\d+[eE][-+]?\d+)",
+        value,
+    ):
         return make_atom("float", float(value))
     return make_atom("symbol", value)
 
@@ -365,6 +379,7 @@ def _tokenize(source: str) -> Iterator[_Token]:
                     continue
                 value.append(char)
                 index += 1
+                continue
             else:
                 raise ValidationError("INVALID_STRING", "unterminated string literal")
             continue
