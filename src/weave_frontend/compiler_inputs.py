@@ -34,6 +34,7 @@ class CompilerInputMixin:
     workspace: Any
     _configured_compiler: str | Path | None
     _compiler: Path | None
+    _environment_fallback: bool
 
     @staticmethod
     def _ordered_documents(
@@ -133,11 +134,14 @@ class CompilerInputMixin:
         return self._compiler
 
     def _resolve_compiler(self, compiler: str | Path | None) -> Path:
-        configured = compiler or os.environ.get("WEAVEC_BIN")
+        environment_fallback = getattr(self, "_environment_fallback", True)
+        configured = compiler
+        if configured is None and environment_fallback:
+            configured = os.environ.get("WEAVEC_BIN")
         if configured is None:
             validator = getattr(self.workspace, "validator", None)
             configured = getattr(validator, "binary", None)
-        if configured is None:
+        if configured is None and environment_fallback:
             configured = shutil.which("weavec")
         if configured is None:
             raise ValidationError(

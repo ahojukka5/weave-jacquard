@@ -7,32 +7,25 @@ from typing import Any
 
 from .database_backup import DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS
 from .mcp_server import _result, mcp, workspace
+from .runtime_container import runtime_config
 from .verified_database_backup import DatabaseBackupService
 
 DATABASE_BACKUP_ROOT_ENV = "WEAVE_DATABASE_BACKUP_ROOT"
-
-
-def _install_configuration_contract() -> None:
-    """Bind backup-root configuration before application manifest finalization."""
-
-    from . import application
-
-    names = set(application.PUBLIC_CONFIGURATION_VARIABLES)
-    names.add(DATABASE_BACKUP_ROOT_ENV)
-    application.PUBLIC_CONFIGURATION_VARIABLES = tuple(sorted(names))
 
 
 @lru_cache(maxsize=1)
 def database_backups() -> DatabaseBackupService:
     """Return the shared immutable database-backup service."""
 
-    return DatabaseBackupService(workspace().db)
+    return DatabaseBackupService(
+        workspace().db,
+        backup_root=runtime_config().database_backup_root,
+    )
 
 
 def install_capability() -> None:
-    """Install configuration identity and discard stale backup-root composition."""
+    """Discard stale backup composition while retaining immutable runtime config."""
 
-    _install_configuration_contract()
     database_backups.cache_clear()
 
 

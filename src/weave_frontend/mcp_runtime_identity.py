@@ -8,6 +8,7 @@ from typing import Any
 from .mcp_build import compiler_bridge
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_runs import test_runs
+from .runtime_container import runtime_config
 from .runtime_identity import RuntimeIdentityService
 
 
@@ -29,6 +30,7 @@ def runtime_identities() -> RuntimeIdentityService:
         compiler_bridge(),
         runs.sandbox,
         _application_manifest,
+        environ=runtime_config().configured_environment,
     )
 
 

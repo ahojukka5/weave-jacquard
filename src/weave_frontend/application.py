@@ -16,22 +16,10 @@ from .mcp_capabilities import (
     ModuleLoader,
     install_public_capabilities,
 )
+from .runtime_config import PUBLIC_CONFIGURATION_VARIABLES
 
 APPLICATION_MANIFEST_FORMAT = "weave-jacquard-application-v2"
 TOOL_MANIFEST_FORMAT = "weave-jacquard-tool-manifest-v2"
-PUBLIC_CONFIGURATION_VARIABLES = (
-    "WEAVEC_BIN",
-    "WEAVEC_SOURCE_ROOT",
-    "WEAVE_ARTIFACT_MAX_BYTES",
-    "WEAVE_BUILD_ROOT",
-    "WEAVE_BWRAP",
-    "WEAVE_DB_PATH",
-    "WEAVE_MERGE_ATTESTATION_ROOT",
-    "WEAVE_MERGE_BUILD_ROOT",
-    "WEAVE_MERGE_TEST_RUN_ROOT",
-    "WEAVE_TEST_BATCH_ROOT",
-    "WEAVE_TEST_RUN_ROOT",
-)
 _REQUIRED_PUBLIC_TOOLS = frozenset(
     {
         "weave_help",

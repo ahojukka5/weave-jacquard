@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from .artifact_quota import (
-    ARTIFACT_QUOTA_ENV,
-    ArtifactQuotaService,
-    parse_artifact_quota,
-)
+from .artifact_quota import ArtifactQuotaService
 from .artifact_storage import ArtifactStorageService
 from .mcp_build import compiler_bridge
 from .mcp_database_backup import database_backups
@@ -24,6 +19,7 @@ from .mcp_test_batches import test_batches
 from .mcp_test_runs import test_runs
 from .mcp_tested_merge_attestations import tested_merge_attestations
 from .quota_aware_compiler_bridge import install_quota_aware_compiler_bridge
+from .runtime_container import runtime_config
 
 
 def _artifact_roots() -> dict[str, Path]:
@@ -58,7 +54,7 @@ def artifact_quota() -> ArtifactQuotaService:
     quota = ArtifactQuotaService(
         artifact_storage(),
         lock_path=workspace().db.path.parent / ".weave-artifact-quota.lock",
-        max_bytes=parse_artifact_quota(os.environ.get(ARTIFACT_QUOTA_ENV)),
+        max_bytes=runtime_config().artifact_max_bytes,
     )
     bridge = install_quota_aware_compiler_bridge(compiler_bridge())
     for service in (

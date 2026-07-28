@@ -10,7 +10,8 @@ from .mcp_build import build_targets, compiler_bridge, merge_previews
 from .mcp_server import _result, mcp
 from .mcp_test_targets import install_metadata_aware_merge_services, test_targets
 from .merge_candidate_test_runs import DEFAULT_OUTPUT_PAGE_BYTES
-from .sandbox import BubblewrapSandbox
+from .runtime_container import runtime_config
+from .runtime_sandbox import RuntimeBubblewrapSandbox
 from .verified_merge_candidate_build import MergeCandidateBuildService
 from .verified_merge_candidate_test_runs import MergeCandidateTestBatchService
 
@@ -23,6 +24,7 @@ def merge_candidate_builds() -> MergeCandidateBuildService:
         merge_previews(),
         build_targets(),
         compiler_bridge(),
+        build_root=runtime_config().merge_build_root,
     )
 
 
@@ -37,11 +39,13 @@ def merge_candidate_build_inspection() -> BuildInspectionService:
 def merge_candidate_test_batches() -> MergeCandidateTestBatchService:
     """Return the shared strict virtual-candidate test execution service."""
 
+    config = runtime_config()
     return MergeCandidateTestBatchService(
         merge_previews(),
         test_targets(),
         merge_candidate_builds(),
-        BubblewrapSandbox(),
+        RuntimeBubblewrapSandbox.from_config(config),
+        run_root=config.merge_test_run_root,
     )
 
 
