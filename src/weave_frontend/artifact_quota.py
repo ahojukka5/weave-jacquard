@@ -117,27 +117,40 @@ class ArtifactQuotaService:
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
 
     def report(self) -> dict[str, Any]:
-        """Return storage accounting plus the active aggregate quota policy."""
+        """Return observed storage plus the retained-byte admission policy state."""
 
         with self._lock():
             storage = self.accounting.report()
-        current = int(storage["aggregate"]["logical_bytes"])
+            retained = self.accounting._report(
+                excluded_paths=(),
+                exclude_internal_entries=True,
+            )
+        observed_bytes = int(storage["aggregate"]["logical_bytes"])
+        current_bytes = int(retained["aggregate"]["logical_bytes"])
+        internal_bytes = max(0, observed_bytes - current_bytes)
         available = (
-            None if self.max_bytes is None else max(0, self.max_bytes - current)
+            None
+            if self.max_bytes is None
+            else max(0, self.max_bytes - current_bytes)
         )
         policy_payload = {
             "format": ARTIFACT_QUOTA_POLICY_FORMAT,
             "enabled": self.max_bytes is not None,
             "max_logical_bytes": self.max_bytes,
-            "current_logical_bytes": current,
+            "current_logical_bytes": current_bytes,
+            "observed_logical_bytes": observed_bytes,
+            "internal_logical_bytes": internal_bytes,
             "available_logical_bytes": available,
-            "exceeded": self.max_bytes is not None and current > self.max_bytes,
+            "exceeded": (
+                self.max_bytes is not None and current_bytes > self.max_bytes
+            ),
             "enforcement": (
                 "interprocess-publication-admission"
                 if self.max_bytes is not None
                 else "disabled"
             ),
             "lock_id": self._lock_id(),
+            "retained_storage_snapshot_id": retained["storage_snapshot_id"],
             "requires_shared_database_directory": True,
         }
         return {
@@ -150,6 +163,9 @@ class ArtifactQuotaService:
                 {
                     "format": ARTIFACT_QUOTA_REPORT_FORMAT,
                     "storage_snapshot_id": storage["storage_snapshot_id"],
+                    "retained_storage_snapshot_id": retained[
+                        "storage_snapshot_id"
+                    ],
                     "policy": policy_payload,
                 }
             ),
