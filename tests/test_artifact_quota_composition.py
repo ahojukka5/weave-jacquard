@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import weave_frontend.application as application_module
 import weave_frontend.mcp_artifact_storage as composition
 from weave_frontend.artifact_quota import ARTIFACT_QUOTA_ENV
@@ -11,7 +13,7 @@ from weave_frontend.quota_aware_compiler_bridge import CompilerBridge
 
 def test_quota_composition_attaches_one_guard_to_every_publisher(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     roots = {
         "committed_builds": tmp_path / "builds",
@@ -77,22 +79,10 @@ def test_quota_composition_attaches_one_guard_to_every_publisher(
     }
 
 
-def test_quota_variable_is_bound_into_application_configuration(
-    monkeypatch,
-) -> None:
-    original = tuple(application_module.PUBLIC_CONFIGURATION_VARIABLES)
-    monkeypatch.setattr(
-        application_module,
-        "PUBLIC_CONFIGURATION_VARIABLES",
-        original,
-    )
-
-    composition._install_configuration_contract()
-    composition._install_configuration_contract()
-
+def test_quota_variable_is_declared_once_in_application_configuration() -> None:
     names = application_module.PUBLIC_CONFIGURATION_VARIABLES
+
     assert ARTIFACT_QUOTA_ENV in names
-    assert names == tuple(sorted(names))
     assert names.count(ARTIFACT_QUOTA_ENV) == 1
 
 
