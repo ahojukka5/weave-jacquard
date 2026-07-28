@@ -13,7 +13,8 @@ The production report composes roots from the active services:
 - committed test runs;
 - committed test batches;
 - virtual-candidate test qualifications;
-- tested-merge attestations.
+- tested-merge attestations;
+- verified database backups.
 
 The service reads the same resolved roots used by publication and inspection. It
 does not infer paths independently from environment variables.
@@ -118,19 +119,20 @@ holding the quota lock and is never authorized by an earlier report ID.
 
 ## Policy boundary
 
-When `WEAVE_ARTIFACT_MAX_BYTES` is configured, all six production MCP publishers
+When `WEAVE_ARTIFACT_MAX_BYTES` is configured, all seven production MCP publishers
 use one shared interprocess admission lock and reject projected overflow before the
-normal atomic publication step. See [artifact quota](artifact-quota.md).
+normal atomic publication step. This includes verified database backups created by
+`database_backup_create`. See [artifact quota](artifact-quota.md).
 
 The capability still does not:
 
 - delete or quarantine retained artifacts as policy action;
 - implement age- or reachability-based retention;
 - measure physical filesystem blocks;
-- include the SQLite database or external qualification evidence directories;
-- bound temporary compiler and test staging bytes as a separate physical-storage
-  policy.
+- include the live SQLite database or external qualification evidence directories;
+- bound temporary compiler, test, or backup staging bytes as a separate
+  physical-storage policy.
 
 Retention and garbage collection require verified reachability and explicit
-operator authorization. Database and temporary-space ceilings require independent
-policies rather than being inferred from retained logical-byte quota.
+operator authorization. Live database and temporary-space ceilings require
+independent policies rather than being inferred from retained logical-byte quota.
