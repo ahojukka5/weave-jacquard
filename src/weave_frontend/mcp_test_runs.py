@@ -8,8 +8,9 @@ from typing import Any
 from .mcp_build import build_targets, compiler_bridge
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_targets import test_targets
+from .quota_aware_test_runs import TestRunService
 from .sandbox import BubblewrapSandbox
-from .test_runs import DEFAULT_TEST_RUN_OUTPUT_PAGE_BYTES, TestRunService
+from .test_runs import DEFAULT_TEST_RUN_OUTPUT_PAGE_BYTES
 
 
 @lru_cache(maxsize=1)
