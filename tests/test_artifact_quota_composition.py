@@ -66,17 +66,21 @@ def test_quota_composition_attaches_one_guard_to_every_publisher(
     composition.artifact_quota.cache_clear()
     composition.artifact_storage.cache_clear()
 
-    quota = composition.artifact_quota()
+    try:
+        quota = composition.artifact_quota()
 
-    assert quota.max_bytes == 100
-    assert bridge.artifact_quota is quota
-    assert all(
-        service.artifact_quota is quota
-        for service in services.values()
-    )
-    assert quota.accounting.roots == {
-        name: path.resolve() for name, path in roots.items()
-    }
+        assert quota.max_bytes == 100
+        assert bridge.artifact_quota is quota
+        assert all(
+            service.artifact_quota is quota
+            for service in services.values()
+        )
+        assert quota.accounting.roots == {
+            name: path.resolve() for name, path in roots.items()
+        }
+    finally:
+        composition.artifact_quota.cache_clear()
+        composition.artifact_storage.cache_clear()
 
 
 def test_quota_variable_is_declared_once_in_application_configuration() -> None:
