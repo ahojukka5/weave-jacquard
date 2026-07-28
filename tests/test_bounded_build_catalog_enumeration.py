@@ -20,7 +20,7 @@ def _service(root: Path) -> BuildDiscoveryService:
 
 def _build_directory(root: Path, build_id: str) -> None:
     directory = root / build_id
-    directory.mkdir()
+    directory.mkdir(parents=True)
     (directory / "manifest.json").write_text("{}", encoding="utf-8")
 
 
