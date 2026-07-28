@@ -149,6 +149,7 @@ def test_production_root_composition_includes_every_artifact_family(
         "test_batches": tmp_path / "batches",
         "candidate_test_qualifications": tmp_path / "qualifications",
         "tested_merge_attestations": tmp_path / "attestations",
+        "database_backups": tmp_path / "database-backups",
     }
     monkeypatch.setattr(
         mcp_storage_module,
@@ -179,6 +180,11 @@ def test_production_root_composition_includes_every_artifact_family(
         mcp_storage_module,
         "tested_merge_attestations",
         lambda: SimpleNamespace(attestation_root=roots["tested_merge_attestations"]),
+    )
+    monkeypatch.setattr(
+        mcp_storage_module,
+        "database_backups",
+        lambda: SimpleNamespace(backup_root=roots["database_backups"]),
     )
 
     assert mcp_storage_module._artifact_roots() == roots

@@ -13,6 +13,8 @@ from typing import Any
 from .artifact_quota import ArtifactQuotaService, artifact_quota_admission
 from .database_backup import (
     MAX_DATABASE_BACKUP_MANIFEST_BYTES,
+)
+from .database_backup import (
     DatabaseBackupService as _DatabaseBackupService,
 )
 from .errors import ArtifactIntegrityError, ValidationError

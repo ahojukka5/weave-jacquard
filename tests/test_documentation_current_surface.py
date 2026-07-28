@@ -25,8 +25,8 @@ def test_architecture_does_not_list_completed_capabilities_as_omissions() -> Non
         not in architecture
     )
     assert "Runtime composition" in architecture
-    assert "Database operations" in architecture
-    assert "Storage policy" in architecture
+    assert "Database and artifact integrity" in architecture
+    assert "Retention and storage operations" in architecture
 
 
 def test_architecture_distinguishes_preview_from_retained_candidate_evidence() -> None:
