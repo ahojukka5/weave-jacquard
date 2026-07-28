@@ -7,7 +7,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from .artifact_quota import ArtifactQuotaService, parse_artifact_quota
+from .artifact_quota import (
+    ARTIFACT_QUOTA_ENV,
+    ArtifactQuotaService,
+    parse_artifact_quota,
+)
 from .artifact_storage import ArtifactStorageService
 from .mcp_build import compiler_bridge
 from .mcp_merge_candidate_test_runs import (
@@ -38,6 +42,16 @@ def _artifact_roots() -> dict[str, Path]:
     }
 
 
+def _install_configuration_contract() -> None:
+    """Bind the quota variable into the application manifest before composition ends."""
+
+    from . import application
+
+    names = set(application.PUBLIC_CONFIGURATION_VARIABLES)
+    names.add(ARTIFACT_QUOTA_ENV)
+    application.PUBLIC_CONFIGURATION_VARIABLES = tuple(sorted(names))
+
+
 @lru_cache(maxsize=1)
 def artifact_storage() -> ArtifactStorageService:
     """Return bounded accounting for all live retained-artifact roots."""
@@ -52,7 +66,7 @@ def artifact_quota() -> ArtifactQuotaService:
     quota = ArtifactQuotaService(
         artifact_storage(),
         lock_path=workspace().db.path.parent / ".weave-artifact-quota.lock",
-        max_bytes=parse_artifact_quota(os.environ.get("WEAVE_ARTIFACT_MAX_BYTES")),
+        max_bytes=parse_artifact_quota(os.environ.get(ARTIFACT_QUOTA_ENV)),
     )
     bridge = install_quota_aware_compiler_bridge(compiler_bridge())
     for service in (
@@ -70,6 +84,7 @@ def artifact_quota() -> ArtifactQuotaService:
 def install_capability() -> None:
     """Recompose root accounting and attach one quota guard to every publisher."""
 
+    _install_configuration_contract()
     artifact_quota.cache_clear()
     artifact_storage.cache_clear()
     artifact_quota()
