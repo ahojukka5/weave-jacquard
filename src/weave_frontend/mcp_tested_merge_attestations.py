@@ -7,7 +7,7 @@ from typing import Any
 
 from .mcp_merge_candidate_test_runs import merge_candidate_test_batches
 from .mcp_server import _result, mcp, workspace
-from .tested_merge_attestations import TestedMergeAttestationService
+from .quota_aware_tested_merge_attestations import TestedMergeAttestationService
 
 
 @lru_cache(maxsize=1)
