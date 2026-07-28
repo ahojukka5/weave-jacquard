@@ -74,13 +74,16 @@ plain rendering and compiler source maps, including integer-valued floats.
 
 ## Retained metadata
 
-Stored `manifest.json` files used by build cache admission, `build_get`, and
+Stored committed-build manifests used by cache admission, `build_get`, and
 `build_list_page` are limited to `MAX_BUILD_MANIFEST_BYTES`, currently 4 MiB.
+Virtual-candidate build manifests use
+`MAX_MERGE_CANDIDATE_BUILD_MANIFEST_BYTES`, also 4 MiB.
+
 Retained test-run and test-batch manifests are independently limited to
-`MAX_TEST_RUN_MANIFEST_BYTES` and `MAX_TEST_BATCH_MANIFEST_BYTES`, also 4 MiB.
+`MAX_TEST_RUN_MANIFEST_BYTES` and `MAX_TEST_BATCH_MANIFEST_BYTES`, likewise 4 MiB.
 Virtual-candidate qualifications use
 `MAX_MERGE_CANDIDATE_TEST_MANIFEST_BYTES`, and tested-merge attestations use
-`MAX_TESTED_MERGE_ATTESTATION_BYTES`; both are likewise 4 MiB.
+`MAX_TESTED_MERGE_ATTESTATION_BYTES`; both are also 4 MiB.
 
 These files are opened through a race-resistant retained-artifact reader that
 rejects symlinks, non-regular files, path replacement during open, invalid UTF-8,
