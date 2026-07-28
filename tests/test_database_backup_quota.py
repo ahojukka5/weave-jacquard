@@ -18,7 +18,7 @@ def _initialized_database(path: Path) -> Database:
     return database
 
 
-def _quota(root: Path, *, max_bytes: int) -> ArtifactQuotaService:
+def _quota(root: Path, *, max_bytes: int | None) -> ArtifactQuotaService:
     return ArtifactQuotaService(
         ArtifactStorageService({"database_backups": root}),
         lock_path=root.parent / "quota.lock",
@@ -32,6 +32,25 @@ def test_database_backup_is_an_explicit_artifact_storage_dependency() -> None:
 
     assert "database_backup" in capabilities["artifact_storage"].depends_on
     assert names.index("database_backup") < names.index("artifact_storage")
+
+
+def test_disabled_database_backup_quota_preserves_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backup_root = tmp_path / "backups"
+    with _initialized_database(tmp_path / "source.db") as database:
+        service = DatabaseBackupService(database, backup_root=backup_root)
+        service.artifact_quota = _quota(backup_root, max_bytes=None)
+
+        def unexpected_stage_scan(_final: Path) -> tuple[Path, ...]:
+            raise AssertionError("disabled quota must not inspect staging")
+
+        monkeypatch.setattr(service, "_quota_stages", unexpected_stage_scan)
+        backup = service.create()
+
+    assert (backup_root / backup["backup_id"]).is_dir()
+    assert not (tmp_path / "quota.lock").exists()
 
 
 def test_database_backup_quota_rejects_before_immutable_publication(
