@@ -14,6 +14,7 @@ from .artifact_quota import (
 )
 from .artifact_storage import ArtifactStorageService
 from .mcp_build import compiler_bridge
+from .mcp_database_backup import database_backups
 from .mcp_merge_candidate_test_runs import (
     merge_candidate_builds,
     merge_candidate_test_batches,
@@ -39,6 +40,7 @@ def _artifact_roots() -> dict[str, Path]:
         "tested_merge_attestations": Path(
             tested_merge_attestations().attestation_root
         ),
+        "database_backups": Path(database_backups().backup_root),
     }
 
 
@@ -66,6 +68,7 @@ def artifact_quota() -> ArtifactQuotaService:
         test_batches(),
         merge_candidate_test_batches(),
         tested_merge_attestations(),
+        database_backups(),
     ):
         service.artifact_quota = quota
     return quota
