@@ -235,10 +235,20 @@ def _decompress_json(value: bytes | bytearray | memoryview) -> str:
 
 def _is_database_busy_error(error: sqlite3.OperationalError) -> bool:
     code = getattr(error, "sqlite_errorcode", None)
-    if isinstance(code, int) and code & 0xFF in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}:
+    if isinstance(code, int) and code & 0xFF in {
+        sqlite3.SQLITE_BUSY,
+        sqlite3.SQLITE_LOCKED,
+    }:
         return True
     message = str(error).casefold()
-    return "database is locked" in message or "database table is locked" in message
+    return any(
+        marker in message
+        for marker in (
+            "database is locked",
+            "database table is locked",
+            "database schema is locked",
+        )
+    )
 
 
 class Database:
@@ -264,40 +274,46 @@ class Database:
             self.path,
             timeout=busy_timeout_ms / 1_000,
         )
-        self.connection.row_factory = sqlite3.Row
-        self.connection.execute(f"PRAGMA busy_timeout = {busy_timeout_ms}")
-        self.connection.execute("PRAGMA foreign_keys = ON")
-        current_version = int(
-            self.connection.execute("PRAGMA user_version").fetchone()[0]
-        )
-        if current_version > SCHEMA_VERSION:
-            self.connection.close()
-            raise RuntimeError(
-                "database schema version "
-                f"{current_version} is newer than supported version {SCHEMA_VERSION}"
+        try:
+            self.connection.row_factory = sqlite3.Row
+            self.connection.execute(f"PRAGMA busy_timeout = {busy_timeout_ms}")
+            self.connection.execute("PRAGMA foreign_keys = ON")
+            current_version = int(
+                self.connection.execute("PRAGMA user_version").fetchone()[0]
             )
-        if current_version < SCHEMA_VERSION and self._has_existing_schema():
-            try:
+            if current_version > SCHEMA_VERSION:
+                raise RuntimeError(
+                    "database schema version "
+                    f"{current_version} is newer than supported version {SCHEMA_VERSION}"
+                )
+            if current_version < SCHEMA_VERSION and self._has_existing_schema():
                 require_migration_integrity(self.connection)
-            except Exception:
-                self.connection.close()
-                raise
-        self.connection.create_function(
-            "weave_compress_json",
-            1,
-            _compress_json,
-            deterministic=True,
-        )
-        self.connection.create_function(
-            "weave_decompress_json",
-            1,
-            _decompress_json,
-            deterministic=True,
-        )
-        migrated = self._migrate_module_snapshots()
-        if migrated:
-            self.connection.execute("VACUUM")
-        self.connection.executescript(SCHEMA)
+            self.connection.create_function(
+                "weave_compress_json",
+                1,
+                _compress_json,
+                deterministic=True,
+            )
+            self.connection.create_function(
+                "weave_decompress_json",
+                1,
+                _decompress_json,
+                deterministic=True,
+            )
+            migrated = self._migrate_module_snapshots()
+            if migrated:
+                self.connection.execute("VACUUM")
+            self.connection.executescript(SCHEMA)
+        except sqlite3.OperationalError as exc:
+            self.connection.close()
+            if _is_database_busy_error(exc):
+                raise DatabaseBusyError(
+                    busy_timeout_ms=self.busy_timeout_ms,
+                ) from exc
+            raise
+        except Exception:
+            self.connection.close()
+            raise
 
     def _has_existing_schema(self) -> bool:
         row = self.connection.execute(
