@@ -6,7 +6,27 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .errors import ValidationError
+from .retained_artifact_io import (
+    RetainedArtifactReadError,
+    read_bounded_regular_bytes,
+)
 from .sexpr import JsonObject, head_symbol, parse_source, render_node, walk_nodes
+from .structural_limits import MAX_SOURCE_BYTES
+
+MAX_GRAMMAR_DIRECTORY_ENTRIES = 16_384
+MAX_GRAMMAR_CORPUS_FILES = 4_096
+MAX_GRAMMAR_CORPUS_BYTES = 64 * 1024 * 1024
+MAX_GRAMMAR_SOURCE_BYTES = MAX_SOURCE_BYTES
+MAX_GRAMMAR_FORMS = 16_384
+MAX_GRAMMAR_ARITIES_PER_FORM = 256
+MAX_GRAMMAR_PARENTS_PER_FORM = 1_024
+MAX_GRAMMAR_EXAMPLES_PER_FORM = 12
+MAX_GRAMMAR_EXAMPLE_BYTES = 64 * 1024
+MAX_GRAMMAR_EXAMPLE_TOTAL_BYTES = 16 * 1024 * 1024
+MAX_GRAMMAR_PARSE_FAILURES = 256
+MAX_GRAMMAR_ERROR_BYTES = 1_024
+MAX_GRAMMAR_HELP_LIMIT = 50
 
 
 @dataclass
@@ -15,6 +35,9 @@ class FormInfo:
     arities: set[int] = field(default_factory=set)
     parents: set[str] = field(default_factory=set)
     examples: list[dict[str, str]] = field(default_factory=list)
+    arities_truncated: bool = False
+    parents_truncated: bool = False
+    examples_truncated: bool = False
 
     def as_dict(self, *, limit: int = 6) -> dict[str, Any]:
         return {
@@ -22,6 +45,9 @@ class FormInfo:
             "observed_arities": sorted(self.arities),
             "observed_parents": sorted(self.parents),
             "examples": self.examples[:limit],
+            "arities_truncated": self.arities_truncated,
+            "parents_truncated": self.parents_truncated,
+            "examples_truncated": self.examples_truncated,
             "note": (
                 "Observed from the weavec surface corpus. This is guidance, not a "
                 "second normative grammar; validate completed programs with weavec."
@@ -30,13 +56,22 @@ class FormInfo:
 
 
 class GrammarIndex:
-    """Searchable examples inferred from weavec's own surface programs."""
+    """Searchable bounded examples inferred from weavec's own surface programs."""
 
     def __init__(self, source_root: str | Path | None = None) -> None:
         self.source_root = self._resolve_source_root(source_root)
         self.forms: dict[str, FormInfo] = {}
+        self.files_discovered = 0
+        self.files_considered = 0
         self.files_scanned = 0
+        self.bytes_scanned = 0
+        self.example_bytes_retained = 0
+        self.parse_failure_count = 0
         self.parse_failures: list[dict[str, str]] = []
+        self.corpus_truncated = False
+        self.forms_truncated = False
+        self.examples_truncated = False
+        self.corpus_error: str | None = None
         if self.source_root is not None:
             self.refresh()
 
@@ -59,19 +94,98 @@ class GrammarIndex:
 
     def refresh(self) -> None:
         self.forms.clear()
+        self.files_discovered = 0
+        self.files_considered = 0
         self.files_scanned = 0
+        self.bytes_scanned = 0
+        self.example_bytes_retained = 0
+        self.parse_failure_count = 0
         self.parse_failures.clear()
+        self.corpus_truncated = False
+        self.forms_truncated = False
+        self.examples_truncated = False
+        self.corpus_error = None
         if self.source_root is None:
             return
+
         surface = self.source_root / "test" / "correctness" / "surface"
-        for path in sorted(surface.glob("*.weave")):
+        paths = self._bounded_surface_paths(surface)
+        if paths is None:
+            return
+        self.files_discovered = len(paths)
+        if len(paths) > MAX_GRAMMAR_CORPUS_FILES:
+            paths = paths[:MAX_GRAMMAR_CORPUS_FILES]
+            self.corpus_truncated = True
+
+        for path in paths:
+            self.files_considered += 1
             try:
-                root = parse_source(path.read_text(encoding="utf-8"))
+                size = path.lstat().st_size
+            except OSError as exc:
+                self._record_failure(path, exc)
+                continue
+            if size > MAX_GRAMMAR_SOURCE_BYTES:
+                self._record_failure(
+                    path,
+                    ValueError(
+                        f"grammar source exceeds {MAX_GRAMMAR_SOURCE_BYTES} bytes"
+                    ),
+                )
+                continue
+            if self.bytes_scanned + size > MAX_GRAMMAR_CORPUS_BYTES:
+                self.corpus_truncated = True
+                break
+            try:
+                payload = read_bounded_regular_bytes(
+                    path,
+                    max_bytes=MAX_GRAMMAR_SOURCE_BYTES,
+                )
+                source = payload.decode("utf-8")
+                root = parse_source(source)
             except Exception as exc:  # corpus diagnostics must not disable help
-                self.parse_failures.append({"path": str(path), "error": str(exc)})
+                self._record_failure(path, exc)
                 continue
             self.files_scanned += 1
+            self.bytes_scanned += len(payload)
             self._index_tree(root, path.relative_to(self.source_root))
+
+    def _bounded_surface_paths(self, surface: Path) -> list[Path] | None:
+        entries: list[Path] = []
+        try:
+            for index, path in enumerate(surface.iterdir()):
+                if index >= MAX_GRAMMAR_DIRECTORY_ENTRIES:
+                    self.corpus_error = (
+                        "surface corpus directory exceeds the bounded entry limit "
+                        f"{MAX_GRAMMAR_DIRECTORY_ENTRIES}"
+                    )
+                    self.corpus_truncated = True
+                    return None
+                if path.suffix == ".weave":
+                    entries.append(path)
+        except OSError as exc:
+            self.corpus_error = self._bounded_error(exc)
+            return None
+        return sorted(entries, key=lambda path: path.name)
+
+    def _record_failure(self, path: Path, error: Exception) -> None:
+        self.parse_failure_count += 1
+        if len(self.parse_failures) >= MAX_GRAMMAR_PARSE_FAILURES:
+            return
+        self.parse_failures.append(
+            {
+                "path": str(path),
+                "error": self._bounded_error(error),
+            }
+        )
+
+    @staticmethod
+    def _bounded_error(error: Exception) -> str:
+        text = str(error)
+        payload = text.encode("utf-8", errors="replace")
+        if len(payload) <= MAX_GRAMMAR_ERROR_BYTES:
+            return text
+        bounded = payload[:MAX_GRAMMAR_ERROR_BYTES].decode("utf-8", errors="ignore")
+        return bounded + "…"
 
     def _index_tree(self, root: JsonObject, path: Path) -> None:
         parent_by_id: dict[str, str] = {}
@@ -89,17 +203,56 @@ class GrammarIndex:
             name = head_symbol(node)
             if name is None:
                 continue
-            info = self.forms.setdefault(name, FormInfo(name))
-            info.arities.add(max(0, len(node["children"]) - 1))
+            info = self.forms.get(name)
+            if info is None:
+                if len(self.forms) >= MAX_GRAMMAR_FORMS:
+                    self.forms_truncated = True
+                    continue
+                info = FormInfo(name)
+                self.forms[name] = info
+
+            arity = max(0, len(node["children"]) - 1)
+            if arity not in info.arities:
+                if len(info.arities) < MAX_GRAMMAR_ARITIES_PER_FORM:
+                    info.arities.add(arity)
+                else:
+                    info.arities_truncated = True
+
             parent = parent_by_id.get(node["id"])
-            if parent:
-                info.parents.add(parent)
+            if parent and parent not in info.parents:
+                if len(info.parents) < MAX_GRAMMAR_PARENTS_PER_FORM:
+                    info.parents.add(parent)
+                else:
+                    info.parents_truncated = True
+
+            if len(info.examples) >= MAX_GRAMMAR_EXAMPLES_PER_FORM:
+                info.examples_truncated = True
+                continue
+            try:
+                sexpr = render_node(node)
+            except Exception:
+                info.examples_truncated = True
+                self.examples_truncated = True
+                continue
+            example_bytes = len(sexpr.encode("utf-8"))
+            if example_bytes > MAX_GRAMMAR_EXAMPLE_BYTES:
+                info.examples_truncated = True
+                self.examples_truncated = True
+                continue
+            if (
+                self.example_bytes_retained + example_bytes
+                > MAX_GRAMMAR_EXAMPLE_TOTAL_BYTES
+            ):
+                info.examples_truncated = True
+                self.examples_truncated = True
+                continue
             example = {
                 "source": str(path),
-                "sexpr": render_node(node),
+                "sexpr": sexpr,
             }
-            if example not in info.examples and len(info.examples) < 12:
+            if example not in info.examples:
                 info.examples.append(example)
+                self.example_bytes_retained += example_bytes
 
     def help(
         self,
@@ -109,6 +262,7 @@ class GrammarIndex:
         parent_form: str | None = None,
         limit: int = 8,
     ) -> dict[str, Any]:
+        self._validate_limit(limit)
         status = self.status()
         if form:
             info = self.forms.get(form)
@@ -154,6 +308,7 @@ class GrammarIndex:
         }
 
     def search(self, query: str, *, limit: int = 8) -> list[dict[str, Any]]:
+        self._validate_limit(limit)
         needle = query.casefold()
         matches = [
             info
@@ -164,6 +319,18 @@ class GrammarIndex:
         ]
         matches.sort(key=lambda item: (not item.name.casefold().startswith(needle), item.name))
         return [info.as_dict(limit=2) for info in matches[:limit]]
+
+    @staticmethod
+    def _validate_limit(limit: Any) -> None:
+        if (
+            isinstance(limit, bool)
+            or not isinstance(limit, int)
+            or not 1 <= limit <= MAX_GRAMMAR_HELP_LIMIT
+        ):
+            raise ValidationError(
+                "INVALID_GRAMMAR_HELP_LIMIT",
+                f"limit must be between 1 and {MAX_GRAMMAR_HELP_LIMIT}",
+            )
 
     def hint_for_node(self, node: JsonObject) -> dict[str, Any] | None:
         name = head_symbol(node)
@@ -184,14 +351,40 @@ class GrammarIndex:
             "observed_arities": sorted(info.arities),
             "complete_by_observed_arity": actual_arity in info.arities,
             "examples": info.examples[:2],
+            "arities_truncated": info.arities_truncated,
+            "parents_truncated": info.parents_truncated,
+            "examples_truncated": info.examples_truncated,
         }
 
     def status(self) -> dict[str, Any]:
         return {
             "source_root": str(self.source_root) if self.source_root else None,
-            "available": self.source_root is not None,
+            "available": self.source_root is not None and self.corpus_error is None,
+            "files_discovered": self.files_discovered,
+            "files_considered": self.files_considered,
             "files_scanned": self.files_scanned,
+            "bytes_scanned": self.bytes_scanned,
             "forms_indexed": len(self.forms),
-            "parse_failure_count": len(self.parse_failures),
+            "example_bytes_retained": self.example_bytes_retained,
+            "parse_failure_count": self.parse_failure_count,
+            "parse_failures_retained": len(self.parse_failures),
+            "corpus_truncated": self.corpus_truncated,
+            "forms_truncated": self.forms_truncated,
+            "examples_truncated": self.examples_truncated,
+            "corpus_error": self.corpus_error,
+            "limits": {
+                "directory_entries": MAX_GRAMMAR_DIRECTORY_ENTRIES,
+                "files": MAX_GRAMMAR_CORPUS_FILES,
+                "source_bytes": MAX_GRAMMAR_SOURCE_BYTES,
+                "total_source_bytes": MAX_GRAMMAR_CORPUS_BYTES,
+                "forms": MAX_GRAMMAR_FORMS,
+                "arities_per_form": MAX_GRAMMAR_ARITIES_PER_FORM,
+                "parents_per_form": MAX_GRAMMAR_PARENTS_PER_FORM,
+                "examples_per_form": MAX_GRAMMAR_EXAMPLES_PER_FORM,
+                "example_bytes": MAX_GRAMMAR_EXAMPLE_BYTES,
+                "total_example_bytes": MAX_GRAMMAR_EXAMPLE_TOTAL_BYTES,
+                "parse_failures": MAX_GRAMMAR_PARSE_FAILURES,
+                "help_limit": MAX_GRAMMAR_HELP_LIMIT,
+            },
             "authority": "weavec surface sources and the weavec frontend validator",
         }
