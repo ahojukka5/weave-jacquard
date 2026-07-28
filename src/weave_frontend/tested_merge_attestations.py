@@ -12,10 +12,15 @@ from typing import Any
 
 from .compiler_artifacts import CompilerArtifactMixin
 from .errors import ArtifactIntegrityError, NotFoundError, ValidationError
+from .retained_artifact_io import (
+    RetainedArtifactReadError,
+    read_bounded_regular_json,
+)
 
 TESTED_MERGE_ATTESTATION_FORMAT = "weave-tested-merge-attestation-v1"
 TESTED_MERGE_ATTESTATION_KEY_FORMAT = "weave-tested-merge-attestation-key-v1"
 TESTED_MERGE_ATTESTATION_ID = re.compile(r"^[0-9a-f]{32}$")
+MAX_TESTED_MERGE_ATTESTATION_BYTES = 4 * 1024 * 1024
 
 
 class TestedMergeAttestationService(CompilerArtifactMixin):
@@ -286,8 +291,11 @@ class TestedMergeAttestationService(CompilerArtifactMixin):
     @staticmethod
     def _read_json(path: Path) -> dict[str, Any]:
         try:
-            value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            value = read_bounded_regular_json(
+                path,
+                max_bytes=MAX_TESTED_MERGE_ATTESTATION_BYTES,
+            )
+        except RetainedArtifactReadError as exc:
             raise ArtifactIntegrityError(
                 f"cannot read tested merge attestation: {exc}"
             ) from exc
