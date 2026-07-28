@@ -3,6 +3,7 @@
 from weave_frontend import (
     CompilerBridge,
     ConflictError,
+    DatabaseBusyError,
     MergeResult,
     NotFoundError,
     ValidationError,
@@ -18,6 +19,7 @@ JacquardError = WeaveFrontendError
 __all__ = [
     "CompilerBridge",
     "ConflictError",
+    "DatabaseBusyError",
     "JacquardError",
     "MergeResult",
     "NotFoundError",
