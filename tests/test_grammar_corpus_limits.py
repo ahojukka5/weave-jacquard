@@ -112,6 +112,20 @@ def test_forms_and_examples_have_independent_bounds(
     assert len(index.forms["first"].examples) == 1
 
 
+def test_long_form_names_are_not_retained(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, surface = _surface_root(tmp_path)
+    monkeypatch.setattr(grammar_help_module, "MAX_GRAMMAR_FORM_NAME_BYTES", 4)
+    (surface / "forms.weave").write_text("(short)", encoding="utf-8")
+
+    index = GrammarIndex(root)
+
+    assert index.forms == {}
+    assert index.forms_truncated is True
+
+
 def test_parse_failure_evidence_is_counted_but_bounded(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -138,3 +152,15 @@ def test_help_rejects_unbounded_result_limit(limit: object) -> None:
         index.help(limit=limit)  # type: ignore[arg-type]
 
     assert captured.value.code == "INVALID_GRAMMAR_HELP_LIMIT"
+
+
+def test_help_rejects_oversized_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(grammar_help_module, "MAX_GRAMMAR_QUERY_BYTES", 4)
+    index = GrammarIndex(None)
+
+    with pytest.raises(ValidationError) as captured:
+        index.help(query="large")
+
+    assert captured.value.code == "INVALID_GRAMMAR_HELP_QUERY"
