@@ -10,7 +10,6 @@ import stat
 import tempfile
 import time
 import uuid
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +25,7 @@ DATABASE_BACKUP_FORMAT = "weave-database-backup-v1"
 DATABASE_BACKUP_KEY_FORMAT = "weave-database-backup-key-v1"
 DATABASE_RESTORE_FORMAT = "weave-database-restore-v1"
 DATABASE_BACKUP_ID_LENGTH = 64
-DATABASE_BACKUP_ID = "0123456789abcdef"
+_HEXADECIMAL = "0123456789abcdef"
 MAX_DATABASE_BACKUP_MANIFEST_BYTES = 1024 * 1024
 DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS = 300
 MAX_DATABASE_BACKUP_TIMEOUT_SECONDS = 3600
@@ -64,7 +63,10 @@ class DatabaseBackupService(CompilerArtifactMixin):
                 "database backup requires no active transaction on the source connection",
             )
 
-        source = self._connection_identity(connection)
+        source = {
+            **self._connection_identity(connection),
+            "location_id": self._location_id(self.database.path),
+        }
         with tempfile.TemporaryDirectory(
             prefix=".database-backup-",
             dir=self.backup_root,
@@ -82,30 +84,25 @@ class DatabaseBackupService(CompilerArtifactMixin):
                     "DATABASE_BACKUP_INTEGRITY_FAILED",
                     "online database backup did not pass integrity verification",
                 )
-            backup_identity = self._database_file_identity(database_path)
+            artifact_identity = self._database_file_identity(database_path)
             backup_database = self._database_identity(database_path)
-            key = {
-                "format": DATABASE_BACKUP_KEY_FORMAT,
-                "database_sha256": backup_identity["sha256"],
-                "database_bytes": backup_identity["bytes"],
-                "schema_version": backup_database["schema_version"],
-            }
+            key = self._backup_key(
+                source=source,
+                backup_database=backup_database,
+                artifact_identity=artifact_identity,
+            )
             backup_id = self._hash_json(key)
             manifest = {
                 "format": DATABASE_BACKUP_FORMAT,
                 "key_format": DATABASE_BACKUP_KEY_FORMAT,
                 "backup_id": backup_id,
                 "cached": False,
-                "created_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-                "source": {
-                    **source,
-                    "location_id": self._location_id(self.database.path),
-                },
+                "source": source,
                 "backup_database": backup_database,
                 "integrity": integrity,
                 "artifacts": {"database": "database.sqlite3"},
-                "artifact_bytes": {"database": backup_identity["bytes"]},
-                "artifact_sha256": {"database": backup_identity["sha256"]},
+                "artifact_bytes": {"database": artifact_identity["bytes"]},
+                "artifact_sha256": {"database": artifact_identity["sha256"]},
                 "backup_key": key,
             }
             manifest_path = temporary_directory / "backup-manifest.json"
@@ -174,7 +171,14 @@ class DatabaseBackupService(CompilerArtifactMixin):
                 )
             self._fsync_file(temporary)
             self._require_restore_destination_absent(destination_path)
-            os.replace(temporary, destination_path)
+            try:
+                os.link(temporary, destination_path, follow_symlinks=False)
+            except FileExistsError as exc:
+                raise ValidationError(
+                    "DATABASE_RESTORE_DESTINATION_EXISTS",
+                    "restore destination appeared during atomic publication",
+                ) from exc
+            os.unlink(temporary)
             self._fsync_directory(parent)
         finally:
             if os.path.lexists(temporary):
@@ -268,37 +272,40 @@ class DatabaseBackupService(CompilerArtifactMixin):
         database_identity = self._database_identity(database_path)
         if manifest.get("backup_database") != database_identity:
             raise ArtifactIntegrityError("database backup SQLite identity is invalid")
-        integrity = self._normalized_integrity(database_path)
+        try:
+            integrity = self._normalized_integrity(database_path)
+        except ValidationError as exc:
+            raise ArtifactIntegrityError(
+                "database backup integrity inspection failed"
+            ) from exc
         if integrity.get("valid") is not True or manifest.get("integrity") != integrity:
             raise ArtifactIntegrityError("database backup integrity evidence is invalid")
 
-        key = {
-            "format": DATABASE_BACKUP_KEY_FORMAT,
-            "database_sha256": identity["sha256"],
-            "database_bytes": identity["bytes"],
-            "schema_version": database_identity["schema_version"],
-        }
+        source = manifest.get("source")
+        if not self._valid_database_identity(source, require_location=True):
+            raise ArtifactIntegrityError("database backup source evidence is invalid")
+        key = self._backup_key(
+            source=source,
+            backup_database=database_identity,
+            artifact_identity=identity,
+        )
         if manifest.get("backup_key") != key or self._hash_json(key) != expected_id:
             raise ArtifactIntegrityError("database backup content-derived key is invalid")
 
-        source = manifest.get("source")
-        if not isinstance(source, dict):
-            raise ArtifactIntegrityError("database backup source evidence is invalid")
-        for field in (
-            "schema_version",
-            "page_size",
-            "page_count",
-            "journal_mode",
-            "sqlite_version",
-            "location_id",
-        ):
-            if field not in source:
-                raise ArtifactIntegrityError(
-                    f"database backup source evidence lacks {field}"
-                )
-        created = manifest.get("created_at_utc")
-        if not isinstance(created, str) or not created.endswith("Z"):
-            raise ArtifactIntegrityError("database backup creation time is invalid")
+    @staticmethod
+    def _backup_key(
+        *,
+        source: dict[str, Any],
+        backup_database: dict[str, Any],
+        artifact_identity: dict[str, Any],
+    ) -> dict[str, Any]:
+        return {
+            "format": DATABASE_BACKUP_KEY_FORMAT,
+            "source": source,
+            "backup_database": backup_database,
+            "database_sha256": artifact_identity["sha256"],
+            "database_bytes": artifact_identity["bytes"],
+        }
 
     def _backup_directory(
         self,
@@ -376,6 +383,8 @@ class DatabaseBackupService(CompilerArtifactMixin):
                     view = memoryview(chunk)
                     while view:
                         written = os.write(destination_descriptor, view)
+                        if written <= 0:
+                            raise OSError("database restore write made no progress")
                         view = view[written:]
                 os.fsync(destination_descriptor)
             finally:
@@ -464,12 +473,63 @@ class DatabaseBackupService(CompilerArtifactMixin):
 
     @classmethod
     def _database_identity(cls, path: Path) -> dict[str, Any]:
-        uri = path.resolve().as_uri() + "?mode=ro"
-        connection = sqlite3.connect(uri, uri=True)
         try:
-            return cls._connection_identity(connection)
+            uri = path.resolve().as_uri() + "?mode=ro"
+            connection = sqlite3.connect(uri, uri=True)
+        except (OSError, sqlite3.Error) as exc:
+            raise ArtifactIntegrityError(
+                "cannot open database backup for SQLite identity inspection"
+            ) from exc
+        try:
+            identity = cls._connection_identity(connection)
+        except sqlite3.Error as exc:
+            raise ArtifactIntegrityError(
+                "cannot inspect database backup SQLite identity"
+            ) from exc
         finally:
             connection.close()
+        if not cls._valid_database_identity(identity, require_location=False):
+            raise ArtifactIntegrityError("database backup SQLite identity is invalid")
+        return identity
+
+    @staticmethod
+    def _valid_database_identity(value: Any, *, require_location: bool) -> bool:
+        if not isinstance(value, dict):
+            return False
+        required = {
+            "schema_version",
+            "page_size",
+            "page_count",
+            "journal_mode",
+            "sqlite_version",
+        }
+        if require_location:
+            required.add("location_id")
+        if set(value) != required:
+            return False
+        integer_fields = ("schema_version", "page_size", "page_count")
+        if any(
+            isinstance(value[field], bool)
+            or not isinstance(value[field], int)
+            or value[field] < 0
+            for field in integer_fields
+        ):
+            return False
+        if value["page_size"] <= 0:
+            return False
+        if not isinstance(value["journal_mode"], str) or not value["journal_mode"]:
+            return False
+        if not isinstance(value["sqlite_version"], str) or not value["sqlite_version"]:
+            return False
+        if require_location:
+            location = value["location_id"]
+            if (
+                not isinstance(location, str)
+                or len(location) != 64
+                or any(character not in _HEXADECIMAL for character in location)
+            ):
+                return False
+        return True
 
     @staticmethod
     def _normalized_integrity(path: Path) -> dict[str, Any]:
@@ -498,7 +558,7 @@ class DatabaseBackupService(CompilerArtifactMixin):
         if (
             not isinstance(backup_id, str)
             or len(backup_id) != DATABASE_BACKUP_ID_LENGTH
-            or any(character not in DATABASE_BACKUP_ID for character in backup_id)
+            or any(character not in _HEXADECIMAL for character in backup_id)
         ):
             raise ValidationError(
                 "INVALID_DATABASE_BACKUP_ID",
