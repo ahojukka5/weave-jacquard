@@ -1,21 +1,24 @@
-"""Production MCP registration for bounded artifact-storage accounting."""
+"""Production MCP registration for artifact accounting and quota admission."""
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from .artifact_quota import ArtifactQuotaService, parse_artifact_quota
 from .artifact_storage import ArtifactStorageService
 from .mcp_build import compiler_bridge
 from .mcp_merge_candidate_test_runs import (
     merge_candidate_builds,
     merge_candidate_test_batches,
 )
-from .mcp_server import _result, mcp
+from .mcp_server import _result, mcp, workspace
 from .mcp_test_batches import test_batches
 from .mcp_test_runs import test_runs
 from .mcp_tested_merge_attestations import tested_merge_attestations
+from .quota_aware_compiler_bridge import install_quota_aware_compiler_bridge
 
 
 def _artifact_roots() -> dict[str, Path]:
@@ -42,14 +45,38 @@ def artifact_storage() -> ArtifactStorageService:
     return ArtifactStorageService(_artifact_roots())
 
 
-def install_capability() -> None:
-    """Discard stale root composition when capabilities are reinstalled."""
+@lru_cache(maxsize=1)
+def artifact_quota() -> ArtifactQuotaService:
+    """Return and attach the shared aggregate publication quota guard."""
 
+    quota = ArtifactQuotaService(
+        artifact_storage(),
+        lock_path=workspace().db.path.parent / ".weave-artifact-quota.lock",
+        max_bytes=parse_artifact_quota(os.environ.get("WEAVE_ARTIFACT_MAX_BYTES")),
+    )
+    bridge = install_quota_aware_compiler_bridge(compiler_bridge())
+    for service in (
+        bridge,
+        merge_candidate_builds(),
+        test_runs(),
+        test_batches(),
+        merge_candidate_test_batches(),
+        tested_merge_attestations(),
+    ):
+        service.artifact_quota = quota
+    return quota
+
+
+def install_capability() -> None:
+    """Recompose root accounting and attach one quota guard to every publisher."""
+
+    artifact_quota.cache_clear()
     artifact_storage.cache_clear()
+    artifact_quota()
 
 
 @mcp.tool()
 def artifact_storage_report() -> dict[str, Any]:
-    """Report bounded path-redacted logical usage for all artifact stores."""
+    """Report bounded logical usage and aggregate publication quota state."""
 
-    return _result(artifact_storage().report)
+    return _result(artifact_quota().report)
