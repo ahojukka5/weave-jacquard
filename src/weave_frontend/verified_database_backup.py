@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import stat
 from collections.abc import Iterator
@@ -10,13 +11,35 @@ from pathlib import Path
 from typing import Any
 
 from .artifact_quota import ArtifactQuotaService, artifact_quota_admission
-from .database_backup import DatabaseBackupService as _DatabaseBackupService
+from .database_backup import (
+    MAX_DATABASE_BACKUP_MANIFEST_BYTES,
+    DatabaseBackupService as _DatabaseBackupService,
+)
 from .errors import ArtifactIntegrityError, ValidationError
+from .retained_artifact_io import (
+    RetainedArtifactReadError,
+    read_bounded_regular_bytes,
+)
 
 MAX_DATABASE_BACKUP_STAGE_ROOT_ENTRIES = 65_536
 MAX_DATABASE_BACKUP_STAGES = 16
 _DATABASE_BACKUP_STAGE_PREFIX = ".database-backup-"
 _DATABASE_BACKUP_FILES = frozenset({"backup-manifest.json", "database.sqlite3"})
+_DATABASE_BACKUP_MANIFEST_FIELDS = frozenset(
+    {
+        "format",
+        "key_format",
+        "backup_id",
+        "cached",
+        "source",
+        "backup_database",
+        "integrity",
+        "artifacts",
+        "artifact_bytes",
+        "artifact_sha256",
+        "backup_key",
+    }
+)
 
 
 class DatabaseBackupService(_DatabaseBackupService):
@@ -32,10 +55,15 @@ class DatabaseBackupService(_DatabaseBackupService):
         expected_id: str,
     ) -> None:
         super()._verify_manifest(manifest, directory, expected_id=expected_id)
+        if set(manifest) != _DATABASE_BACKUP_MANIFEST_FIELDS:
+            raise ArtifactIntegrityError(
+                "database backup manifest fields are invalid"
+            )
         if manifest.get("cached") is not False:
             raise ArtifactIntegrityError(
                 "database backup stored cache state is invalid"
             )
+        self._verify_manifest_encoding(directory / "backup-manifest.json", manifest)
         self._verify_directory_layout(directory)
 
     @contextmanager
@@ -78,7 +106,7 @@ class DatabaseBackupService(_DatabaseBackupService):
         ) from missing_stage
 
     def _quota_stages(self, final: Path) -> tuple[Path, ...]:
-        """Locate bounded verified stages whose manifests bind the final backup ID."""
+        """Locate bounded byte-equivalent stages bound to the final backup ID."""
 
         matches: list[Path] = []
         try:
@@ -137,6 +165,25 @@ class DatabaseBackupService(_DatabaseBackupService):
                 "database backup publication has no verified matching stage",
             )
         return tuple(sorted(matches, key=lambda path: path.name))
+
+    @staticmethod
+    def _verify_manifest_encoding(path: Path, manifest: dict[str, Any]) -> None:
+        expected = (
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        try:
+            observed = read_bounded_regular_bytes(
+                path,
+                max_bytes=MAX_DATABASE_BACKUP_MANIFEST_BYTES,
+            )
+        except RetainedArtifactReadError as exc:
+            raise ArtifactIntegrityError(
+                "cannot re-read database backup manifest bytes"
+            ) from exc
+        if observed != expected:
+            raise ArtifactIntegrityError(
+                "database backup manifest encoding is not canonical"
+            )
 
     @staticmethod
     def _verify_directory_layout(directory: Path) -> None:
