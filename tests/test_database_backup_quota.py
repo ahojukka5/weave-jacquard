@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -101,4 +102,43 @@ def test_database_backup_rejects_unbound_extra_files(tmp_path: Path) -> None:
         (directory / "unbound-extra").write_bytes(b"not in the backup manifest")
 
         with pytest.raises(ArtifactIntegrityError, match="directory layout"):
+            service.get(backup["backup_id"])
+
+
+def test_database_backup_rejects_unknown_manifest_fields(tmp_path: Path) -> None:
+    backup_root = tmp_path / "backups"
+    with _initialized_database(tmp_path / "source.db") as database:
+        service = DatabaseBackupService(database, backup_root=backup_root)
+        backup = service.create()
+        manifest_path = (
+            backup_root / backup["backup_id"] / "backup-manifest.json"
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["unbound"] = "field"
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(ArtifactIntegrityError, match="manifest fields"):
+            service.get(backup["backup_id"])
+
+
+def test_database_backup_rejects_noncanonical_manifest_encoding(
+    tmp_path: Path,
+) -> None:
+    backup_root = tmp_path / "backups"
+    with _initialized_database(tmp_path / "source.db") as database:
+        service = DatabaseBackupService(database, backup_root=backup_root)
+        backup = service.create()
+        manifest_path = (
+            backup_root / backup["backup_id"] / "backup-manifest.json"
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest_path.write_text(
+            json.dumps(manifest, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+        with pytest.raises(ArtifactIntegrityError, match="encoding is not canonical"):
             service.get(backup["backup_id"])
