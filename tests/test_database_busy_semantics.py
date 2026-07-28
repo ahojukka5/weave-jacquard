@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import weave_jacquard
 from weave_frontend.database import (
     DEFAULT_DATABASE_BUSY_TIMEOUT_MS,
     MAX_DATABASE_BUSY_TIMEOUT_MS,
@@ -29,6 +30,10 @@ def test_database_configures_explicit_busy_timeout(tmp_path: Path) -> None:
 def test_database_rejects_invalid_busy_timeout(tmp_path: Path, value: object) -> None:
     with pytest.raises(ValueError, match="busy_timeout_ms"):
         Database(tmp_path / "jacquard.db", busy_timeout_ms=value)  # type: ignore[arg-type]
+
+
+def test_database_busy_error_is_public() -> None:
+    assert weave_jacquard.DatabaseBusyError is DatabaseBusyError
 
 
 def test_busy_writer_returns_retryable_domain_error_and_recovers(tmp_path: Path) -> None:
@@ -120,11 +125,15 @@ connection.close()
                 time.sleep(0.01)
             assert process.poll() is None
 
-            with pytest.raises(DatabaseBusyError) as captured:
+            with pytest.raises(DatabaseBusyError) as startup_error:
+                Database(path, busy_timeout_ms=50)
+            assert startup_error.value.busy_timeout_ms == 50
+
+            with pytest.raises(DatabaseBusyError) as transaction_error:
                 with contender.transaction():
                     raise AssertionError("busy transaction unexpectedly started")
 
-            assert captured.value.busy_timeout_ms == 50
+            assert transaction_error.value.busy_timeout_ms == 50
             assert contender.connection.in_transaction is False
         finally:
             stdout, stderr = process.communicate("\n", timeout=5)
