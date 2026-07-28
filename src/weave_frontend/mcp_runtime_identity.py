@@ -40,6 +40,6 @@ def install_capability() -> None:
 
 @mcp.tool()
 def runtime_identity() -> dict[str, Any]:
-    """Report the exact path-redacted Jacquard runtime and capability identity."""
+    """Report exact runtime identity with configuration values redacted."""
 
     return _result(runtime_identities().report)
