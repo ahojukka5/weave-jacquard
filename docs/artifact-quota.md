@@ -19,6 +19,12 @@ The variable name is included in the content-derived public application manifest
 `runtime_identity` reports whether it is set and includes its opaque value ID
 without revealing the configured value.
 
+Every process writing to one shared artifact-root graph must use the same database
+directory and quota configuration. A process with the quota disabled or a different
+ceiling can intentionally admit a state another process would reject. Runtime
+identity makes configuration disagreement observable, but the lock file is not a
+persistent configuration registry and cannot repair mixed operator policy.
+
 ## Scope
 
 The aggregate ceiling covers completed logical regular-file bytes in:
@@ -40,11 +46,16 @@ operator who points separate Jacquard databases at overlapping artifact roots ha
 created unsupported independent publication domains and can exceed the intended
 ceiling.
 
+The public Python service classes and `weave-build` CLI are not silently placed
+inside the MCP application's lock domain. Embedded or CLI writers sharing these
+roots must either use the production composition or provide an equivalent explicit
+quota guard. The current guarantee is for the composed production MCP application.
+
 ## Admission algorithm
 
-A publisher first creates and verifies its temporary artifact directory using the
-normal process, protocol, checksum, and manifest limits. Immediately before atomic
-publication it then:
+A publisher creates its temporary artifact directory using the normal process,
+protocol, checksum, and manifest limits. Immediately before atomic publication it
+then:
 
 ```text
 acquire aggregate quota lock
@@ -54,7 +65,7 @@ acquire aggregate quota lock
 → measure the exact staged publication
 → calculate projected retained logical bytes
 → reject or enter the existing per-artifact publication lock
-→ publish atomically
+→ verify and publish atomically
 → release per-artifact lock
 → release aggregate quota lock
 ```
@@ -118,6 +129,7 @@ Other admission failures include:
 - `ARTIFACT_STORAGE_STAGE_NOT_FOUND`;
 - `ARTIFACT_STORAGE_STAGE_LIMIT_EXCEEDED`;
 - `ARTIFACT_STORAGE_QUOTA_ROOT_LIMIT_EXCEEDED`;
+- `ARTIFACT_STORAGE_QUOTA_LOCK_UNAVAILABLE`;
 - normal bounded storage scan failures.
 
 No branch or revision database state is changed by artifact quota refusal because
@@ -130,15 +142,19 @@ before their final atomic directory move.
 accounting:
 
 - enabled state and ceiling;
-- current and available bytes;
-- already-exceeded state;
+- retained `current_logical_bytes` used for admission;
+- public `observed_logical_bytes`, including root-level internal staging;
+- the corresponding `internal_logical_bytes` difference;
+- available bytes and already-exceeded state;
 - enforcement mode;
 - opaque lock ID;
+- retained-storage snapshot ID;
 - quota policy ID;
 - combined quota snapshot ID.
 
-The report is diagnostic. Publication always remeasures under the lock rather than
-trusting an earlier snapshot.
+The public storage view and retained quota view are each bounded scans performed
+under the same interprocess lock. The report is diagnostic. Publication always
+remeasures under the lock rather than trusting an earlier snapshot.
 
 ## Remaining storage work
 
@@ -150,4 +166,5 @@ operator capabilities include:
 - explicit dry-run deletion plans;
 - guarded garbage collection and quarantine recovery;
 - temporary staging and physical-block limits;
-- SQLite file and backup-storage policy.
+- SQLite file and backup-storage policy;
+- a typed runtime container that removes the current cached-service adaptation.
