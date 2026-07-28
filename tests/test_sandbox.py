@@ -35,8 +35,11 @@ def test_missing_bubblewrap_reports_unavailable_and_refuses_execution(
     assert capabilities["available"] is False
     assert capabilities["policy"]["network"] == "deny"
     assert capabilities["policy"]["filesystem"] == "isolated"
+    assert capabilities["policy"]["process_creation"] == "deny"
+    assert capabilities["policy"]["max_processes"] == 1
     assert capabilities["policy"]["seccomp"] is False
-    assert capabilities["resource_limits"]["process_count"] is False
+    assert capabilities["resource_limits"]["process_count"] is True
+    assert capabilities["resource_limits"]["aggregate_memory"] is False
     assert capabilities["policy_hash"]
 
     executable = tmp_path / "program"
@@ -45,6 +48,32 @@ def test_missing_bubblewrap_reports_unavailable_and_refuses_execution(
     with pytest.raises(ValidationError) as raised:
         sandbox.run(executable, [], b"", _limits())
     assert raised.value.code == "SANDBOX_UNAVAILABLE"
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["timeout_ms", "max_memory_bytes", "max_output_bytes", "max_file_bytes"],
+)
+def test_sandbox_limits_require_positive_integers(name: str) -> None:
+    values = {
+        "timeout_ms": 2_000,
+        "max_memory_bytes": 256 * 1024 * 1024,
+        "max_output_bytes": 64 * 1024,
+        "max_file_bytes": 1024 * 1024,
+    }
+    values[name] = 0
+
+    with pytest.raises(ValidationError) as raised:
+        SandboxLimits(**values)
+
+    assert raised.value.code == "INVALID_SANDBOX_LIMIT"
+
+
+def test_sandbox_limits_reject_boolean_values() -> None:
+    with pytest.raises(ValidationError) as raised:
+        _limits(timeout_ms=True)
+
+    assert raised.value.code == "INVALID_SANDBOX_LIMIT"
 
 
 def test_collector_allows_exact_limit_and_stops_excess_output() -> None:
@@ -102,7 +131,10 @@ def test_collector_enforces_wall_timeout() -> None:
     assert output_limited is False
 
 
-@pytest.mark.skipif(shutil.which("bwrap") is None, reason="bubblewrap not installed")
+_STRICT_SANDBOX_UNAVAILABLE = shutil.which("bwrap") is None or shutil.which("prlimit") is None
+
+
+@pytest.mark.skipif(_STRICT_SANDBOX_UNAVAILABLE, reason="bubblewrap or prlimit not installed")
 def test_bubblewrap_denies_host_files_and_host_network(tmp_path: Path) -> None:
     sandbox = BubblewrapSandbox()
     capabilities = sandbox.capabilities()
@@ -143,7 +175,7 @@ port=$2
 if [[ -e "$secret" ]]; then
     exit 80
 fi
-if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
+if { exec 3<>"/dev/tcp/127.0.0.1/$port"; } 2>/dev/null; then
     exit 81
 fi
 printf 'isolated\n'
@@ -165,3 +197,33 @@ printf 'isolated\n'
     assert result.timed_out is False
     assert result.output_limited is False
     assert os.path.exists(secret)
+
+
+@pytest.mark.skipif(_STRICT_SANDBOX_UNAVAILABLE, reason="bubblewrap or prlimit not installed")
+def test_bubblewrap_denies_process_creation() -> None:
+    sandbox = BubblewrapSandbox()
+    capabilities = sandbox.capabilities()
+    if not capabilities["available"]:
+        pytest.skip(str(capabilities["probe_error"]))
+
+    bash = shutil.which("bash")
+    assert bash is not None
+    script = r'''
+if [[ "$(ulimit -u)" != "1" ]]; then
+    exit 82
+fi
+if ( : ) 2>/dev/null; then
+    exit 83
+fi
+printf 'single-process\n'
+'''
+    result = sandbox.run(
+        Path(bash),
+        ["-c", script],
+        b"",
+        _limits(),
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == b"single-process\n"
+    assert result.stderr == b""
