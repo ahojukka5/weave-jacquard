@@ -4,16 +4,61 @@ from __future__ import annotations
 
 from typing import Any
 
+from . import mcp_build as _build
 from . import mcp_server as _server
-from .concurrent_workspace import SExpressionWorkspace
+from .runtime_container import (
+    clear_runtime_compiler_bridge,
+    compiler_bridge_cache_info,
+    reset_runtime_services,
+    runtime_services,
+    workspace_cache_info,
+)
 
-# The base MCP workspace factory resolves this module global when first called.
-# Install the public race-safe subclass before any tool can populate its cache.
-_server.SExpressionWorkspace = SExpressionWorkspace
+
+def workspace() -> Any:
+    """Return the race-safe workspace owned by the typed process runtime."""
+
+    return runtime_services().workspace()
+
+
+def compiler_bridge() -> Any:
+    """Return the quota-capable compiler bridge owned by the typed process runtime."""
+
+    return runtime_services().compiler_bridge()
+
+
+workspace.cache_clear = reset_runtime_services  # type: ignore[attr-defined]
+workspace.cache_info = workspace_cache_info  # type: ignore[attr-defined]
+compiler_bridge.cache_clear = clear_runtime_compiler_bridge  # type: ignore[attr-defined]
+compiler_bridge.cache_info = compiler_bridge_cache_info  # type: ignore[attr-defined]
+
+
+def install_capability() -> None:
+    """Install runtime-backed factories before dependent capabilities are imported."""
+
+    _server.workspace = workspace
+    _build.workspace = workspace
+    _build.compiler_bridge = compiler_bridge
+    for factory in (
+        _build.edit_batches,
+        _build.branch_activity,
+        _build.revision_inspection,
+        _build.revision_diffs,
+        _build.merge_previews,
+        _build.build_inspection,
+        _build.build_targets,
+        _build.merge_impacts,
+        _build.merge_validations,
+        _build.merge_validation_sets,
+        _build.build_target_validator,
+    ):
+        factory.cache_clear()
+
+
+install_capability()
 
 mcp = _server.mcp
 _result = _server._result
-workspace = _server.workspace
 
 for _tool_name in (
     "program_create",

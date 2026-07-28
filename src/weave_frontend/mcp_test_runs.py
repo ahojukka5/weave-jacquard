@@ -9,7 +9,8 @@ from .mcp_build import build_targets, compiler_bridge
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_targets import test_targets
 from .quota_aware_test_runs import TestRunService
-from .sandbox import BubblewrapSandbox
+from .runtime_container import runtime_config
+from .runtime_sandbox import RuntimeBubblewrapSandbox
 from .test_runs import DEFAULT_TEST_RUN_OUTPUT_PAGE_BYTES
 
 
@@ -17,12 +18,14 @@ from .test_runs import DEFAULT_TEST_RUN_OUTPUT_PAGE_BYTES
 def test_runs() -> TestRunService:
     """Return the shared immutable sandboxed test-run service."""
 
+    config = runtime_config()
     return TestRunService(
         workspace(),
         build_targets(),
         test_targets(),
         compiler_bridge(),
-        BubblewrapSandbox(),
+        RuntimeBubblewrapSandbox.from_config(config),
+        run_root=config.test_run_root,
     )
 
 

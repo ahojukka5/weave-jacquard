@@ -104,9 +104,12 @@ annotations, icons, metadata, and a content-derived contract ID. The aggregate
 manifest has its own content-derived identity. This manifest—not a hand-maintained
 list in documentation—is the authoritative public surface.
 
-Application composition currently isolates FastMCP registry access in one module,
-but the underlying SDK registry is still private API. Replacing import-time service
-singletons with an explicit typed runtime container remains architectural work.
+Application composition isolates FastMCP registry access in one compatibility
+boundary. A frozen `RuntimeConfig` and explicit `RuntimeServices` container own the
+production workspace, SQLite connection, compiler bridge, executable discovery, and
+shutdown lifecycle. The first capability installs those runtime-backed factories
+before dependent modules are composed. Remaining dependent service caches are an
+incremental migration boundary rather than owners of separate runtime roots.
 
 ## 5. Structural programming model
 
@@ -377,13 +380,19 @@ Merge identities are layered:
 Only final user-facing `weavec` is part of the public compiler contract. Bootstrap
 stages must not leak into Jacquard's API.
 
+One process captures supported runtime configuration and executable discovery once.
+Every production service rooted in that process therefore observes the same
+database, artifact roots, compiler selection, sandbox selection, and quota policy.
+Applying configuration changes requires a new process and produces new runtime
+identity evidence.
+
 ## 15. Remaining boundaries and next milestones
 
 The highest-value remaining work is:
 
-1. **Runtime composition** — introduce typed immutable configuration, an explicit
-   service container, deterministic lifecycle management, and a compatibility
-   adapter around FastMCP private registry access.
+1. **Runtime service-graph completion** — migrate dependent module-local caches into
+   typed container fields, add explicit construction phases, and replace the
+   remaining import-time service adaptation without changing MCP contracts.
 2. **Database and artifact integrity** — complete snapshot and root-hash
    reconstruction, artifact reachability reconciliation, and bounded catalog
    evidence.
@@ -402,6 +411,6 @@ The highest-value remaining work is:
    SQLite only after measured workloads justify the complexity.
 
 More MCP convenience tools are not the current priority. Jacquard already has a
-broad public capability graph; the next phase is to make runtime composition,
-operations, storage, and compiler integration as explicit as its revision and
-qualification contracts.
+broad public capability graph; the next phase is to complete explicit runtime
+composition, operations, storage, and compiler integration with the same rigor as
+its revision and qualification contracts.

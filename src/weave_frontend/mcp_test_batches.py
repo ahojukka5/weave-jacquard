@@ -9,13 +9,19 @@ from .mcp_server import _result, mcp, workspace
 from .mcp_test_runs import test_runs
 from .mcp_test_targets import test_targets
 from .quota_aware_test_batches import TestBatchService
+from .runtime_container import runtime_config
 
 
 @lru_cache(maxsize=1)
 def test_batches() -> TestBatchService:
     """Return the shared immutable explicit test-batch service."""
 
-    return TestBatchService(workspace(), test_targets(), test_runs())
+    return TestBatchService(
+        workspace(),
+        test_targets(),
+        test_runs(),
+        batch_root=runtime_config().test_batch_root,
+    )
 
 
 @mcp.tool()

@@ -71,7 +71,11 @@ def test_quota_composition_attaches_one_guard_to_every_publisher(
         "workspace",
         lambda: SimpleNamespace(db=SimpleNamespace(path=tmp_path / "weave.db")),
     )
-    monkeypatch.setenv(ARTIFACT_QUOTA_ENV, "100")
+    monkeypatch.setattr(
+        composition,
+        "runtime_config",
+        lambda: SimpleNamespace(artifact_max_bytes=100),
+    )
     composition.artifact_quota.cache_clear()
     composition.artifact_storage.cache_clear()
 

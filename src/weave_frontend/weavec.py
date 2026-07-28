@@ -24,6 +24,7 @@ class WeavecValidator:
         timeout_seconds: int = 30,
         max_output_bytes: int = MAX_COMPILER_OUTPUT_BYTES,
         max_wir_bytes: int = MAX_WIR_BYTES,
+        environment_fallback: bool = True,
     ) -> None:
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
@@ -33,31 +34,37 @@ class WeavecValidator:
         ):
             if isinstance(value, bool) or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")
+        if not isinstance(environment_fallback, bool):
+            raise TypeError("environment_fallback must be boolean")
         self.source_root = Path(source_root).resolve() if source_root else None
+        self.environment_fallback = environment_fallback
         self.binary = self._resolve_binary(binary)
         self.timeout_seconds = timeout_seconds
         self.max_output_bytes = max_output_bytes
         self.max_wir_bytes = max_wir_bytes
 
     def _resolve_binary(self, binary: str | Path | None) -> Path | None:
-        configured = binary or os.environ.get("WEAVEC_BIN")
+        configured = binary
+        if configured is None and self.environment_fallback:
+            configured = os.environ.get("WEAVEC_BIN")
         candidates: list[Path] = []
         if configured:
             candidates.append(Path(configured).expanduser())
 
-        installed = shutil.which("weavec")
-        if installed:
-            candidates.append(Path(installed))
+        if self.environment_fallback:
+            installed = shutil.which("weavec")
+            if installed:
+                candidates.append(Path(installed))
 
-        if self.source_root is not None:
-            candidates.append(self.source_root / "build" / "weavec")
+            if self.source_root is not None:
+                candidates.append(self.source_root / "build" / "weavec")
 
-        candidates.extend(
-            [
-                Path.cwd() / "weavec" / "build" / "weavec",
-                Path.cwd().parent / "weavec" / "build" / "weavec",
-            ]
-        )
+            candidates.extend(
+                [
+                    Path.cwd() / "weavec" / "build" / "weavec",
+                    Path.cwd().parent / "weavec" / "build" / "weavec",
+                ]
+            )
         for candidate in candidates:
             if candidate.is_file() and os.access(candidate, os.X_OK):
                 return candidate.resolve()
@@ -66,7 +73,10 @@ class WeavecValidator:
     def _active_binary(self) -> Path | None:
         """Return a currently executable compiler, re-resolving stale paths."""
 
-        if self.binary is not None and self.binary.is_file() and os.access(self.binary, os.X_OK):
+        if self.binary is not None and self.binary.is_file() and os.access(
+            self.binary,
+            os.X_OK,
+        ):
             return self.binary
         self.binary = self._resolve_binary(None)
         return self.binary
