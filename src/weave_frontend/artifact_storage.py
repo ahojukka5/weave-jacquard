@@ -166,7 +166,11 @@ class ArtifactStorageService:
                         entry_path = Path(entry.path)
                         if entry_path in skipped_paths:
                             continue
-                        if exclude_internal_entries and entry.name.startswith("."):
+                        if (
+                            exclude_internal_entries
+                            and depth == 0
+                            and entry.name.startswith(".")
+                        ):
                             continue
                         try:
                             entry_stat = entry.stat(follow_symlinks=False)
