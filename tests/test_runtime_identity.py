@@ -16,6 +16,7 @@ from weave_frontend.runtime_identity import (
 
 class _Database:
     def __init__(self) -> None:
+        self.path = Path("/secret/database")
         self.busy_timeout_ms = 25
         self.connection = sqlite3.connect(":memory:")
         self.connection.execute("PRAGMA foreign_keys = ON")
@@ -95,6 +96,10 @@ def test_runtime_identity_binds_application_and_active_components() -> None:
             "busy_timeout_ms": 25,
             "journal_mode": "memory",
             "foreign_keys": True,
+            "location_id": RuntimeIdentityService._opaque_value_id(
+                "database_path",
+                str(workspace.db.path.resolve()),
+            ),
         }
         assert report["compiler"]["available"] is True
         assert report["compiler"]["binary"]["sha256"]
@@ -103,11 +108,19 @@ def test_runtime_identity_binds_application_and_active_components() -> None:
         assert report["configuration"] == {
             "variables": ["WEAVEC_BIN", "WEAVE_DB_PATH"],
             "configured_variables": ["WEAVEC_BIN"],
+            "value_ids": {
+                "WEAVEC_BIN": RuntimeIdentityService._opaque_value_id(
+                    "WEAVEC_BIN",
+                    "/secret/compiler",
+                )
+            },
             "values_redacted": True,
         }
         assert len(report["runtime_id"]) == 64
         assert report == service.report()
-        assert "/secret/compiler" not in json.dumps(report, sort_keys=True)
+        encoded = json.dumps(report, sort_keys=True)
+        assert "/secret/compiler" not in encoded
+        assert "/secret/database" not in encoded
     finally:
         workspace.db.connection.close()
 
@@ -131,6 +144,32 @@ def test_runtime_identity_changes_with_application_identity() -> None:
             environ={},
         ).report()
 
+        assert first["runtime_id"] != second["runtime_id"]
+    finally:
+        first_workspace.db.connection.close()
+        second_workspace.db.connection.close()
+
+
+def test_runtime_identity_changes_with_redacted_configuration_value() -> None:
+    first_workspace = _Workspace()
+    second_workspace = _Workspace()
+    try:
+        first = RuntimeIdentityService(
+            first_workspace,
+            _Compiler(),
+            _Sandbox(),
+            _application_manifest,
+            environ={"WEAVEC_BIN": "/first/compiler"},
+        ).report()
+        second = RuntimeIdentityService(
+            second_workspace,
+            _Compiler(),
+            _Sandbox(),
+            _application_manifest,
+            environ={"WEAVEC_BIN": "/second/compiler"},
+        ).report()
+
+        assert first["configuration"]["value_ids"] != second["configuration"]["value_ids"]
         assert first["runtime_id"] != second["runtime_id"]
     finally:
         first_workspace.db.connection.close()
