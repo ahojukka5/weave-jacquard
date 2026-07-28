@@ -46,20 +46,24 @@ The in-memory index has independent ceilings:
 | Limit | Value |
 |---|---:|
 | distinct forms | 16,384 |
+| bytes in one form name | 256 |
 | observed arities per form | 256 |
-| observed parents per form | 1,024 |
+| observed parents per form | 64 |
 | retained examples per form | 12 |
 | example render attempts | 4,096 |
 | nodes in one rendered example | 256 |
+| depth of one rendered example | 32 |
 | bytes in one rendered example | 64 KiB |
 | aggregate retained example bytes | 16 MiB |
 | retained parse-failure records | 256 |
 | bytes in one retained error message | 1 KiB |
+| bytes in one query, form, or parent filter | 4 KiB |
 | `grammar_help` result limit | 1–50 |
 
-Example subtree size is checked before rendering, so a large accepted program
-cannot force repeated rendering of complete subtrees. Counters continue to record
-total parse failures even after diagnostic retention reaches its ceiling.
+Example node count, depth, and a conservative rendered-byte upper bound are checked
+before rendering, so a large accepted program cannot force repeated materialization
+of complete or deeply indented subtrees. Counters continue to record total parse
+failures even after diagnostic retention reaches its ceiling.
 
 ## Truncation evidence
 
