@@ -19,15 +19,18 @@ MAX_GRAMMAR_CORPUS_FILES = 4_096
 MAX_GRAMMAR_CORPUS_BYTES = 64 * 1024 * 1024
 MAX_GRAMMAR_SOURCE_BYTES = MAX_SOURCE_BYTES
 MAX_GRAMMAR_FORMS = 16_384
+MAX_GRAMMAR_FORM_NAME_BYTES = 256
 MAX_GRAMMAR_ARITIES_PER_FORM = 256
-MAX_GRAMMAR_PARENTS_PER_FORM = 1_024
+MAX_GRAMMAR_PARENTS_PER_FORM = 64
 MAX_GRAMMAR_EXAMPLES_PER_FORM = 12
 MAX_GRAMMAR_EXAMPLE_ATTEMPTS = 4_096
 MAX_GRAMMAR_EXAMPLE_NODES = 256
+MAX_GRAMMAR_EXAMPLE_DEPTH = 32
 MAX_GRAMMAR_EXAMPLE_BYTES = 64 * 1024
 MAX_GRAMMAR_EXAMPLE_TOTAL_BYTES = 16 * 1024 * 1024
 MAX_GRAMMAR_PARSE_FAILURES = 256
 MAX_GRAMMAR_ERROR_BYTES = 1_024
+MAX_GRAMMAR_QUERY_BYTES = 4_096
 MAX_GRAMMAR_HELP_LIMIT = 50
 
 
@@ -199,7 +202,10 @@ class GrammarIndex:
         payload = text.encode("utf-8", errors="replace")
         if len(payload) <= MAX_GRAMMAR_ERROR_BYTES:
             return text
-        bounded = payload[:MAX_GRAMMAR_ERROR_BYTES].decode("utf-8", errors="ignore")
+        bounded = payload[:MAX_GRAMMAR_ERROR_BYTES].decode(
+            "utf-8",
+            errors="ignore",
+        )
         return bounded + "…"
 
     def _index_tree(self, root: JsonObject, path: Path) -> None:
@@ -218,6 +224,9 @@ class GrammarIndex:
             name = head_symbol(node)
             if name is None:
                 continue
+            if len(name.encode("utf-8")) > MAX_GRAMMAR_FORM_NAME_BYTES:
+                self.forms_truncated = True
+                continue
             info = self.forms.get(name)
             if info is None:
                 if len(self.forms) >= MAX_GRAMMAR_FORMS:
@@ -234,7 +243,11 @@ class GrammarIndex:
                     info.arities_truncated = True
 
             parent = parent_by_id.get(node["id"])
-            if parent and parent not in info.parents:
+            if (
+                parent
+                and len(parent.encode("utf-8")) <= MAX_GRAMMAR_FORM_NAME_BYTES
+                and parent not in info.parents
+            ):
                 if len(info.parents) < MAX_GRAMMAR_PARENTS_PER_FORM:
                     info.parents.add(parent)
                 else:
@@ -248,7 +261,7 @@ class GrammarIndex:
                 self.examples_truncated = True
                 continue
             self.example_attempts += 1
-            if not self._example_node_count_within_limit(node):
+            if not self._example_render_within_limits(node):
                 info.examples_truncated = True
                 self.examples_truncated = True
                 continue
@@ -279,9 +292,39 @@ class GrammarIndex:
                 self.example_bytes_retained += example_bytes
 
     @staticmethod
-    def _example_node_count_within_limit(node: JsonObject) -> bool:
-        for count, _ in enumerate(walk_nodes(node), start=1):
-            if count > MAX_GRAMMAR_EXAMPLE_NODES:
+    def _example_render_within_limits(root: JsonObject) -> bool:
+        node_count = 0
+        upper_bytes = 0
+        stack: list[tuple[JsonObject, int]] = [(root, 0)]
+        while stack:
+            node, depth = stack.pop()
+            node_count += 1
+            if (
+                node_count > MAX_GRAMMAR_EXAMPLE_NODES
+                or depth > MAX_GRAMMAR_EXAMPLE_DEPTH
+            ):
+                return False
+
+            if node.get("kind") == "list":
+                children = node.get("children", [])
+                upper_bytes += 2
+                if children:
+                    upper_bytes += max(0, len(children) - 1) * (2 * depth + 3)
+                    for child in reversed(children):
+                        stack.append((child, depth + 1))
+            else:
+                kind = node.get("kind")
+                value = node.get("value")
+                if kind == "string":
+                    upper_bytes += 2 + 2 * len(str(value).encode("utf-8"))
+                elif kind == "boolean":
+                    upper_bytes += 5
+                elif kind == "float":
+                    upper_bytes += len(repr(float(value)).encode("utf-8"))
+                else:
+                    upper_bytes += len(str(value).encode("utf-8"))
+
+            if upper_bytes > MAX_GRAMMAR_EXAMPLE_BYTES:
                 return False
         return True
 
@@ -294,6 +337,9 @@ class GrammarIndex:
         limit: int = 8,
     ) -> dict[str, Any]:
         self._validate_limit(limit)
+        self._validate_query_value("form", form)
+        self._validate_query_value("query", query)
+        self._validate_query_value("parent_form", parent_form)
         status = self.status()
         if form:
             info = self.forms.get(form)
@@ -322,7 +368,11 @@ class GrammarIndex:
             }
 
         if query:
-            return {**status, "query": query, "matches": self.search(query, limit=limit)}
+            return {
+                **status,
+                "query": query,
+                "matches": self.search(query, limit=limit),
+            }
 
         return {
             **status,
@@ -340,15 +390,24 @@ class GrammarIndex:
 
     def search(self, query: str, *, limit: int = 8) -> list[dict[str, Any]]:
         self._validate_limit(limit)
+        self._validate_query_value("query", query)
         needle = query.casefold()
         matches = [
             info
             for name, info in self.forms.items()
             if needle in name.casefold()
             or any(needle in parent.casefold() for parent in info.parents)
-            or any(needle in example["sexpr"].casefold() for example in info.examples)
+            or any(
+                needle in example["sexpr"].casefold()
+                for example in info.examples
+            )
         ]
-        matches.sort(key=lambda item: (not item.name.casefold().startswith(needle), item.name))
+        matches.sort(
+            key=lambda item: (
+                not item.name.casefold().startswith(needle),
+                item.name,
+            )
+        )
         return [info.as_dict(limit=2) for info in matches[:limit]]
 
     @staticmethod
@@ -361,6 +420,21 @@ class GrammarIndex:
             raise ValidationError(
                 "INVALID_GRAMMAR_HELP_LIMIT",
                 f"limit must be between 1 and {MAX_GRAMMAR_HELP_LIMIT}",
+            )
+
+    @staticmethod
+    def _validate_query_value(name: str, value: Any) -> None:
+        if value is None:
+            return
+        if not isinstance(value, str):
+            raise ValidationError(
+                "INVALID_GRAMMAR_HELP_QUERY",
+                f"{name} must be a string or null",
+            )
+        if len(value.encode("utf-8")) > MAX_GRAMMAR_QUERY_BYTES:
+            raise ValidationError(
+                "INVALID_GRAMMAR_HELP_QUERY",
+                f"{name} exceeds {MAX_GRAMMAR_QUERY_BYTES} UTF-8 bytes",
             )
 
     def hint_for_node(self, node: JsonObject) -> dict[str, Any] | None:
@@ -410,14 +484,17 @@ class GrammarIndex:
                 "source_bytes": MAX_GRAMMAR_SOURCE_BYTES,
                 "total_source_bytes": MAX_GRAMMAR_CORPUS_BYTES,
                 "forms": MAX_GRAMMAR_FORMS,
+                "form_name_bytes": MAX_GRAMMAR_FORM_NAME_BYTES,
                 "arities_per_form": MAX_GRAMMAR_ARITIES_PER_FORM,
                 "parents_per_form": MAX_GRAMMAR_PARENTS_PER_FORM,
                 "examples_per_form": MAX_GRAMMAR_EXAMPLES_PER_FORM,
                 "example_attempts": MAX_GRAMMAR_EXAMPLE_ATTEMPTS,
                 "example_nodes": MAX_GRAMMAR_EXAMPLE_NODES,
+                "example_depth": MAX_GRAMMAR_EXAMPLE_DEPTH,
                 "example_bytes": MAX_GRAMMAR_EXAMPLE_BYTES,
                 "total_example_bytes": MAX_GRAMMAR_EXAMPLE_TOTAL_BYTES,
                 "parse_failures": MAX_GRAMMAR_PARSE_FAILURES,
+                "query_bytes": MAX_GRAMMAR_QUERY_BYTES,
                 "help_limit": MAX_GRAMMAR_HELP_LIMIT,
             },
             "authority": "weavec surface sources and the weavec frontend validator",
