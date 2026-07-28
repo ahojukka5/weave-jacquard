@@ -203,7 +203,7 @@ def test_runtime_identity_capability_is_last_and_explicit() -> None:
 
     assert capability.name == "runtime_identity"
     assert capability.module == "weave_frontend.mcp_runtime_identity"
-    assert capability.depends_on == ("revision_reads", "test_runs")
+    assert capability.depends_on == ("revision_reads", "artifact_storage")
 
 
 def test_runtime_identity_has_dedicated_help_topic() -> None:
