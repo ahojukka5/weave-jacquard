@@ -7,7 +7,7 @@ import pytest
 
 from weave_frontend.artifact_quota import ArtifactQuotaService
 from weave_frontend.artifact_storage import ArtifactStorageService
-from weave_frontend.errors import ValidationError
+from weave_frontend.errors import ArtifactQuotaExceededError, ValidationError
 
 
 def _quota(
@@ -66,7 +66,7 @@ def test_hidden_files_inside_completed_artifacts_remain_in_quota(tmp_path: Path)
     (temporary / "artifact").write_bytes(b"abc")
     quota = _quota(root, max_bytes=6)
 
-    with pytest.raises(Exception) as captured:
+    with pytest.raises(ArtifactQuotaExceededError) as captured:
         with quota.admit(
             family="committed_builds",
             temporary=temporary,
@@ -74,7 +74,7 @@ def test_hidden_files_inside_completed_artifacts_remain_in_quota(tmp_path: Path)
         ):
             raise AssertionError("hidden retained bytes were not counted")
 
-    assert getattr(captured.value, "projected_bytes", None) == 7
+    assert captured.value.projected_bytes == 7
 
 
 def test_exact_stage_rejects_symlink_directory(tmp_path: Path) -> None:
@@ -119,7 +119,8 @@ def test_final_symlink_is_not_followed_for_replacement_accounting(
     root.mkdir()
     outside = tmp_path / "outside"
     outside.mkdir()
-    (outside / "artifact").write_bytes(b"123456789")
+    outside_artifact = outside / "artifact"
+    outside_artifact.write_bytes(b"123456789")
     final = root / ("a" * 32)
     final.symlink_to(outside, target_is_directory=True)
     temporary = root / ".new-stage"
@@ -135,3 +136,6 @@ def test_final_symlink_is_not_followed_for_replacement_accounting(
         assert evidence is not None
         assert evidence["current_bytes"] == 0
         assert evidence["staged_bytes"] == 3
+
+    assert final.is_symlink()
+    assert outside_artifact.read_bytes() == b"123456789"
