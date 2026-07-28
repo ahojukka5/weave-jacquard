@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 
+import weave_frontend.verified_database_backup as backup_module
 from weave_frontend.artifact_quota import ArtifactQuotaService
 from weave_frontend.artifact_storage import ArtifactStorageService
 from weave_frontend.database import Database
-from weave_frontend.errors import ArtifactIntegrityError, ArtifactQuotaExceededError
+from weave_frontend.errors import (
+    ArtifactIntegrityError,
+    ArtifactQuotaExceededError,
+    ValidationError,
+)
 from weave_frontend.mcp_capabilities import PUBLIC_CAPABILITIES
 from weave_frontend.verified_database_backup import DatabaseBackupService
 
@@ -91,6 +97,48 @@ def test_database_backup_quota_accounts_successful_publication(tmp_path: Path) -
         item for item in report["families"] if item["family"] == "database_backups"
     )
     assert family["logical_bytes"] == report["aggregate"]["logical_bytes"]
+
+
+def test_database_backup_quota_retries_a_disappeared_matching_stage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backup_root = tmp_path / "backups"
+    with _initialized_database(tmp_path / "source.db") as database:
+        service = DatabaseBackupService(database, backup_root=backup_root)
+        backup = service.create()
+        final = backup_root / backup["backup_id"]
+        valid_stage = backup_root / ".database-backup-valid"
+        shutil.copytree(final, valid_stage)
+        missing_stage = backup_root / ".database-backup-missing"
+        service.artifact_quota = _quota(backup_root, max_bytes=100 * 1024 * 1024)
+        monkeypatch.setattr(
+            service,
+            "_quota_stages",
+            lambda _final: (missing_stage, valid_stage),
+        )
+
+        with service._publication_lock(final):
+            pass
+
+
+def test_database_backup_matching_stage_count_is_bounded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backup_root = tmp_path / "backups"
+    with _initialized_database(tmp_path / "source.db") as database:
+        service = DatabaseBackupService(database, backup_root=backup_root)
+        backup = service.create()
+        final = backup_root / backup["backup_id"]
+        for suffix in ("first", "second"):
+            shutil.copytree(final, backup_root / f".database-backup-{suffix}")
+        monkeypatch.setattr(backup_module, "MAX_DATABASE_BACKUP_STAGES", 1)
+
+        with pytest.raises(ValidationError) as captured:
+            service._quota_stages(final)
+
+    assert captured.value.code == "ARTIFACT_STORAGE_STAGE_LIMIT_EXCEEDED"
 
 
 def test_database_backup_rejects_unbound_extra_files(tmp_path: Path) -> None:
