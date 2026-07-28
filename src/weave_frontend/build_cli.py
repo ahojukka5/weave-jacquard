@@ -10,6 +10,7 @@ from typing import Any
 
 from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
+from .database_integrity import inspect_database
 from .errors import ConflictError, ValidationError, WeaveFrontendError
 from .sexpr_service import SExpressionWorkspace
 from .target_validation import BuildTargetValidator
@@ -106,12 +107,20 @@ def build_parser() -> argparse.ArgumentParser:
     source_list.add_argument("project")
     _add_revision_selector(source_list)
 
+    subcommands.add_parser(
+        "db-check",
+        help="inspect database integrity read-only without running migrations",
+    )
+
     get = subcommands.add_parser("get", help="read a stored build manifest")
     get.add_argument("build_id")
     return parser
 
 
 def _execute(args: argparse.Namespace) -> Any:
+    if args.command == "db-check":
+        return inspect_database(args.db)
+
     with SExpressionWorkspace(args.db, weavec_binary=args.weavec) as workspace:
         targets = BuildTargetRegistry(workspace)
         bridge_instance: CompilerBridge | None = None
@@ -210,6 +219,8 @@ def main() -> None:
         )
         raise SystemExit(2) from None
     print(json.dumps(result, indent=2, sort_keys=True))
+    if args.command == "db-check" and result.get("valid") is not True:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

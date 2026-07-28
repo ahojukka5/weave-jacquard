@@ -12,7 +12,9 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-SCHEMA_VERSION = 2
+from .database_integrity import inspect_connection, require_migration_integrity
+
+SCHEMA_VERSION = 3
 _SNAPSHOT_RAW = b"WJR1"
 _SNAPSHOT_ZLIB = b"WJZ1"
 
@@ -120,7 +122,90 @@ CREATE TABLE IF NOT EXISTS revision_documents (
 
 CREATE INDEX IF NOT EXISTS idx_documents_scope ON documents(scope_kind, scope_name);
 CREATE INDEX IF NOT EXISTS idx_operations_revision ON operations(revision_id, sequence_number);
-PRAGMA user_version = 2;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_operations_revision_sequence
+ON operations(revision_id, sequence_number);
+
+CREATE TRIGGER IF NOT EXISTS revisions_validate_parent_projects_insert
+BEFORE INSERT ON revisions
+BEGIN
+    SELECT RAISE(ABORT, 'parent1 revision does not belong to project')
+    WHERE NEW.parent1_id IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1 FROM revisions parent
+          WHERE parent.id = NEW.parent1_id
+            AND parent.project_id = NEW.project_id
+      );
+    SELECT RAISE(ABORT, 'parent2 revision does not belong to project')
+    WHERE NEW.parent2_id IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1 FROM revisions parent
+          WHERE parent.id = NEW.parent2_id
+            AND parent.project_id = NEW.project_id
+      );
+END;
+
+CREATE TRIGGER IF NOT EXISTS revisions_validate_parent_projects_update
+BEFORE UPDATE OF project_id, parent1_id, parent2_id ON revisions
+BEGIN
+    SELECT RAISE(ABORT, 'parent1 revision does not belong to project')
+    WHERE NEW.parent1_id IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1 FROM revisions parent
+          WHERE parent.id = NEW.parent1_id
+            AND parent.project_id = NEW.project_id
+      );
+    SELECT RAISE(ABORT, 'parent2 revision does not belong to project')
+    WHERE NEW.parent2_id IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1 FROM revisions parent
+          WHERE parent.id = NEW.parent2_id
+            AND parent.project_id = NEW.project_id
+      );
+    SELECT RAISE(ABORT, 'revision project change would orphan a child')
+    WHERE EXISTS (
+        SELECT 1 FROM revisions child
+        WHERE (child.parent1_id = NEW.id OR child.parent2_id = NEW.id)
+          AND child.project_id <> NEW.project_id
+    );
+    SELECT RAISE(ABORT, 'revision project change would orphan a branch')
+    WHERE EXISTS (
+        SELECT 1 FROM branches branch
+        WHERE branch.head_revision_id = NEW.id
+          AND branch.project_id <> NEW.project_id
+    );
+END;
+
+CREATE TRIGGER IF NOT EXISTS branches_validate_project_insert
+BEFORE INSERT ON branches
+BEGIN
+    SELECT RAISE(ABORT, 'branch project does not exist')
+    WHERE NOT EXISTS (
+        SELECT 1 FROM projects project WHERE project.id = NEW.project_id
+    );
+    SELECT RAISE(ABORT, 'branch head revision does not belong to project')
+    WHERE NOT EXISTS (
+        SELECT 1 FROM revisions revision
+        WHERE revision.id = NEW.head_revision_id
+          AND revision.project_id = NEW.project_id
+    );
+END;
+
+CREATE TRIGGER IF NOT EXISTS branches_validate_project_update
+BEFORE UPDATE OF project_id, head_revision_id ON branches
+BEGIN
+    SELECT RAISE(ABORT, 'branch project does not exist')
+    WHERE NOT EXISTS (
+        SELECT 1 FROM projects project WHERE project.id = NEW.project_id
+    );
+    SELECT RAISE(ABORT, 'branch head revision does not belong to project')
+    WHERE NOT EXISTS (
+        SELECT 1 FROM revisions revision
+        WHERE revision.id = NEW.head_revision_id
+          AND revision.project_id = NEW.project_id
+    );
+END;
+
+PRAGMA user_version = 3;
 """
 
 
@@ -161,6 +246,12 @@ class Database:
                 "database schema version "
                 f"{current_version} is newer than supported version {SCHEMA_VERSION}"
             )
+        if current_version < SCHEMA_VERSION and self._has_existing_schema():
+            try:
+                require_migration_integrity(self.connection)
+            except Exception:
+                self.connection.close()
+                raise
         self.connection.create_function(
             "weave_compress_json",
             1,
@@ -177,6 +268,12 @@ class Database:
         if migrated:
             self.connection.execute("VACUUM")
         self.connection.executescript(SCHEMA)
+
+    def _has_existing_schema(self) -> bool:
+        row = self.connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'revisions'"
+        ).fetchone()
+        return row is not None
 
     def _migrate_module_snapshots(self) -> bool:
         row = self.connection.execute(
@@ -269,6 +366,11 @@ class Database:
             self.connection.rollback()
             raise
         return True
+
+    def integrity_report(self) -> dict[str, Any]:
+        """Return a read-only bounded integrity report for the open database."""
+
+        return inspect_connection(self.connection, path=self.path.resolve())
 
     def close(self) -> None:
         self.connection.close()
