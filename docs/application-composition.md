@@ -55,10 +55,10 @@ listed above. Unknown fields are rejected rather than silently excluded from the
 identity.
 
 The normalizer accepts JSON primitives, finite numbers, string-keyed mappings,
-sequences, dataclasses, enums, and Pydantic values through `model_dump(mode="json")`.
-Unsupported values, failed model serialization, non-finite numbers, non-string
-keys, missing input schemas, and non-mapping output schemas are startup errors
-rather than silently omitted contract data.
+sequences, dataclasses, enums, and Pydantic values through
+`model_dump(mode="json")`. Unsupported values, failed model serialization,
+non-finite numbers, non-string keys, missing input schemas, and non-mapping output
+schemas are startup errors rather than silently omitted contract data.
 
 The manifest is API evidence. It does not hash the Python implementation, service
 state, compiler binary, database contents, or runtime artifact paths.
@@ -75,6 +75,28 @@ Its `application_id` therefore changes when the public tool contract, capability
 graph, or configuration surface changes. It is not a security token, release
 version, or proof that every tool behaves correctly. Syntax, unit, real-MCP,
 packaged-compiler, sandbox, and native execution qualification remain required.
+
+## Runtime identity v1
+
+The application manifest intentionally excludes live component values. The public
+`runtime_identity` tool adds a separate content-derived live report that binds:
+
+- `application_id`, `tool_manifest_id`, tool count, and capability count;
+- Jacquard, Python, and MCP versions;
+- Python executable hash;
+- database schema and connection policy;
+- final compiler binary hash and bounded version evidence;
+- sandbox policy and Bubblewrap and `prlimit` binary hashes;
+- which public configuration variables are set, without revealing their values.
+
+The runtime identity tool is itself part of the tool manifest. Its function reads
+the completed public application manifest lazily only when called. There is no
+hash cycle: the application ID binds the tool contract, while the runtime ID binds
+the already completed application ID and current component evidence.
+
+Runtime identity is diagnostic and audit-correlation evidence. It is not a
+qualification result. See [runtime identity](runtime-identity.md) and
+[qualification](qualification.md).
 
 ## Startup invariant
 
@@ -151,7 +173,8 @@ runtime variables:
 
 The names are validated as a unique lexical set before the application identity is
 computed. Paths and secrets are intentionally absent from public composition
-metadata. Runtime artifact manifests continue to bind the exact compiler,
+metadata. Runtime identity reports only the subset of variable names whose values
+are non-empty. Runtime artifact manifests continue to bind exact compiler,
 executable, sandbox, and content hashes where those identities matter.
 
 ## Contributor rules
@@ -162,5 +185,5 @@ executable, sandbox, and content hashes where those identities matter.
   and real-MCP qualification.
 - Keep schemas and metadata JSON-canonical and deterministic.
 - Do not add environment values or server-local paths to public application
-  manifests.
+  manifests or runtime identity reports.
 - Preserve `weavec` as the authoritative compiler and language implementation.
