@@ -1,7 +1,8 @@
 # Artifact storage accounting
 
 The `artifact_storage_report` MCP tool measures the complete logical footprint of
-all retained artifact families used by one live Jacquard server.
+all retained artifact families used by one live Jacquard server and reports the
+active aggregate publication quota.
 
 ## Included families
 
@@ -19,7 +20,7 @@ does not infer paths independently from environment variables.
 
 ## Logical accounting
 
-The report counts:
+The public report counts:
 
 - logical bytes in regular files;
 - regular-file count;
@@ -36,6 +37,12 @@ links may use a different number of physical blocks.
 Symlinks are counted but never followed. FIFOs, devices, sockets, and other
 non-regular entries are counted as special entries and contribute no logical file
 bytes.
+
+The public operational report includes dot-prefixed temporary, lock, and
+quarantine entries. Quota admission separately excludes those internal entries and
+adds only the exact staged publication under review. This distinction prevents
+concurrent staging from consuming retained quota before publication while keeping
+temporary filesystem use visible to operators.
 
 ## Nested roots
 
@@ -96,23 +103,34 @@ IDs, nesting assignments, limits, and accounting semantics. The report contains 
 timestamp or random value. Repeated scans of unchanged stores and configuration
 produce the same ID.
 
-The filesystem is not frozen while a report runs. The result is a bounded
-read-only operational snapshot, not a transactional publication admission token.
-Immutable completed artifacts should remain stable, while concurrent temporary
-publication content may appear or disappear between reports.
+The quota section adds:
+
+- whether aggregate admission is enabled;
+- the configured logical-byte ceiling;
+- current and available logical bytes;
+- whether existing retained content already exceeds the ceiling;
+- a path-redacted interprocess lock ID;
+- content-derived quota policy and combined snapshot IDs.
+
+The filesystem is not frozen while a public report runs. The result is a bounded
+read-only operational snapshot. Publication admission performs a new scan while
+holding the quota lock and is never authorized by an earlier report ID.
 
 ## Policy boundary
 
-This capability provides the accounting prerequisite for storage policy. It does
-not yet:
+When `WEAVE_ARTIFACT_MAX_BYTES` is configured, all six production MCP publishers
+use one shared interprocess admission lock and reject projected overflow before the
+normal atomic publication step. See [artifact quota](artifact-quota.md).
 
-- reject new publication based on aggregate bytes;
-- reserve capacity across concurrent publishers;
-- delete or quarantine artifacts;
-- implement retention or garbage collection;
+The capability still does not:
+
+- delete or quarantine retained artifacts as policy action;
+- implement age- or reachability-based retention;
 - measure physical filesystem blocks;
-- include the SQLite database or external qualification evidence directories.
+- include the SQLite database or external qualification evidence directories;
+- bound temporary compiler and test staging bytes as a separate physical-storage
+  policy.
 
-Quota enforcement requires an interprocess reservation protocol around every
-artifact publication family. Retention and garbage collection additionally require
-verified reachability and explicit operator authorization.
+Retention and garbage collection require verified reachability and explicit
+operator authorization. Database and temporary-space ceilings require independent
+policies rather than being inferred from retained logical-byte quota.
