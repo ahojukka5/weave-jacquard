@@ -5,12 +5,13 @@ from weave_frontend import (
     ConflictError,
     MergeResult,
     NotFoundError,
-    SExpressionWorkspace,
     ValidationError,
     WeaveFrontendError,
     render_with_node_map,
     smallest_node_for_span,
 )
+
+from .workspace import SExpressionWorkspace
 
 JacquardError = WeaveFrontendError
 

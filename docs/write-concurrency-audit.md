@@ -46,9 +46,11 @@ branch row.
 ## Other writes
 
 Project initialization creates the project, initial revision, and main branch as
-one database operation. Explicit internal checkout intentionally moves a branch
-to a caller-selected project revision, but no public MCP checkout tool currently
-exists.
+one database operation. The internal revision service retains a low-level
+checkout primitive for controlled migration and recovery code, but it is exposed
+by neither MCP nor the public `weave_jacquard.SExpressionWorkspace` facade.
+Public historical work must use `branch_create_at_revision` or an immutable
+revert so branch movement remains explicit and auditable.
 
 Native builds and validations are pinned reads of immutable revisions and do not
 advance branches. Read-only tools do not participate in this audit.
