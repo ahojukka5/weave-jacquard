@@ -1,4 +1,4 @@
-"""Command-line access to revision-pinned native builds."""
+"""Command-line access to revision-pinned native builds and database operations."""
 
 from __future__ import annotations
 
@@ -10,6 +10,11 @@ from typing import Any
 
 from .build_targets import BuildTargetRegistry
 from .compiler_bridge import CompilerBridge
+from .database import Database
+from .database_backup import (
+    DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS,
+    DatabaseBackupService,
+)
 from .database_integrity import inspect_database
 from .errors import ConflictError, ValidationError, WeaveFrontendError
 from .sexpr_service import SExpressionWorkspace
@@ -26,6 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--db", type=Path, default=Path("weave.db"))
     parser.add_argument("--weavec", type=Path)
     parser.add_argument("--build-root", type=Path)
+    parser.add_argument("--backup-root", type=Path)
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     build = subcommands.add_parser(
@@ -112,14 +118,60 @@ def build_parser() -> argparse.ArgumentParser:
         help="inspect database integrity read-only without running migrations",
     )
 
+    database_backup = subcommands.add_parser(
+        "db-backup",
+        help="create and verify one immutable online SQLite backup",
+    )
+    database_backup.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS,
+    )
+
+    database_backup_get = subcommands.add_parser(
+        "db-backup-get",
+        help="read and reverify one immutable database backup",
+    )
+    database_backup_get.add_argument("backup_id")
+
+    database_restore = subcommands.add_parser(
+        "db-restore",
+        help="restore a verified backup to one new offline database path",
+    )
+    database_restore.add_argument("backup_id")
+    database_restore.add_argument("destination", type=Path)
+
     get = subcommands.add_parser("get", help="read a stored build manifest")
     get.add_argument("build_id")
     return parser
 
 
+def _backup_root(args: argparse.Namespace) -> Path:
+    if args.backup_root is not None:
+        return args.backup_root
+    return args.db.parent / ".weave-database-backups"
+
+
+def _offline_backup_store(args: argparse.Namespace) -> DatabaseBackupService:
+    return DatabaseBackupService(None, backup_root=_backup_root(args))
+
+
 def _execute(args: argparse.Namespace) -> Any:
     if args.command == "db-check":
         return inspect_database(args.db)
+    if args.command == "db-backup":
+        with Database(args.db) as database:
+            return DatabaseBackupService(
+                database,
+                backup_root=_backup_root(args),
+            ).create(timeout_seconds=args.timeout_seconds)
+    if args.command == "db-backup-get":
+        return _offline_backup_store(args).get(args.backup_id)
+    if args.command == "db-restore":
+        return _offline_backup_store(args).restore(
+            args.backup_id,
+            args.destination,
+        )
 
     with SExpressionWorkspace(args.db, weavec_binary=args.weavec) as workspace:
         targets = BuildTargetRegistry(workspace)
