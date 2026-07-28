@@ -14,22 +14,37 @@ contract can be identified. The report binds:
 - capability count;
 - Python implementation, version, and executable hash;
 - MCP SDK version;
-- SQLite schema version, busy timeout, journal mode, and foreign-key policy;
+- SQLite schema version, busy timeout, journal mode, foreign-key policy, and an
+  opaque database-location ID;
 - final `weavec` binary hash and bounded `--version` identity;
 - strict sandbox capability report and Bubblewrap and `prlimit` binary hashes;
-- the public configuration-variable names and which ones are set;
+- the public configuration-variable names, which ones are set, and opaque IDs for
+  their values;
 - one content-derived runtime ID covering the complete report.
 
 The application and tool-manifest IDs come from the completed public composition,
 not from a parallel hand-maintained inventory.
 
-## Redaction
+## Redaction and opaque configuration IDs
 
-Configuration values are never returned. The report exposes only:
+Configuration values are never returned. The report exposes:
 
 - the configuration-variable names already bound into the application manifest;
 - the subset whose values are non-empty;
+- a domain-separated SHA-256 value ID for each configured value;
+- a domain-separated ID for the resolved database location;
 - component hashes and public capability evidence.
+
+The value ID input is:
+
+```text
+weave-jacquard-configuration-value-v1 NUL variable-name NUL value
+```
+
+This lets two runtime reports prove whether their configuration values match
+without revealing the values themselves. The IDs are identity evidence rather
+than password hashes: path-like configuration values may have low entropy and
+must not be treated as secrets solely because only their hashes are returned.
 
 Compiler resolution failures are normalized by error code. Configured executable
 paths and raw filesystem exception text are not returned.
@@ -70,10 +85,11 @@ The ID changes when any bound component changes, including:
 - application or tool contract;
 - Jacquard, MCP, or Python version;
 - Python, compiler, Bubblewrap, or `prlimit` binary content;
-- database runtime policy;
+- database location or runtime policy;
 - compiler version evidence;
 - sandbox policy or availability;
-- which public configuration variables are set.
+- which public configuration variables are set;
+- any configured public value, through its opaque value ID.
 
 The report intentionally contains no wall-clock timestamp, random identifier, or
 mutable counter, so repeated calls against an unchanged process return the same
