@@ -20,6 +20,8 @@ ARTIFACT_QUOTA_POLICY_FORMAT = "weave-artifact-quota-policy-v1"
 ARTIFACT_QUOTA_LOCK_ID_FORMAT = "weave-artifact-quota-lock-v1"
 ARTIFACT_QUOTA_ENV = "WEAVE_ARTIFACT_MAX_BYTES"
 MAX_ARTIFACT_QUOTA_BYTES = 9_223_372_036_854_775_807
+MAX_ARTIFACT_QUOTA_ROOT_ENTRIES = 65_536
+MAX_ARTIFACT_STAGED_CANDIDATES = 16
 
 
 def parse_artifact_quota(value: str | None) -> int | None:
@@ -68,13 +70,13 @@ def artifact_quota_publication_lock(
     family: str,
     final: Path,
 ) -> Iterator[dict[str, Any] | None]:
-    """Admit already-staged root content and hold the global lock through publication."""
+    """Admit an existing temporary-prefix stage and hold the global lock."""
 
     quota = _attached_quota(owner)
     if quota is None:
         yield None
         return
-    with quota.admit_staged_root(family=family, final=final) as evidence:
+    with quota.admit_staged_prefix(family=family, final=final) as evidence:
         yield evidence
 
 
@@ -173,12 +175,10 @@ class ArtifactQuotaService:
         with self._lock():
             current_report = self.accounting._report(
                 excluded_paths=(temporary_path, final_path),
+                exclude_internal_entries=True,
             )
-            staged_report = ArtifactStorageService(
-                {"staged_publication": temporary_path}
-            ).report()
+            staged_bytes = self._logical_bytes(temporary_path)
             current_bytes = int(current_report["aggregate"]["logical_bytes"])
-            staged_bytes = int(staged_report["aggregate"]["logical_bytes"])
             projected_bytes = current_bytes + staged_bytes
             self._require_within_quota(
                 family=family,
@@ -195,13 +195,13 @@ class ArtifactQuotaService:
             )
 
     @contextmanager
-    def admit_staged_root(
+    def admit_staged_prefix(
         self,
         *,
         family: str,
         final: Path,
     ) -> Iterator[dict[str, Any] | None]:
-        """Admit when staging already resides under an accounted family root."""
+        """Admit a service whose temporary directory is named from its final ID."""
 
         if self.max_bytes is None:
             yield None
@@ -209,26 +209,78 @@ class ArtifactQuotaService:
 
         root = self._family_root(family)
         final_path = self._contained_path(final, root, subject="final")
+        prefix = f".{final_path.name}-"
         with self._lock():
-            projected_report = self.accounting._report(excluded_paths=(final_path,))
-            projected_bytes = int(projected_report["aggregate"]["logical_bytes"])
-            current_report = self.accounting._report(excluded_paths=())
+            staged = self._staged_directories(root, prefix=prefix)
+            if not staged:
+                raise ValidationError(
+                    "ARTIFACT_STORAGE_STAGE_NOT_FOUND",
+                    "artifact publication has no matching staged directory",
+                )
+            current_report = self.accounting._report(
+                excluded_paths=(final_path,),
+                exclude_internal_entries=True,
+            )
             current_bytes = int(current_report["aggregate"]["logical_bytes"])
-            replaced_bytes = max(0, current_bytes - projected_bytes)
-            staged_bytes = max(0, projected_bytes - (current_bytes - replaced_bytes))
+            staged_bytes = max(self._logical_bytes(path) for path in staged)
+            projected_bytes = current_bytes + staged_bytes
             self._require_within_quota(
                 family=family,
-                current_bytes=current_bytes - replaced_bytes,
+                current_bytes=current_bytes,
                 staged_bytes=staged_bytes,
                 projected_bytes=projected_bytes,
             )
             yield self._admission_evidence(
                 family=family,
-                current_bytes=current_bytes - replaced_bytes,
+                current_bytes=current_bytes,
                 staged_bytes=staged_bytes,
                 projected_bytes=projected_bytes,
-                storage_snapshot_id=projected_report["storage_snapshot_id"],
+                storage_snapshot_id=current_report["storage_snapshot_id"],
             )
+
+    def _staged_directories(self, root: Path, *, prefix: str) -> list[Path]:
+        result: list[Path] = []
+        try:
+            with os.scandir(root) as iterator:
+                for index, entry in enumerate(iterator):
+                    if index >= MAX_ARTIFACT_QUOTA_ROOT_ENTRIES:
+                        raise ValidationError(
+                            "ARTIFACT_STORAGE_QUOTA_ROOT_LIMIT_EXCEEDED",
+                            "artifact family root exceeds the bounded quota entry limit "
+                            f"{MAX_ARTIFACT_QUOTA_ROOT_ENTRIES}",
+                        )
+                    if not entry.name.startswith(prefix):
+                        continue
+                    try:
+                        metadata = entry.stat(follow_symlinks=False)
+                    except OSError as exc:
+                        raise ValidationError(
+                            "ARTIFACT_STORAGE_SCAN_FAILED",
+                            "artifact staging changed during quota admission",
+                        ) from exc
+                    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(
+                        metadata.st_mode
+                    ):
+                        continue
+                    result.append(Path(entry.path).resolve())
+                    if len(result) > MAX_ARTIFACT_STAGED_CANDIDATES:
+                        raise ValidationError(
+                            "ARTIFACT_STORAGE_STAGE_LIMIT_EXCEEDED",
+                            "artifact publication has too many matching staged directories",
+                        )
+        except ValidationError:
+            raise
+        except OSError as exc:
+            raise ValidationError(
+                "ARTIFACT_STORAGE_SCAN_FAILED",
+                "cannot enumerate artifact family staging",
+            ) from exc
+        return result
+
+    @staticmethod
+    def _logical_bytes(path: Path) -> int:
+        report = ArtifactStorageService({"staged_publication": path}).report()
+        return int(report["aggregate"]["logical_bytes"])
 
     def _family_root(self, family: str) -> Path:
         root = self.accounting.roots.get(family)
@@ -336,6 +388,8 @@ __all__ = [
     "ARTIFACT_QUOTA_POLICY_FORMAT",
     "ARTIFACT_QUOTA_REPORT_FORMAT",
     "MAX_ARTIFACT_QUOTA_BYTES",
+    "MAX_ARTIFACT_QUOTA_ROOT_ENTRIES",
+    "MAX_ARTIFACT_STAGED_CANDIDATES",
     "ArtifactQuotaService",
     "artifact_quota_admission",
     "artifact_quota_publication_lock",
