@@ -33,7 +33,8 @@ Jacquard owns:
 - canonical source and source maps;
 - revision, branch, context, task, checkpoint, and policy history;
 - compiler invocation bounds and protocol validation;
-- build, test, candidate, and attestation artifact integrity;
+- build, test, candidate, attestation, and database-backup artifact integrity;
+- aggregate retained-artifact accounting and publication quota admission;
 - optimistic concurrency and merge publication;
 - MCP application composition and exact public tool contracts.
 
@@ -86,7 +87,10 @@ capabilities. The graph currently covers:
 - revisioned task contracts and immutable reverts;
 - target-authoritative policy and preflight;
 - project agent status, merge queues, impact queues, and merge-train previews;
-- resume snapshots and bounded revision reads.
+- resume snapshots and bounded revision reads;
+- verified online database backup;
+- aggregate artifact storage accounting and quota admission;
+- content-derived runtime identity.
 
 Composition produces three deterministic snapshots:
 
@@ -297,8 +301,12 @@ Revert is a new immutable revision whose state matches an earlier selected state
 It preserves intervening history and produces normal publication evidence. Resume
 snapshots summarize pinned work state; they do not mutate branches.
 
-Verified backup and restore, artifact reconciliation, retention, and garbage
-collection remain operator capabilities to implement.
+The production server can create and reverify content-derived online SQLite
+backups. Restore is deliberately offline and publishes only to a new absent path.
+Database backups join builds, tests, qualifications, and attestations in the shared
+aggregate retained-artifact quota. Artifact reconciliation, retention, guarded
+garbage collection, and remote recovery replication remain operator capabilities
+to implement.
 
 ## 12. Resource limits
 
@@ -319,16 +327,17 @@ Compiler limits cover:
 - retained trace count, individual size, and aggregate size.
 
 Artifact metadata limits cover committed builds, virtual-candidate builds, test
-runs, test batches, virtual-candidate qualifications, and tested-merge
-attestations.
+runs, test batches, virtual-candidate qualifications, tested-merge attestations,
+and verified database backups. The production composition also enforces one
+optional aggregate retained logical-byte ceiling across all seven publishers.
 
 Grammar guidance independently bounds directory enumeration, corpus files and
 bytes, forms, relationships, example rendering, diagnostics, query size, and
 response fanout. Truncation is returned as evidence and never changes compiler
 language authority.
 
-Aggregate artifact-store quotas and SQLite file-size policy remain separate
-operator work.
+Live SQLite database size, temporary staging blocks, and physical filesystem
+allocation remain separate operator policy.
 
 ## 13. Qualification
 
@@ -375,11 +384,12 @@ The highest-value remaining work is:
 1. **Runtime composition** — introduce typed immutable configuration, an explicit
    service container, deterministic lifecycle management, and a compatibility
    adapter around FastMCP private registry access.
-2. **Database operations** — verified online backup and restore, complete snapshot
-   and root-hash reconstruction, artifact reconciliation, retention, and guarded
-   garbage collection.
-3. **Storage policy** — aggregate quotas and bounded catalog statistics for build,
-   test, candidate, attestation, and qualification roots.
+2. **Database and artifact integrity** — complete snapshot and root-hash
+   reconstruction, artifact reachability reconciliation, and bounded catalog
+   evidence.
+3. **Retention and storage operations** — explicit dry-run deletion plans, guarded
+   garbage collection, quarantine recovery, temporary/physical-space policy, and
+   live SQLite database-size policy.
 4. **Compiler capability contract** — consume a machine-readable grammar,
    capability, target, and language-version registry from `weavec` and remove
    observational corpus dependence.
