@@ -28,4 +28,6 @@ def test_native_ci_delegates_to_unified_qualification() -> None:
     assert "python -m pytest" not in workflow
     assert "qualification-summary.json" not in workflow
     assert "bubblewrap clang file llvm" in workflow
+    assert 'COMPILER_STAGE: ${{ runner.temp }}/jacquard-weavec-release' in workflow
+    assert '> "$COMPILER_STAGE/release-metadata.json"' in workflow
     assert "if-no-files-found: error" in workflow
