@@ -36,7 +36,13 @@ Before publication Jacquard verifies:
 - page size and page count;
 - journal mode;
 - the bounded database-integrity checker (`quick_check`, foreign keys, and
-  relational ownership / operation-sequence invariants).
+  relational ownership / operation-sequence invariants);
+- an exact two-file directory layout containing only `backup-manifest.json` and
+  `database.sqlite3` as regular files.
+
+The exact layout rule prevents unbound files from being retained outside the
+content-derived backup identity and makes concurrent stages for one backup ID
+byte-equivalent for quota admission.
 
 Process SQLite library version is not part of backup identity, so inspection and
 restore remain valid after a host upgrade when the database bytes are unchanged.
@@ -63,7 +69,7 @@ backup identity produce a different ID.
 The stored manifest always has `cached=false`. Cache state returned to a caller is
 response evidence and cannot be modified in an accepted immutable manifest.
 
-## Publication and durability
+## Publication, quota, and durability
 
 A backup is staged below the backup root, verified, and then published as:
 
@@ -77,6 +83,13 @@ The database file, manifest, temporary directory, and backup-root directory are
 synchronized before success is returned. Publication uses the same content-derived
 lock convention as other immutable artifact stores.
 
+When `WEAVE_ARTIFACT_MAX_BYTES` is configured in the production MCP application,
+verified database backups are the seventh family covered by the shared aggregate
+retained-artifact quota. Backup staging is matched to the final ID through the
+bounded, reverified manifest before the aggregate lock is acquired. Quota admission
+then measures the exact stage, excludes any replaceable final backup, and rejects
+projected overflow before entering the per-backup lock or moving the directory.
+
 The default root is:
 
 ```text
@@ -86,6 +99,11 @@ The default root is:
 Set `WEAVE_DATABASE_BACKUP_ROOT` or CLI `--backup-root` to use another location.
 The environment-variable name is included in the public application manifest, and
 runtime identity reports an opaque value ID when it is configured.
+
+The standalone `weave-build db-backup` command is intentionally outside the live
+MCP service composition. It is not automatically attached to the MCP process's
+quota lock; operators sharing one backup root must apply an equivalent explicit
+policy or use the production MCP backup tool.
 
 ## Offline restore
 
@@ -111,7 +129,8 @@ Restore refuses:
 - an existing `-wal`, `-shm`, or `-journal` sidecar;
 - a destination inside the backup store;
 - a corrupt backup or manifest;
-- a symlinked or non-regular backup file or directory.
+- a symlinked or non-regular backup file or directory;
+- an accepted backup directory containing unbound extra entries.
 
 It never replaces an existing file. After success, start a new Jacquard process
 with `WEAVE_DB_PATH` or `--db` pointing at the restored database.
@@ -133,7 +152,9 @@ Creation can fail with:
 - `DATABASE_BACKUP_TIMEOUT`;
 - `DATABASE_BACKUP_FAILED`;
 - `DATABASE_BACKUP_INTEGRITY_FAILED`;
-- `DATABASE_BACKUP_SIDECAR_RETAINED`.
+- `DATABASE_BACKUP_SIDECAR_RETAINED`;
+- `ARTIFACT_STORAGE_QUOTA_EXCEEDED` and bounded quota-stage failures when the
+  production aggregate quota is enabled.
 
 Restore can fail with:
 
