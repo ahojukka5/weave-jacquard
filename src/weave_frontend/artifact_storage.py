@@ -42,14 +42,15 @@ class ArtifactStorageService:
     def report(self) -> dict[str, Any]:
         """Return one complete path-redacted logical storage snapshot."""
 
-        return self._report(excluded_paths=())
+        return self._report(excluded_paths=(), exclude_internal_entries=False)
 
     def _report(
         self,
         *,
         excluded_paths: Iterable[str | Path],
+        exclude_internal_entries: bool = False,
     ) -> dict[str, Any]:
-        """Return accounting while omitting exact internal reservation subtrees."""
+        """Return complete accounting with optional internal-publication exclusion."""
 
         self._validate_distinct_roots()
         internal_exclusions = {Path(path).resolve() for path in excluded_paths}
@@ -73,6 +74,7 @@ class ArtifactStorageService:
                 path,
                 nested_root_names=sorted(nested),
                 skipped_paths=skipped_paths,
+                exclude_internal_entries=exclude_internal_entries,
                 entries_remaining=entries_remaining,
             )
             families.append(family)
@@ -123,6 +125,7 @@ class ArtifactStorageService:
         *,
         nested_root_names: list[str],
         skipped_paths: set[Path],
+        exclude_internal_entries: bool,
         entries_remaining: int,
     ) -> tuple[dict[str, Any], int]:
         try:
@@ -162,6 +165,8 @@ class ArtifactStorageService:
                         entries_scanned += 1
                         entry_path = Path(entry.path)
                         if entry_path in skipped_paths:
+                            continue
+                        if exclude_internal_entries and entry.name.startswith("."):
                             continue
                         try:
                             entry_stat = entry.stat(follow_symlinks=False)
