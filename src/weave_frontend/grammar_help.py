@@ -8,7 +8,7 @@ from typing import Any
 
 from .errors import ValidationError
 from .retained_artifact_io import (
-    RetainedArtifactReadError,
+    RetainedArtifactTooLarge,
     read_bounded_regular_bytes,
 )
 from .sexpr import JsonObject, head_symbol, parse_source, render_node, walk_nodes
@@ -22,6 +22,8 @@ MAX_GRAMMAR_FORMS = 16_384
 MAX_GRAMMAR_ARITIES_PER_FORM = 256
 MAX_GRAMMAR_PARENTS_PER_FORM = 1_024
 MAX_GRAMMAR_EXAMPLES_PER_FORM = 12
+MAX_GRAMMAR_EXAMPLE_ATTEMPTS = 4_096
+MAX_GRAMMAR_EXAMPLE_NODES = 256
 MAX_GRAMMAR_EXAMPLE_BYTES = 64 * 1024
 MAX_GRAMMAR_EXAMPLE_TOTAL_BYTES = 16 * 1024 * 1024
 MAX_GRAMMAR_PARSE_FAILURES = 256
@@ -65,6 +67,7 @@ class GrammarIndex:
         self.files_considered = 0
         self.files_scanned = 0
         self.bytes_scanned = 0
+        self.example_attempts = 0
         self.example_bytes_retained = 0
         self.parse_failure_count = 0
         self.parse_failures: list[dict[str, str]] = []
@@ -98,6 +101,7 @@ class GrammarIndex:
         self.files_considered = 0
         self.files_scanned = 0
         self.bytes_scanned = 0
+        self.example_attempts = 0
         self.example_bytes_retained = 0
         self.parse_failure_count = 0
         self.parse_failures.clear()
@@ -132,21 +136,32 @@ class GrammarIndex:
                     ),
                 )
                 continue
-            if self.bytes_scanned + size > MAX_GRAMMAR_CORPUS_BYTES:
+
+            remaining = MAX_GRAMMAR_CORPUS_BYTES - self.bytes_scanned
+            if remaining <= 0 or size > remaining:
                 self.corpus_truncated = True
                 break
+            read_limit = min(MAX_GRAMMAR_SOURCE_BYTES, remaining)
             try:
-                payload = read_bounded_regular_bytes(
-                    path,
-                    max_bytes=MAX_GRAMMAR_SOURCE_BYTES,
-                )
+                payload = read_bounded_regular_bytes(path, max_bytes=read_limit)
+            except RetainedArtifactTooLarge as exc:
+                if read_limit < MAX_GRAMMAR_SOURCE_BYTES:
+                    self.corpus_truncated = True
+                    break
+                self._record_failure(path, exc)
+                continue
+            except Exception as exc:  # corpus diagnostics must not disable help
+                self._record_failure(path, exc)
+                continue
+
+            self.bytes_scanned += len(payload)
+            try:
                 source = payload.decode("utf-8")
                 root = parse_source(source)
             except Exception as exc:  # corpus diagnostics must not disable help
                 self._record_failure(path, exc)
                 continue
             self.files_scanned += 1
-            self.bytes_scanned += len(payload)
             self._index_tree(root, path.relative_to(self.source_root))
 
     def _bounded_surface_paths(self, surface: Path) -> list[Path] | None:
@@ -228,6 +243,15 @@ class GrammarIndex:
             if len(info.examples) >= MAX_GRAMMAR_EXAMPLES_PER_FORM:
                 info.examples_truncated = True
                 continue
+            if self.example_attempts >= MAX_GRAMMAR_EXAMPLE_ATTEMPTS:
+                info.examples_truncated = True
+                self.examples_truncated = True
+                continue
+            self.example_attempts += 1
+            if not self._example_node_count_within_limit(node):
+                info.examples_truncated = True
+                self.examples_truncated = True
+                continue
             try:
                 sexpr = render_node(node)
             except Exception:
@@ -253,6 +277,13 @@ class GrammarIndex:
             if example not in info.examples:
                 info.examples.append(example)
                 self.example_bytes_retained += example_bytes
+
+    @staticmethod
+    def _example_node_count_within_limit(node: JsonObject) -> bool:
+        for count, _ in enumerate(walk_nodes(node), start=1):
+            if count > MAX_GRAMMAR_EXAMPLE_NODES:
+                return False
+        return True
 
     def help(
         self,
@@ -365,6 +396,7 @@ class GrammarIndex:
             "files_scanned": self.files_scanned,
             "bytes_scanned": self.bytes_scanned,
             "forms_indexed": len(self.forms),
+            "example_attempts": self.example_attempts,
             "example_bytes_retained": self.example_bytes_retained,
             "parse_failure_count": self.parse_failure_count,
             "parse_failures_retained": len(self.parse_failures),
@@ -381,6 +413,8 @@ class GrammarIndex:
                 "arities_per_form": MAX_GRAMMAR_ARITIES_PER_FORM,
                 "parents_per_form": MAX_GRAMMAR_PARENTS_PER_FORM,
                 "examples_per_form": MAX_GRAMMAR_EXAMPLES_PER_FORM,
+                "example_attempts": MAX_GRAMMAR_EXAMPLE_ATTEMPTS,
+                "example_nodes": MAX_GRAMMAR_EXAMPLE_NODES,
                 "example_bytes": MAX_GRAMMAR_EXAMPLE_BYTES,
                 "total_example_bytes": MAX_GRAMMAR_EXAMPLE_TOTAL_BYTES,
                 "parse_failures": MAX_GRAMMAR_PARSE_FAILURES,
