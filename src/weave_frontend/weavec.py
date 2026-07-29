@@ -38,6 +38,7 @@ class WeavecValidator:
             raise TypeError("environment_fallback must be boolean")
         self.source_root = Path(source_root).resolve() if source_root else None
         self.environment_fallback = environment_fallback
+        self._configured_binary = binary
         self.binary = self._resolve_binary(binary)
         self.timeout_seconds = timeout_seconds
         self.max_output_bytes = max_output_bytes
@@ -78,7 +79,10 @@ class WeavecValidator:
             os.X_OK,
         ):
             return self.binary
-        self.binary = self._resolve_binary(None)
+        # Prefer the snapshot/constructor path over env/PATH rediscovery so
+        # production validators with environment_fallback=False can recover when
+        # the configured binary becomes available after a transient absence.
+        self.binary = self._resolve_binary(self._configured_binary)
         return self.binary
 
     def validate(self, source: str) -> dict[str, Any]:

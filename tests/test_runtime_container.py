@@ -31,6 +31,7 @@ from weave_frontend.runtime_container import (
     runtime_services,
 )
 from weave_frontend.runtime_sandbox import RuntimeBubblewrapSandbox
+from weave_frontend.weavec import WeavecValidator
 
 
 class _Workspace:
@@ -95,9 +96,9 @@ def test_runtime_config_is_canonical_immutable_snapshot(tmp_path: Path) -> None:
     config = RuntimeConfig.from_environ(source)
     source["WEAVE_DB_PATH"] = "/changed-after-startup.db"
 
-    assert PUBLIC_CONFIGURATION_VARIABLES == tuple(
+    assert tuple(
         sorted(PUBLIC_CONFIGURATION_VARIABLES)
-    )
+    ) == PUBLIC_CONFIGURATION_VARIABLES
     assert config.configuration_variables == PUBLIC_CONFIGURATION_VARIABLES
     assert config.database_path == tmp_path / "workspace.db"
     assert config.artifact_max_bytes == 4096
@@ -321,3 +322,20 @@ def test_runtime_sandbox_paths_are_frozen_and_resolved(tmp_path: Path) -> None:
 
     assert sandbox.executable == bwrap.resolve()
     assert sandbox.prlimit == prlimit.resolve()
+
+
+def test_snapshot_validator_recovers_configured_binary_after_transient_absence(
+    tmp_path: Path,
+) -> None:
+    compiler = tmp_path / "weavec"
+    compiler.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    compiler.chmod(0o755)
+    validator = WeavecValidator(compiler, environment_fallback=False)
+    assert validator.binary == compiler.resolve()
+
+    compiler.unlink()
+    assert validator._active_binary() is None
+
+    compiler.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    compiler.chmod(0o755)
+    assert validator._active_binary() == compiler.resolve()
