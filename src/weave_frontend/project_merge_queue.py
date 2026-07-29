@@ -14,12 +14,15 @@ from .project_merge_catalog import (
     PROJECT_MERGE_CATALOG_FORMAT,
     ProjectMergeCatalogService,
 )
+from .revision_limits import (
+    MAX_PROJECT_MERGE_QUEUE_CONFLICTS,
+    MAX_PROJECT_MERGE_QUEUE_DOCUMENTS,
+    MAX_PROJECT_MERGE_QUEUE_PAGE,
+    require_bounded_int,
+)
 
 PROJECT_MERGE_QUEUE_FORMAT = "weave-project-merge-queue-v1"
 PROJECT_MERGE_QUEUE_CATALOG_FORMAT = PROJECT_MERGE_CATALOG_FORMAT
-MAX_PROJECT_MERGE_QUEUE_PAGE = 20
-MAX_PROJECT_MERGE_QUEUE_CONFLICTS = 100
-MAX_PROJECT_MERGE_QUEUE_DOCUMENTS = 200
 
 
 class ProjectMergeQueueService:
@@ -122,7 +125,16 @@ class ProjectMergeQueueService:
             "changed_document_limit": changed_document_limit,
             "returned_source_count": len(entries),
             "has_more": has_more,
+            "truncated": has_more,
             "next_after_source": selected[-1]["branch"] if has_more and selected else None,
+            "limits": {
+                "maximum_page_size": MAX_PROJECT_MERGE_QUEUE_PAGE,
+                "maximum_checkpoint_scan": MAX_AGENT_STATUS_CHECKPOINT_SCAN,
+                "maximum_conflicts_per_source": MAX_PROJECT_MERGE_QUEUE_CONFLICTS,
+                "maximum_changed_documents_per_source": (
+                    MAX_PROJECT_MERGE_QUEUE_DOCUMENTS
+                ),
+            },
             "sources": entries,
             "ordering": "lexical source branch name within one exact branch-head catalog",
             "readiness_note": (
@@ -237,16 +249,13 @@ class ProjectMergeQueueService:
 
     @staticmethod
     def _validate_limit(name: str, value: Any, maximum: int) -> None:
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or value < 1
-            or value > maximum
-        ):
-            raise ValidationError(
-                "INVALID_PROJECT_MERGE_QUEUE_LIMIT",
-                f"{name} must be an integer between 1 and {maximum}",
-            )
+        require_bounded_int(
+            value,
+            code="INVALID_PROJECT_MERGE_QUEUE_LIMIT",
+            name=name,
+            minimum=1,
+            maximum=maximum,
+        )
 
     @staticmethod
     def _validate_optional_id(name: str, value: Any) -> None:

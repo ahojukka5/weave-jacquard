@@ -5,10 +5,13 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any, Protocol
 
-from .errors import NotFoundError, ValidationError
+from .errors import NotFoundError
+from .revision_limits import (
+    MAX_REVISION_DIFF_PAGE_SIZE,
+    require_bounded_int,
+    require_nonnegative_int,
+)
 from .sexpr import head_symbol
-
-MAX_REVISION_DIFF_PAGE_SIZE = 200
 
 
 class _Workspace(Protocol):
@@ -47,8 +50,18 @@ class RevisionNodeDiffService:
     ) -> dict[str, Any]:
         """Return one immutable, deterministic page of stable-node changes."""
 
-        self._validate_start_index(start_index)
-        self._validate_limit(limit)
+        effective_start = require_nonnegative_int(
+            start_index,
+            code="INVALID_REVISION_DIFF_INDEX",
+            name="start_index",
+        )
+        effective_limit = require_bounded_int(
+            limit,
+            code="INVALID_REVISION_DIFF_LIMIT",
+            name="limit",
+            minimum=1,
+            maximum=MAX_REVISION_DIFF_PAGE_SIZE,
+        )
         self._require_project_revision(project, base_revision_id)
 
         branch_head = self.workspace.branch_head(project, branch)
@@ -73,8 +86,8 @@ class RevisionNodeDiffService:
             kind for change in changes for kind in change["change_kinds"]
         )
 
-        page = changes[start_index : start_index + limit]
-        next_index = start_index + len(page)
+        page = changes[effective_start : effective_start + effective_limit]
+        next_index = effective_start + len(page)
         has_more = next_index < len(changes)
         return {
             "project": project,
@@ -90,11 +103,13 @@ class RevisionNodeDiffService:
             "target_node_count": len(after),
             "total_change_count": len(changes),
             "change_kind_counts": dict(sorted(counts.items())),
-            "start_index": start_index,
-            "limit": limit,
+            "start_index": effective_start,
+            "limit": effective_limit,
             "returned_count": len(page),
             "has_more": has_more,
+            "truncated": has_more,
             "next_index": next_index if has_more else None,
+            "limits": {"maximum_page_size": MAX_REVISION_DIFF_PAGE_SIZE},
             "changes": page,
         }
 
@@ -197,25 +212,18 @@ class RevisionNodeDiffService:
 
     @staticmethod
     def _validate_start_index(start_index: int) -> None:
-        if (
-            isinstance(start_index, bool)
-            or not isinstance(start_index, int)
-            or start_index < 0
-        ):
-            raise ValidationError(
-                "INVALID_REVISION_DIFF_INDEX",
-                "start_index must be a non-negative integer",
-            )
+        require_nonnegative_int(
+            start_index,
+            code="INVALID_REVISION_DIFF_INDEX",
+            name="start_index",
+        )
 
     @staticmethod
     def _validate_limit(limit: int) -> None:
-        if isinstance(limit, bool) or not isinstance(limit, int):
-            raise ValidationError(
-                "INVALID_REVISION_DIFF_LIMIT",
-                "limit must be an integer",
-            )
-        if limit < 1 or limit > MAX_REVISION_DIFF_PAGE_SIZE:
-            raise ValidationError(
-                "INVALID_REVISION_DIFF_LIMIT",
-                f"limit must be between 1 and {MAX_REVISION_DIFF_PAGE_SIZE}",
-            )
+        require_bounded_int(
+            limit,
+            code="INVALID_REVISION_DIFF_LIMIT",
+            name="limit",
+            minimum=1,
+            maximum=MAX_REVISION_DIFF_PAGE_SIZE,
+        )

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from .errors import NotFoundError
+from .revision_limits import MAX_NODE_INSPECT_DEPTH, require_bounded_int
 from .sexpr import find_node, find_parent, head_symbol, render_node
 
 
@@ -38,6 +39,13 @@ class RevisionNodeInspectionService:
     ) -> dict[str, Any]:
         """Inspect a stable node without advancing or rewriting any branch."""
 
+        effective_depth = require_bounded_int(
+            depth,
+            code="INVALID_NODE_INSPECT_DEPTH",
+            name="depth",
+            minimum=0,
+            maximum=MAX_NODE_INSPECT_DEPTH,
+        )
         branch_head = self.workspace.branch_head(project, branch)
         selected_revision = revision_id or branch_head
         if revision_id is not None:
@@ -59,7 +67,7 @@ class RevisionNodeInspectionService:
             parent_id = None
             index = 0
 
-        subtree = self.workspace._truncate(node, max(0, depth))
+        subtree = self.workspace._truncate(node, effective_depth)
         return {
             "project": project,
             "document": document,
@@ -72,6 +80,8 @@ class RevisionNodeInspectionService:
             "head": head_symbol(node),
             "parent_id": parent_id,
             "position": index if parent_id else None,
+            "depth": effective_depth,
+            "limits": {"maximum_depth": MAX_NODE_INSPECT_DEPTH},
             "subtree": subtree,
             "annotated_weave": render_node(subtree, annotated=True),
             "grammar_hint": self.workspace.grammar.hint_for_node(node),

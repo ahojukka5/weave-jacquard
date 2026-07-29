@@ -7,9 +7,13 @@ from typing import Any
 from .build_targets import BUILD_TARGET_PREFIX, BuildTargetRegistry
 from .errors import ConflictError, ValidationError
 from .merge_preview import MergePreviewService
+from .revision_limits import (
+    MAX_MERGE_TARGET_IMPACT_PAGE_SIZE,
+    require_bounded_int,
+    require_nonnegative_int,
+)
 
 MERGE_TARGET_IMPACT_FORMAT = "weave-merge-target-impact-v1"
-MAX_MERGE_TARGET_IMPACT_PAGE_SIZE = 200
 
 
 class MergeTargetImpactService:
@@ -35,8 +39,18 @@ class MergeTargetImpactService:
     ) -> dict[str, Any]:
         """Return one bounded deterministic page of affected named targets."""
 
-        self._validate_start_index(start_index)
-        self._validate_limit(limit)
+        effective_start = require_nonnegative_int(
+            start_index,
+            code="INVALID_MERGE_TARGET_IMPACT_INDEX",
+            name="start_index",
+        )
+        effective_limit = require_bounded_int(
+            limit,
+            code="INVALID_MERGE_TARGET_IMPACT_LIMIT",
+            name="limit",
+            minimum=1,
+            maximum=MAX_MERGE_TARGET_IMPACT_PAGE_SIZE,
+        )
         result = self.analyze(
             project,
             target_branch,
@@ -44,16 +58,20 @@ class MergeTargetImpactService:
             preview_id=preview_id,
         )
         affected = result.pop("affected_targets")
-        page = affected[start_index : start_index + limit]
-        next_index = start_index + len(page)
+        page = affected[effective_start : effective_start + effective_limit]
+        next_index = effective_start + len(page)
         has_more = next_index < len(affected)
         return {
             **result,
-            "start_index": start_index,
-            "limit": limit,
+            "start_index": effective_start,
+            "limit": effective_limit,
             "returned_count": len(page),
             "has_more": has_more,
+            "truncated": has_more,
             "next_index": next_index if has_more else None,
+            "limits": {
+                "maximum_page_size": MAX_MERGE_TARGET_IMPACT_PAGE_SIZE,
+            },
             "affected_targets": page,
         }
 
@@ -227,25 +245,18 @@ class MergeTargetImpactService:
 
     @staticmethod
     def _validate_start_index(start_index: int) -> None:
-        if (
-            isinstance(start_index, bool)
-            or not isinstance(start_index, int)
-            or start_index < 0
-        ):
-            raise ValidationError(
-                "INVALID_MERGE_TARGET_IMPACT_INDEX",
-                "start_index must be a non-negative integer",
-            )
+        require_nonnegative_int(
+            start_index,
+            code="INVALID_MERGE_TARGET_IMPACT_INDEX",
+            name="start_index",
+        )
 
     @staticmethod
     def _validate_limit(limit: int) -> None:
-        if isinstance(limit, bool) or not isinstance(limit, int):
-            raise ValidationError(
-                "INVALID_MERGE_TARGET_IMPACT_LIMIT",
-                "limit must be an integer",
-            )
-        if limit < 1 or limit > MAX_MERGE_TARGET_IMPACT_PAGE_SIZE:
-            raise ValidationError(
-                "INVALID_MERGE_TARGET_IMPACT_LIMIT",
-                f"limit must be between 1 and {MAX_MERGE_TARGET_IMPACT_PAGE_SIZE}",
-            )
+        require_bounded_int(
+            limit,
+            code="INVALID_MERGE_TARGET_IMPACT_LIMIT",
+            name="limit",
+            minimum=1,
+            maximum=MAX_MERGE_TARGET_IMPACT_PAGE_SIZE,
+        )

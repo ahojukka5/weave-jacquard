@@ -5,21 +5,20 @@ from __future__ import annotations
 from typing import Any
 
 from .errors import ValidationError
-from .merge_impact import (
-    MAX_MERGE_TARGET_IMPACT_PAGE_SIZE,
-    MergeTargetImpactService,
-)
+from .merge_impact import MergeTargetImpactService
 from .merge_policy import MergePolicyRegistry
 from .project_agent_status import MAX_AGENT_STATUS_CHECKPOINT_SCAN
-from .project_merge_queue import (
+from .project_merge_queue import ProjectMergeQueueService
+from .revision_limits import (
+    MAX_MERGE_TARGET_IMPACT_PAGE_SIZE,
+    MAX_PROJECT_MERGE_IMPACT_QUEUE_DOCUMENTS,
+    MAX_PROJECT_MERGE_IMPACT_QUEUE_PAGE,
     MAX_PROJECT_MERGE_QUEUE_CONFLICTS,
     MAX_PROJECT_MERGE_QUEUE_DOCUMENTS,
-    ProjectMergeQueueService,
+    require_bounded_int,
 )
 
 PROJECT_MERGE_IMPACT_QUEUE_FORMAT = "weave-project-merge-impact-queue-v1"
-MAX_PROJECT_MERGE_IMPACT_QUEUE_PAGE = 10
-MAX_PROJECT_MERGE_IMPACT_QUEUE_DOCUMENTS = 200
 
 
 class ProjectMergeImpactQueueService:
@@ -126,7 +125,22 @@ class ProjectMergeImpactQueueService:
             "coverage_document_limit": coverage_document_limit,
             "returned_source_count": len(sources),
             "has_more": queue["has_more"],
+            "truncated": queue["has_more"],
             "next_after_source": queue["next_after_source"],
+            "limits": {
+                "maximum_page_size": MAX_PROJECT_MERGE_IMPACT_QUEUE_PAGE,
+                "maximum_checkpoint_scan": MAX_AGENT_STATUS_CHECKPOINT_SCAN,
+                "maximum_conflicts_per_source": MAX_PROJECT_MERGE_QUEUE_CONFLICTS,
+                "maximum_changed_documents_per_source": (
+                    MAX_PROJECT_MERGE_QUEUE_DOCUMENTS
+                ),
+                "maximum_affected_targets_per_source": (
+                    MAX_MERGE_TARGET_IMPACT_PAGE_SIZE
+                ),
+                "maximum_coverage_documents_per_source": (
+                    MAX_PROJECT_MERGE_IMPACT_QUEUE_DOCUMENTS
+                ),
+            },
             "target_merge_policy": target_policy,
             "sources": sources,
             "ordering": queue["ordering"],
@@ -282,13 +296,10 @@ class ProjectMergeImpactQueueService:
 
     @staticmethod
     def _validate_limit(name: str, value: Any, maximum: int) -> None:
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or value < 1
-            or value > maximum
-        ):
-            raise ValidationError(
-                "INVALID_PROJECT_MERGE_IMPACT_QUEUE_LIMIT",
-                f"{name} must be an integer between 1 and {maximum}",
-            )
+        require_bounded_int(
+            value,
+            code="INVALID_PROJECT_MERGE_IMPACT_QUEUE_LIMIT",
+            name=name,
+            minimum=1,
+            maximum=maximum,
+        )
