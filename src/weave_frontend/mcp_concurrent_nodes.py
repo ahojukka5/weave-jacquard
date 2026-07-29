@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 from . import mcp_build as _build
@@ -36,9 +37,22 @@ compiler_bridge.cache_info = compiler_bridge_cache_info  # type: ignore[attr-def
 def install_capability() -> None:
     """Install runtime-backed factories before dependent capabilities are imported."""
 
+    previous_server = _server.workspace
+    previous_build = _build.workspace
     _server.workspace = workspace
     _build.workspace = workspace
     _build.compiler_bridge = compiler_bridge
+    # Modules that already did `from .mcp_server import workspace` keep the old
+    # binding; rebind them so production and direct test imports share one root.
+    for module in tuple(sys.modules.values()):
+        if module is None:
+            continue
+        name = getattr(module, "__name__", "")
+        if not isinstance(name, str) or not name.startswith("weave_frontend."):
+            continue
+        bound = getattr(module, "workspace", None)
+        if bound is previous_server or bound is previous_build:
+            module.workspace = workspace
     for factory in (
         _build.edit_batches,
         _build.branch_activity,
