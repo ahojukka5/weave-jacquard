@@ -289,7 +289,8 @@ async def _run_stdio_qualification(
             "branch_history",
             {"project": "stdio-qualification", "branch": "main"},
         )
-        assert len(history) >= 10
+        assert history["returned_count"] >= 10
+        assert len(history["revisions"]) == history["returned_count"]
 
         if build_native:
             validated = await _call(

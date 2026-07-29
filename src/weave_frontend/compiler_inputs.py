@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .errors import NotFoundError, ValidationError
+from .revision_limits import MAX_BUILD_DOCUMENTS
 from .source_map import render_with_node_map
 
 
@@ -49,6 +50,11 @@ class CompilerInputMixin:
                     "additional_documents must be a list of document names",
                 )
             values.extend(additional_documents)
+        if len(values) > MAX_BUILD_DOCUMENTS:
+            raise ValidationError(
+                "BUILD_DOCUMENT_LIMIT_EXCEEDED",
+                f"one compiler invocation may include at most {MAX_BUILD_DOCUMENTS} documents",
+            )
         if any(not isinstance(value, str) or not value for value in values):
             raise ValidationError(
                 "INVALID_DOCUMENT_SET",

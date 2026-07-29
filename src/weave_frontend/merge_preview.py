@@ -6,6 +6,7 @@ from collections import Counter
 from typing import Any, Protocol
 
 from .errors import ConflictError, ValidationError
+from .revision_dag import RevisionDagAnalysis
 from .sexpr import head_symbol
 
 MERGE_PREVIEW_FORMAT = "weave-merge-preview-v1"
@@ -16,7 +17,11 @@ class _Workspace(Protocol):
 
     def branch_head(self, project: str, branch: str = "main") -> str: ...
 
-    def _common_ancestor(self, left: str, right: str) -> str: ...
+    def _common_ancestor_analysis(
+        self,
+        left: str,
+        right: str,
+    ) -> RevisionDagAnalysis: ...
 
     def _state_at_revision(self, revision_id: str) -> dict[str, dict[str, Any]]: ...
 
@@ -148,7 +153,8 @@ class MergePreviewService:
     ) -> dict[str, Any]:
         target_head = self.workspace.branch_head(project, target_branch)
         source_head = self.workspace.branch_head(project, source_branch)
-        base = self.workspace._common_ancestor(target_head, source_head)
+        ancestry = self.workspace._common_ancestor_analysis(target_head, source_head)
+        base = ancestry.require_single_best()
         preview_payload = {
             "format": MERGE_PREVIEW_FORMAT,
             "project": project,
@@ -157,6 +163,7 @@ class MergePreviewService:
             "base_revision_id": base,
             "target_head_revision_id": target_head,
             "source_head_revision_id": source_head,
+            "ancestry": ancestry.evidence(),
         }
         preview_id = self.workspace.db.hash_value(preview_payload)
 
@@ -241,10 +248,14 @@ class MergePreviewService:
                     "document": document,
                     "status": status,
                     "before_hash": (
-                        self.workspace.db.hash_value(before) if before is not None else None
+                        self.workspace.db.hash_value(before)
+                        if before is not None
+                        else None
                     ),
                     "after_hash": (
-                        self.workspace.db.hash_value(after) if after is not None else None
+                        self.workspace.db.hash_value(after)
+                        if after is not None
+                        else None
                     ),
                     **summary,
                 }

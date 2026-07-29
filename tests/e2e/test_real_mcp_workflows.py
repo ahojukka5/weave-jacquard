@@ -218,7 +218,9 @@ async def _exercise_rejected_mutation(
         "branch_history",
         {"project": project, "branch": "main"},
     )
-    assert [item["id"] for item in after] == [item["id"] for item in before]
+    assert [item["id"] for item in after["revisions"]] == [
+        item["id"] for item in before["revisions"]
+    ]
 
     repaired = await _call(
         session,
@@ -239,7 +241,7 @@ async def _exercise_rejected_mutation(
         "branch_history",
         {"project": project, "branch": "main"},
     )
-    assert repaired_history[0]["id"] != before[0]["id"]
+    assert repaired_history["revisions"][0]["id"] != before["revisions"][0]["id"]
 
 
 async def _exercise_parallel_merge(
@@ -368,8 +370,8 @@ async def _exercise_parallel_merge(
         "branch_history",
         {"project": project, "branch": "main"},
     )
-    assert history[0]["parent2_id"] is not None
-    assert history[1]["parent2_id"] is not None
+    assert history["revisions"][0]["parent2_id"] is not None
+    assert history["revisions"][1]["parent2_id"] is not None
 
 
 async def _exercise_revisioned_target(

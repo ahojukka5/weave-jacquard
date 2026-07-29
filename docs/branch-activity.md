@@ -8,9 +8,11 @@ rows. Jacquard exposes three read-only tools for bounded review:
 - `revision_operations_page`
 - `branch_activity_summary`
 
-The existing `branch_history` tool remains available for compact compatibility
-reads. None of the observability tools changes revisions, branches, operation
-rows, or the database schema.
+The existing `branch_history` tool remains available and now returns the same
+bounded truncation evidence as the compatibility history page path, while
+`branch_history_page` stays the continuation-oriented paging tool. None of the
+observability tools changes revisions, branches, operation rows, or the database
+schema.
 
 ## Paginated first-parent history
 

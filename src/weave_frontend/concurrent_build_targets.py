@@ -5,12 +5,28 @@ from __future__ import annotations
 from typing import Any
 
 from .build_targets import BuildTargetRegistry as _BaseBuildTargetRegistry
-from .errors import NotFoundError
+from .errors import NotFoundError, ValidationError
+from .revision_limits import MAX_BUILD_DOCUMENTS
 from .sexpr import validate_tree
 
 
 class BuildTargetRegistry(_BaseBuildTargetRegistry):
     """Build-target registry whose writes compare-and-set one captured branch head."""
+
+    @classmethod
+    def _validate_document_set(
+        cls,
+        document: str,
+        additional_documents: list[str] | None,
+    ) -> list[str]:
+        documents = super()._validate_document_set(document, additional_documents)
+        if len(documents) > MAX_BUILD_DOCUMENTS:
+            raise ValidationError(
+                "BUILD_DOCUMENT_LIMIT_EXCEEDED",
+                "one build target may reference at most "
+                f"{MAX_BUILD_DOCUMENTS} documents",
+            )
+        return documents
 
     def set(
         self,

@@ -8,13 +8,24 @@ from typing import Any
 from .mcp_server import _result, mcp, workspace
 from .revision_reads import RevisionReadService
 
-mcp.remove_tool("node_find")
-mcp.remove_tool("program_render")
+for _tool_name in ("branch_history", "node_find", "program_render"):
+    mcp.remove_tool(_tool_name)
 
 
 @lru_cache(maxsize=1)
 def revision_reads() -> RevisionReadService:
     return RevisionReadService(workspace())
+
+
+@mcp.tool()
+def branch_history(
+    project: str,
+    branch: str = "main",
+    limit: int = 50,
+) -> dict[str, Any]:
+    """Read a validated bounded first-parent prefix with truncation evidence."""
+
+    return _result(lambda: workspace().history_page(project, branch, limit=limit))
 
 
 @mcp.tool()
