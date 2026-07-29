@@ -137,7 +137,9 @@ def test_rejected_public_atom_write_does_not_advance_branch(
         sexpr_workspace.list_documents("sexpr-demo", "main")[0]["root_node_id"]
     )
     before = sexpr_workspace.branch_head("sexpr-demo", "main")
-    monkeypatch.setattr(sexpr_module, "MAX_ATOM_VALUE_BYTES", 3)
+    # Keep the limit above already-admitted atoms so the verified loader can
+    # reconstruct the revision, then reject only the oversized new write.
+    monkeypatch.setattr(sexpr_module, "MAX_ATOM_VALUE_BYTES", 32)
 
     with pytest.raises(ValidationError) as raised:
         sexpr_workspace.add_atom(
@@ -146,7 +148,7 @@ def test_rejected_public_atom_write_does_not_advance_branch(
             "main.weave",
             root_id,
             "string",
-            "four",
+            "x" * 33,
         )
 
     assert raised.value.code == "ATOM_VALUE_TOO_LARGE"

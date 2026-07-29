@@ -9,9 +9,9 @@ from collections.abc import Callable
 from threading import RLock
 from typing import Any
 
-from .concurrent_workspace import SExpressionWorkspace
 from .quota_aware_compiler_bridge import CompilerBridge
 from .runtime_config import RuntimeConfig
+from .verified_workspace import SExpressionWorkspace
 from .weavec import WeavecValidator
 
 WorkspaceFactory = Callable[[RuntimeConfig], Any]

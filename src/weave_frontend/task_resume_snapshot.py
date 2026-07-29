@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from .errors import NotFoundError
@@ -68,56 +67,44 @@ class TaskResumeSnapshotService(TestResumeSnapshotService):
 
     def _programs(
         self,
+        modules: dict[str, dict[str, Any]],
         revision_id: str,
         *,
         limit: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        patterns = self._metadata_patterns()
-        where = " AND ".join("qualified_name NOT LIKE ?" for _ in patterns)
-        parameters = (revision_id, *patterns)
-        total = int(
-            self.workspace.db.connection.execute(
-                f"""SELECT COUNT(*) AS count
-                    FROM module_snapshots
-                    WHERE revision_id = ? AND {where}""",
-                parameters,
-            ).fetchone()["count"]
-        )
-        rows = self.workspace.db.connection.execute(
-            f"""SELECT qualified_name, ast_json
-                FROM module_snapshots
-                WHERE revision_id = ? AND {where}
-                ORDER BY qualified_name
-                LIMIT ?""",
-            (*parameters, limit),
-        ).fetchall()
+        excluded = self._metadata_prefixes()
+        names = [
+            name
+            for name in self._program_document_names(modules)
+            if not any(name.startswith(prefix) for prefix in excluded)
+        ]
+        page = names[:limit]
         return (
             [
                 self._program_summary(
-                    str(row["qualified_name"]),
-                    json.loads(str(row["ast_json"])),
+                    name,
+                    modules[name],
                     revision_id=revision_id,
                 )
-                for row in rows
+                for name in page
             ],
-            total,
+            len(names),
         )
 
     def _require_program_documents(
         self,
-        revision_id: str,
+        modules: dict[str, dict[str, Any]],
         documents: list[str],
     ) -> None:
-        patterns = self._metadata_patterns()
-        where = " AND ".join("qualified_name NOT LIKE ?" for _ in patterns)
+        excluded = self._metadata_prefixes()
         for document in documents:
-            row = self.workspace.db.connection.execute(
-                f"""SELECT 1 FROM module_snapshots
-                    WHERE revision_id = ? AND qualified_name = ? AND {where}""",
-                (revision_id, document, *patterns),
-            ).fetchone()
-            if row is None:
+            if document not in modules or any(
+                document.startswith(prefix) for prefix in excluded
+            ):
                 raise NotFoundError(f"program document {document!r} not found")
+
+    def _metadata_prefixes(self) -> tuple[str, ...]:
+        return (BUILD_TARGET_PREFIX, TEST_TARGET_PREFIX, TASK_CONTRACT_PREFIX)
 
     def _tasks(
         self,
@@ -127,31 +114,17 @@ class TaskResumeSnapshotService(TestResumeSnapshotService):
         *,
         limit: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        pattern = f"{TASK_CONTRACT_PREFIX}%"
-        total = int(
-            self.workspace.db.connection.execute(
-                """SELECT COUNT(*) AS count
-                   FROM module_snapshots
-                   WHERE revision_id = ? AND qualified_name LIKE ?""",
-                (revision_id, pattern),
-            ).fetchone()["count"]
+        modules = self._revision_modules(revision_id)
+        names = sorted(
+            name for name in modules if name.startswith(TASK_CONTRACT_PREFIX)
         )
-        rows = self.workspace.db.connection.execute(
-            """SELECT qualified_name, ast_json
-               FROM module_snapshots
-               WHERE revision_id = ? AND qualified_name LIKE ?
-               ORDER BY qualified_name
-               LIMIT ?""",
-            (revision_id, pattern, limit),
-        ).fetchall()
-        state = self.workspace._state_at_revision(revision_id)
+        page = names[:limit]
         result = []
-        for row in rows:
-            storage_document = str(row["qualified_name"])
+        for storage_document in page:
             name = storage_document[len(TASK_CONTRACT_PREFIX) :]
-            root = json.loads(str(row["ast_json"]))
+            root = modules[storage_document]
             config = self.tasks._parse_tree(root, name=name)
-            self.tasks._validate_references(state, config, creating=False)
+            self.tasks._validate_references(modules, config, creating=False)
             result.append(
                 {
                     "name": name,
@@ -177,12 +150,4 @@ class TaskResumeSnapshotService(TestResumeSnapshotService):
                     },
                 }
             )
-        return result, total
-
-    @staticmethod
-    def _metadata_patterns() -> tuple[str, ...]:
-        return (
-            f"{BUILD_TARGET_PREFIX}%",
-            f"{TEST_TARGET_PREFIX}%",
-            f"{TASK_CONTRACT_PREFIX}%",
-        )
+        return result, len(names)

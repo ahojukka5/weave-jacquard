@@ -30,6 +30,8 @@ class _Workspace(Protocol):
 
     def branch_head(self, project: str, branch: str = "main") -> str: ...
 
+    def _state_at_revision(self, revision_id: str) -> dict[str, dict[str, Any]]: ...
+
 
 class ResumeSnapshotService:
     """Compose one deterministic bounded read from an exact immutable revision."""
@@ -75,11 +77,14 @@ class ResumeSnapshotService:
         branch_head_revision_id = self.workspace.branch_head(project, branch)
         selected_revision_id = revision_id or branch_head_revision_id
         revision = self._revision(project, selected_revision_id)
+        modules = self._revision_modules(selected_revision_id)
         program_entries, total_program_count = self._programs(
+            modules,
             selected_revision_id,
             limit=document_limit,
         )
         target_entries, total_target_count = self._targets(
+            modules,
             selected_revision_id,
             limit=target_limit,
             source_limit=target_source_limit,
@@ -184,73 +189,61 @@ class ResumeSnapshotService:
             )
         return dict(row)
 
+    def _revision_modules(self, revision_id: str) -> dict[str, dict[str, Any]]:
+        """Load one exact revision through the workspace semantic integrity boundary."""
+
+        return self.workspace._state_at_revision(revision_id)
+
+    def _program_document_names(
+        self,
+        modules: dict[str, dict[str, Any]],
+    ) -> list[str]:
+        return sorted(
+            name
+            for name in modules
+            if not name.startswith(BUILD_TARGET_PREFIX)
+        )
+
     def _programs(
         self,
+        modules: dict[str, dict[str, Any]],
         revision_id: str,
         *,
         limit: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        target_pattern = f"{BUILD_TARGET_PREFIX}%"
-        total = int(
-            self.workspace.db.connection.execute(
-                """SELECT COUNT(*) AS count
-                   FROM module_snapshots
-                   WHERE revision_id = ? AND qualified_name NOT LIKE ?""",
-                (revision_id, target_pattern),
-            ).fetchone()["count"]
-        )
-        rows = self.workspace.db.connection.execute(
-            """SELECT qualified_name, ast_json
-               FROM module_snapshots
-               WHERE revision_id = ? AND qualified_name NOT LIKE ?
-               ORDER BY qualified_name
-               LIMIT ?""",
-            (revision_id, target_pattern, limit),
-        ).fetchall()
+        names = self._program_document_names(modules)
+        page = names[:limit]
         return (
             [
                 self._program_summary(
-                    str(row["qualified_name"]),
-                    json.loads(str(row["ast_json"])),
+                    name,
+                    modules[name],
                     revision_id=revision_id,
                 )
-                for row in rows
+                for name in page
             ],
-            total,
+            len(names),
         )
 
     def _targets(
         self,
+        modules: dict[str, dict[str, Any]],
         revision_id: str,
         *,
         limit: int,
         source_limit: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        target_pattern = f"{BUILD_TARGET_PREFIX}%"
-        total = int(
-            self.workspace.db.connection.execute(
-                """SELECT COUNT(*) AS count
-                   FROM module_snapshots
-                   WHERE revision_id = ? AND qualified_name LIKE ?""",
-                (revision_id, target_pattern),
-            ).fetchone()["count"]
+        names = sorted(
+            name for name in modules if name.startswith(BUILD_TARGET_PREFIX)
         )
-        rows = self.workspace.db.connection.execute(
-            """SELECT qualified_name, ast_json
-               FROM module_snapshots
-               WHERE revision_id = ? AND qualified_name LIKE ?
-               ORDER BY qualified_name
-               LIMIT ?""",
-            (revision_id, target_pattern, limit),
-        ).fetchall()
+        page = names[:limit]
         result: list[dict[str, Any]] = []
-        for row in rows:
-            storage_document = str(row["qualified_name"])
+        for storage_document in page:
             name = storage_document[len(BUILD_TARGET_PREFIX) :]
-            root = json.loads(str(row["ast_json"]))
+            root = modules[storage_document]
             config = self.targets._parse_tree(root, name=name)
             documents = [config["document"], *config["additional_documents"]]
-            self._require_program_documents(revision_id, documents)
+            self._require_program_documents(modules, documents)
             additional = list(config["additional_documents"])
             returned_additional = additional[:source_limit]
             result.append(
@@ -267,21 +260,15 @@ class ResumeSnapshotService:
                     "root_node_id": root["id"],
                 }
             )
-        return result, total
+        return result, len(names)
 
     def _require_program_documents(
         self,
-        revision_id: str,
+        modules: dict[str, dict[str, Any]],
         documents: list[str],
     ) -> None:
         for document in documents:
-            row = self.workspace.db.connection.execute(
-                """SELECT 1 FROM module_snapshots
-                   WHERE revision_id = ? AND qualified_name = ?
-                     AND qualified_name NOT LIKE ?""",
-                (revision_id, document, f"{BUILD_TARGET_PREFIX}%"),
-            ).fetchone()
-            if row is None:
+            if document not in modules or document.startswith(BUILD_TARGET_PREFIX):
                 raise NotFoundError(f"program document {document!r} not found")
 
     def _branches(

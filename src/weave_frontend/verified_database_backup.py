@@ -17,6 +17,7 @@ from .database_backup import (
 from .database_backup import (
     DatabaseBackupService as _DatabaseBackupService,
 )
+from .database_integrity import DATABASE_SEMANTIC_INTEGRITY_CONTRACT
 from .errors import ArtifactIntegrityError, ValidationError
 from .retained_artifact_io import (
     RetainedArtifactReadError,
@@ -48,6 +49,24 @@ class DatabaseBackupService(_DatabaseBackupService):
     """Reject mutable evidence and quota-admit verified backup publication."""
 
     artifact_quota_family = "database_backups"
+
+    @staticmethod
+    def _backup_key(
+        *,
+        source: dict[str, Any],
+        backup_database: dict[str, Any],
+        artifact_identity: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Bind new backup identities to the semantic verification contract."""
+
+        return {
+            **_DatabaseBackupService._backup_key(
+                source=source,
+                backup_database=backup_database,
+                artifact_identity=artifact_identity,
+            ),
+            "semantic_integrity_contract": DATABASE_SEMANTIC_INTEGRITY_CONTRACT,
+        }
 
     def _verify_manifest(
         self,
@@ -101,7 +120,6 @@ class DatabaseBackupService(_DatabaseBackupService):
                 with super()._publication_lock(final):
                     yield
                 return
-
         raise ValidationError(
             "ARTIFACT_STORAGE_STAGE_NOT_FOUND",
             "database backup publication has no available verified matching stage",

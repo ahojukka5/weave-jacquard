@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from .checkpoint_resume_snapshot import CheckpointResumeSnapshotService
@@ -67,60 +66,40 @@ class TestResumeSnapshotService(CheckpointResumeSnapshotService):
 
     def _programs(
         self,
+        modules: dict[str, dict[str, Any]],
         revision_id: str,
         *,
         limit: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        build_pattern = f"{BUILD_TARGET_PREFIX}%"
-        test_pattern = f"{TEST_TARGET_PREFIX}%"
-        total = int(
-            self.workspace.db.connection.execute(
-                """SELECT COUNT(*) AS count
-                   FROM module_snapshots
-                   WHERE revision_id = ?
-                     AND qualified_name NOT LIKE ?
-                     AND qualified_name NOT LIKE ?""",
-                (revision_id, build_pattern, test_pattern),
-            ).fetchone()["count"]
-        )
-        rows = self.workspace.db.connection.execute(
-            """SELECT qualified_name, ast_json
-               FROM module_snapshots
-               WHERE revision_id = ?
-                 AND qualified_name NOT LIKE ?
-                 AND qualified_name NOT LIKE ?
-               ORDER BY qualified_name
-               LIMIT ?""",
-            (revision_id, build_pattern, test_pattern, limit),
-        ).fetchall()
+        names = [
+            name
+            for name in self._program_document_names(modules)
+            if not name.startswith(TEST_TARGET_PREFIX)
+        ]
+        page = names[:limit]
         return (
             [
                 self._program_summary(
-                    str(row["qualified_name"]),
-                    json.loads(str(row["ast_json"])),
+                    name,
+                    modules[name],
                     revision_id=revision_id,
                 )
-                for row in rows
+                for name in page
             ],
-            total,
+            len(names),
         )
 
     def _require_program_documents(
         self,
-        revision_id: str,
+        modules: dict[str, dict[str, Any]],
         documents: list[str],
     ) -> None:
-        build_pattern = f"{BUILD_TARGET_PREFIX}%"
-        test_pattern = f"{TEST_TARGET_PREFIX}%"
         for document in documents:
-            row = self.workspace.db.connection.execute(
-                """SELECT 1 FROM module_snapshots
-                   WHERE revision_id = ? AND qualified_name = ?
-                     AND qualified_name NOT LIKE ?
-                     AND qualified_name NOT LIKE ?""",
-                (revision_id, document, build_pattern, test_pattern),
-            ).fetchone()
-            if row is None:
+            if (
+                document not in modules
+                or document.startswith(BUILD_TARGET_PREFIX)
+                or document.startswith(TEST_TARGET_PREFIX)
+            ):
                 raise NotFoundError(f"program document {document!r} not found")
 
     def _tests(
@@ -131,31 +110,17 @@ class TestResumeSnapshotService(CheckpointResumeSnapshotService):
         *,
         limit: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        pattern = f"{TEST_TARGET_PREFIX}%"
-        total = int(
-            self.workspace.db.connection.execute(
-                """SELECT COUNT(*) AS count
-                   FROM module_snapshots
-                   WHERE revision_id = ? AND qualified_name LIKE ?""",
-                (revision_id, pattern),
-            ).fetchone()["count"]
+        modules = self._revision_modules(revision_id)
+        names = sorted(
+            name for name in modules if name.startswith(TEST_TARGET_PREFIX)
         )
-        rows = self.workspace.db.connection.execute(
-            """SELECT qualified_name, ast_json
-               FROM module_snapshots
-               WHERE revision_id = ? AND qualified_name LIKE ?
-               ORDER BY qualified_name
-               LIMIT ?""",
-            (revision_id, pattern, limit),
-        ).fetchall()
-        state = self.workspace._state_at_revision(revision_id)
+        page = names[:limit]
         result: list[dict[str, Any]] = []
-        for row in rows:
-            storage_document = str(row["qualified_name"])
+        for storage_document in page:
             name = storage_document[len(TEST_TARGET_PREFIX) :]
-            root = json.loads(str(row["ast_json"]))
+            root = modules[storage_document]
             config = self.tests._parse_tree(root, name=name)
-            self.tests._require_build_target(state, config["build_target"])
+            self.tests._require_build_target(modules, config["build_target"])
             result.append(
                 {
                     "name": name,
@@ -189,4 +154,4 @@ class TestResumeSnapshotService(CheckpointResumeSnapshotService):
                     },
                 }
             )
-        return result, total
+        return result, len(names)

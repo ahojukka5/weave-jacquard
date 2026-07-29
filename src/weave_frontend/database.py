@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import sqlite3
-import zlib
 from collections.abc import Iterable
 from contextlib import contextmanager
 from pathlib import Path
@@ -14,12 +11,16 @@ from uuid import uuid4
 
 from .database_integrity import inspect_connection, require_migration_integrity
 from .errors import DatabaseBusyError
+from .snapshot_codec import (
+    canonical_json as _canonical_json,
+    compress_snapshot_json,
+    decompress_snapshot_json,
+    hash_value as _hash_value,
+)
 
 SCHEMA_VERSION = 3
 DEFAULT_DATABASE_BUSY_TIMEOUT_MS = 5_000
 MAX_DATABASE_BUSY_TIMEOUT_MS = 2_147_483_647
-_SNAPSHOT_RAW = b"WJR1"
-_SNAPSHOT_ZLIB = b"WJZ1"
 
 SCHEMA = """
 PRAGMA foreign_keys = ON;
@@ -134,16 +135,16 @@ BEGIN
     SELECT RAISE(ABORT, 'parent1 revision does not belong to project')
     WHERE NEW.parent1_id IS NOT NULL
       AND NOT EXISTS (
-          SELECT 1 FROM revisions parent
-          WHERE parent.id = NEW.parent1_id
-            AND parent.project_id = NEW.project_id
+        SELECT 1 FROM revisions parent
+        WHERE parent.id = NEW.parent1_id
+          AND parent.project_id = NEW.project_id
       );
     SELECT RAISE(ABORT, 'parent2 revision does not belong to project')
     WHERE NEW.parent2_id IS NOT NULL
       AND NOT EXISTS (
-          SELECT 1 FROM revisions parent
-          WHERE parent.id = NEW.parent2_id
-            AND parent.project_id = NEW.project_id
+        SELECT 1 FROM revisions parent
+        WHERE parent.id = NEW.parent2_id
+          AND parent.project_id = NEW.project_id
       );
 END;
 
@@ -153,16 +154,16 @@ BEGIN
     SELECT RAISE(ABORT, 'parent1 revision does not belong to project')
     WHERE NEW.parent1_id IS NOT NULL
       AND NOT EXISTS (
-          SELECT 1 FROM revisions parent
-          WHERE parent.id = NEW.parent1_id
-            AND parent.project_id = NEW.project_id
+        SELECT 1 FROM revisions parent
+        WHERE parent.id = NEW.parent1_id
+          AND parent.project_id = NEW.project_id
       );
     SELECT RAISE(ABORT, 'parent2 revision does not belong to project')
     WHERE NEW.parent2_id IS NOT NULL
       AND NOT EXISTS (
-          SELECT 1 FROM revisions parent
-          WHERE parent.id = NEW.parent2_id
-            AND parent.project_id = NEW.project_id
+        SELECT 1 FROM revisions parent
+        WHERE parent.id = NEW.parent2_id
+          AND parent.project_id = NEW.project_id
       );
     SELECT RAISE(ABORT, 'revision project change would orphan a child')
     WHERE EXISTS (
@@ -213,24 +214,11 @@ PRAGMA user_version = 3;
 
 
 def _compress_json(value: str) -> bytes:
-    if not isinstance(value, str):
-        raise TypeError("snapshot JSON must be text")
-    raw = value.encode("utf-8")
-    compressed = zlib.compress(raw, level=3)
-    if len(compressed) < len(raw):
-        return _SNAPSHOT_ZLIB + compressed
-    return _SNAPSHOT_RAW + raw
+    return compress_snapshot_json(value)
 
 
 def _decompress_json(value: bytes | bytearray | memoryview) -> str:
-    blob = bytes(value)
-    prefix = blob[:4]
-    payload = blob[4:]
-    if prefix == _SNAPSHOT_ZLIB:
-        return zlib.decompress(payload).decode("utf-8")
-    if prefix == _SNAPSHOT_RAW:
-        return payload.decode("utf-8")
-    raise ValueError("unsupported snapshot encoding")
+    return decompress_snapshot_json(value)
 
 
 def _is_database_busy_error(error: sqlite3.OperationalError) -> bool:
@@ -448,11 +436,11 @@ class Database:
 
     @staticmethod
     def canonical_json(value: Any) -> str:
-        return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        return _canonical_json(value)
 
-    @classmethod
-    def hash_value(cls, value: Any) -> str:
-        return hashlib.sha256(cls.canonical_json(value).encode()).hexdigest()
+    @staticmethod
+    def hash_value(value: Any) -> str:
+        return _hash_value(value)
 
     def initialize_project(self, name: str, *, author: str = "system") -> tuple[str, str]:
         project_id = str(uuid4())
