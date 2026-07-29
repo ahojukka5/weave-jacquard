@@ -1,7 +1,7 @@
 # Database integrity
 
-Jacquard schema version 3 moves project-graph ownership and operation ordering
-from application convention into the SQLite boundary.
+Jacquard schema version 3 combines SQLite relational constraints with bounded
+semantic verification of immutable program history.
 
 ## Read-only inspection
 
@@ -12,110 +12,138 @@ weave-build --db /path/to/weave.db db-check
 ```
 
 The command opens SQLite with `mode=ro` and returns
-`weave-database-integrity-v1` JSON. Exit status is:
+`weave-database-integrity-v1` JSON. The report names the exact semantic proof
+contract as:
+
+```text
+weave-database-semantic-integrity-v1
+```
+
+The outer report format can retain compatible operational fields while the semantic
+contract identifies the exact snapshot, hash, operation, context, and history
+invariants being claimed. Exit status is:
 
 - `0` when `valid = true`;
 - `1` when the database was read but integrity issues were found;
 - `2` when the file could not be opened or inspected.
 
-The bounded checker verifies:
+`db-check` does not create a database, change journal mode, install triggers,
+advance schema version, or repair data.
 
-- stored `PRAGMA user_version` and core schema objects;
+## Relational verification
+
+The checker verifies:
+
+- stored `PRAGMA user_version` and required schema objects;
 - SQLite `quick_check` results;
 - foreign-key violations;
 - cross-project first and second revision parents;
 - missing branch projects and cross-project branch heads;
 - duplicate operation sequence numbers within one revision.
 
-At most 20 examples are returned for each issue category. Counts and
-`examples_truncated` preserve the distinction between a bounded response and the
-complete finding set.
+Schema-v3 triggers and indexes enforce these relationships for normal writes and
+direct SQLite writes.
 
-`db-check` does not create a database, change journal mode, install triggers,
-advance schema version, or repair data.
+## Semantic revision verification
 
-## Schema-v3 constraints
+Every revision is reconstructed from its retained module snapshots in lexical
+qualified-name order. The checker:
 
-Schema v3 adds:
+- decodes each raw or zlib snapshot through the bounded shared codec;
+- rejects unsupported prefixes, invalid streams, truncation, trailing bytes,
+  invalid UTF-8, invalid JSON, and non-object roots;
+- validates every decoded S-expression tree through the production structural
+  limits;
+- canonicalizes each tree and compares its SHA-256 with `ast_hash`;
+- reconstructs the complete module mapping and compares its SHA-256 with the
+  revision `root_hash`;
+- validates qualified module names;
+- requires operation sequence numbers to begin at zero and remain contiguous;
+- parses every operation payload as a JSON object and requires canonical encoding;
+- recomputes every context-document `content_hash`;
+- detects cycles across first and second revision parents.
 
-```text
-UNIQUE operations(revision_id, sequence_number)
-```
+Normal production workspace reads use the same snapshot codec and hash
+reconstruction. A corrupt retained state fails with the stable
+`CORRUPT_REVISION_STATE` domain error rather than being returned to rendering,
+build, merge, test, CLI build, or agent-inspection code.
 
-and deterministic triggers requiring:
+## Resource ceilings
 
-- every non-null `parent1_id` revision to belong to the child's project;
-- every non-null `parent2_id` revision to belong to the child's project;
-- every branch project to exist;
-- every branch head revision to belong to that branch's project;
-- revision project changes not to orphan child revisions or branch heads.
+The current semantic limits are:
 
-These checks protect direct SQLite writes in addition to Jacquard's existing
-application-level project checks and compare-and-set publication rules.
+| Dimension | Limit |
+|---|---:|
+| compressed bytes in one snapshot blob | 16 MiB |
+| decoded bytes in one snapshot | 32 MiB |
+| modules in one revision | 4,096 |
+| aggregate decoded snapshot bytes in one revision | 256 MiB |
+| UTF-8 bytes in one qualified module name | 4,096 |
+| retained examples per issue category | 20 |
 
-Branches remain mutable named pointers. Revisions, snapshots, and operation rows
-remain logically immutable through the public API; schema v3 does not yet add
-general update/delete denial triggers for every immutable table.
+Exact-limit values are admitted. Limit-plus-one values fail closed. Internal
+completeness overflow never returns a valid partial revision or a plausible root
+identity.
+
+The report includes complete issue counts, bounded examples, semantic scan metrics,
+and the effective limit set. `examples_truncated` distinguishes response truncation
+from the complete finding count.
 
 ## Migration admission
 
-Opening an older database validates relational integrity before any schema-v3
-object is created or `user_version` is advanced.
+Opening an older database validates relational and semantic integrity before any
+schema-v3 object is created or `user_version` is advanced.
 
-Migration stops when it finds:
+A legitimate legacy database may lack `module_snapshots_compressed` while it still
+contains the uncompressed `module_snapshots` table. Legacy `ast_json` rows are
+parsed, structurally validated, hash-checked, and included in revision-root
+reconstruction before migration begins. Only that known missing-table transition is
+allowed.
 
-- a failed SQLite quick check;
-- any foreign-key violation;
-- a cross-project revision parent;
-- a missing or cross-project branch project/head;
-- duplicate operation sequence numbers;
-- any missing core relational table.
+Migration stops on any relational or semantic finding, including malformed legacy
+snapshot JSON, AST hash mismatch, root hash mismatch, invalid operation payload,
+context hash mismatch, or parent cycle. A rejected migration leaves the legacy
+schema version and data unchanged.
 
-A legitimate schema-v1 database may lack `module_snapshots_compressed` while it
-still contains the legacy `module_snapshots` table. That one known transition is
-allowed so the existing transactional snapshot migration can run. No other
-missing-table finding is ignored.
+## Backup and restore integration
 
-A rejected migration leaves the legacy schema version and data unchanged. The
-operator should run `db-check`, restore from a verified backup, or repair a copy
-manually; Jacquard does not guess how to rewrite corrupt project history.
+`database_backup_create` applies the complete checker to the consistent online copy
+before publication. A source whose bytes can be copied but whose immutable program
+history is semantically corrupt is rejected with
+`DATABASE_BACKUP_INTEGRITY_FAILED`.
 
-## Open-database inspection
+`database_backup_get` rehashes the retained file and reruns the same semantic
+checker. Offline `db-restore` verifies the copied destination again before atomic
+publication to a new path. The stored integrity report is path-normalized and must
+match the newly observed report exactly.
 
-Internal operators and tests may call:
+The semantic contract identifier is also bound into the content-derived backup key.
+A backup created under an older proof contract cannot collide with or silently be
+presented as a backup verified under the current semantic contract.
 
-```python
-report = database.integrity_report()
-```
+A verified backup therefore proves, within the documented limits:
 
-This runs the same checker on the already-open connection. It is read-only and
-does not replace transaction-time validation.
+- SQLite file and relational integrity;
+- bounded decodability and structural validity of every module snapshot;
+- every snapshot `ast_hash`;
+- every revision `root_hash`;
+- canonical operation payloads and contiguous operation order;
+- context-document hashes;
+- acyclic revision parent history.
 
-## Backup integration
-
-`database_backup_create` applies this complete checker to a consistent online
-SQLite backup before publication. `database_backup_get` reruns the checker whenever
-a retained backup is inspected. Offline `db-restore` checks the copied destination
-again before publishing it to a new path.
-
-Backup and restore are non-repairing operations. A backup whose source state can be
-copied but does not pass the checker is rejected rather than retained as valid
-evidence. See [verified database backup and restore](database-backup.md).
+Backup and restore remain non-repairing operations. Corrupt evidence is rejected,
+not rewritten.
 
 ## Remaining operations work
 
-Database integrity and verified backup still do not provide:
+Database semantic integrity does not provide:
 
-- snapshot JSON/hash recomputation for every revision;
-- root-hash reconstruction across the complete history;
-- operation payload JSON and context-document content-hash recomputation;
-- retained-artifact catalog reconciliation;
+- retained-artifact reachability reconciliation;
 - remote backup replication and verification;
-- backup-store listing, retention, or guarded deletion;
+- backup-store listing, retention, quarantine, or guarded deletion;
 - automatic repair;
 - live in-place database replacement.
 
-Those should preserve the same evidence-first rule: inspection, copy, planning,
-and deletion must be non-destructive until an operator explicitly authorizes a
-verified action, bounded where exposed through agent interfaces, and explicit about
-checks that were not performed.
+Those operations must preserve the same evidence-first rule: inspect before
+mutation, fail closed on incomplete scans, and require explicit operator authority
+for destructive actions.

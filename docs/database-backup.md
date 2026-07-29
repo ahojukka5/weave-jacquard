@@ -32,14 +32,22 @@ one self-contained `database.sqlite3` file.
 Before publication Jacquard verifies:
 
 - exact regular-file byte count and SHA-256;
-- SQLite user schema version;
-- page size and page count;
-- journal mode;
-- the bounded database-integrity checker (`quick_check`, foreign keys, and
-  relational ownership / operation-sequence invariants);
+- SQLite user schema version, page size, page count, and journal mode;
+- SQLite `quick_check`, foreign keys, project ownership, and branch ownership;
+- bounded decoding and structural validation of every retained module snapshot;
+- canonical snapshot SHA-256 equality with every stored `ast_hash`;
+- complete lexical revision reconstruction and equality with every `root_hash`;
+- operation sequences beginning at zero and remaining contiguous;
+- valid canonical JSON-object operation payloads;
+- every context-document `content_hash`;
+- acyclic first/second-parent revision history;
 - the exact manifest field set and canonical JSON encoding;
 - an exact two-file directory layout containing only `backup-manifest.json` and
   `database.sqlite3` as regular files.
+
+Snapshot verification uses the same bounded codec as normal production workspace
+reads and legacy migration admission. A database whose bytes can be copied but whose
+stored program history fails semantic verification is rejected before publication.
 
 These manifest and layout rules prevent unbound data from being retained outside
 the verified backup contract. Together with the database bytes and source identity
@@ -48,7 +56,6 @@ the same retained logical size for quota admission.
 
 Process SQLite library version is not part of backup identity, so inspection and
 restore remain valid after a host upgrade when the database bytes are unchanged.
-
 The integrity report path is normalized out before retention. Source and backup
 locations are represented by opaque IDs rather than raw paths.
 
@@ -61,12 +68,25 @@ source database identity and opaque location ID
 backup database identity
 database file byte count
 database file SHA-256
+semantic integrity contract identity
 ```
 
-Canonical JSON of this key is hashed with SHA-256 to create the 64-character
-`backup_id`. Repeating an unchanged backup reuses the same verified directory and
-returns `cached=true`. Any changed database bytes, source identity, location, or
-backup identity produce a different ID.
+The semantic field is currently:
+
+```text
+weave-database-semantic-integrity-v1
+```
+
+This prevents a backup created under the earlier relational-only verification
+contract from colliding with a newly created backup of identical SQLite bytes.
+Pre-contract retained manifests are not silently promoted to the stronger claim;
+they must be recreated and published through the current verifier.
+
+Canonical JSON of the key is hashed with SHA-256 to create the 64-character
+`backup_id`. Repeating an unchanged backup under the same semantic contract reuses
+the same verified directory and returns `cached=true`. Any changed database bytes,
+source identity, location, backup identity, or semantic contract produce a
+different ID.
 
 The stored manifest always has `cached=false`. Cache state returned to a caller is
 response evidence and cannot be modified in an accepted immutable manifest.
@@ -122,8 +142,8 @@ weave-build --db weave.db --backup-root /backups \
 
 The source database named by `--db` does not need to exist. The CLI reads the
 backup store directly, reverifies the manifest and database, copies the file into
-the destination directory, reruns integrity checks, synchronizes it, and publishes
-it through an atomic no-overwrite hard link.
+the destination directory, reruns the complete relational and semantic integrity
+checks, synchronizes it, and publishes it through an atomic no-overwrite hard link.
 
 Restore refuses:
 
@@ -131,6 +151,8 @@ Restore refuses:
 - an existing `-wal`, `-shm`, or `-journal` sidecar;
 - a destination inside the backup store;
 - a corrupt backup or manifest;
+- any snapshot, AST hash, revision root, operation, context hash, or parent-cycle
+  semantic corruption;
 - a symlinked or non-regular backup file or directory;
 - an accepted backup directory containing unbound extra entries.
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -261,3 +262,25 @@ def test_resume_snapshot_rejects_foreign_revision(tmp_path: Path) -> None:
             service.snapshot("demo", "main", revision_id=foreign_revision)
 
         assert service.snapshot("demo", "main")["revision_id"] == reviewed_revision
+
+
+def test_resume_snapshot_rejects_corrupt_revision_state(tmp_path: Path) -> None:
+    path = tmp_path / "corrupt-resume.db"
+    with SExpressionWorkspace(path) as workspace:
+        service, revision_id, _ = _build_reviewed_state(workspace)
+
+    connection = sqlite3.connect(path)
+    connection.execute(
+        """UPDATE module_snapshots_compressed
+           SET ast_hash = ?
+           WHERE revision_id = ? AND qualified_name = 'main.weave'""",
+        ("0" * 64, revision_id),
+    )
+    connection.commit()
+    connection.close()
+
+    with SExpressionWorkspace(path) as workspace:
+        service, _, _ = _service(workspace)
+        with pytest.raises(ValidationError) as captured:
+            service.snapshot("demo", "main", revision_id=revision_id)
+    assert captured.value.code == "CORRUPT_REVISION_STATE"

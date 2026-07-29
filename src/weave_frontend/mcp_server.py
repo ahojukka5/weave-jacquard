@@ -12,7 +12,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from .errors import ConflictError, ValidationError, WeaveFrontendError
-from .sexpr_service import SExpressionWorkspace
+from .verified_workspace import SExpressionWorkspace
 
 INSTRUCTIONS = """
 Build Weave programs atomically. Read larger annotated subtrees when useful, but

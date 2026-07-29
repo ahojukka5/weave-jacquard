@@ -22,5 +22,5 @@ def test_large_snapshot_uses_compressed_versioned_payload():
 
 
 def test_unknown_snapshot_encoding_is_rejected():
-    with pytest.raises(ValueError, match="unsupported snapshot encoding"):
+    with pytest.raises(ValueError, match="unsupported encoding prefix"):
         _decompress_json(b"BAD1payload")

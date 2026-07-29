@@ -15,9 +15,9 @@ from .database import Database
 from .database_backup import DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS
 from .database_integrity import inspect_database
 from .errors import ConflictError, ValidationError, WeaveFrontendError
-from .sexpr_service import SExpressionWorkspace
 from .target_validation import BuildTargetValidator
 from .verified_database_backup import DatabaseBackupService
+from .verified_workspace import SExpressionWorkspace
 
 
 def _add_revision_selector(parser: argparse.ArgumentParser) -> None:
