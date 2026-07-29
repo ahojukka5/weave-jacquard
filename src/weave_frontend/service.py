@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,7 +16,16 @@ from typing import Any
 from uuid import uuid4
 
 from .database import Database
-from .errors import ConflictError, NotFoundError, ValidationError
+from .errors import NotFoundError, ValidationError
+from .revision_dag import (
+    RevisionDagAnalysis,
+    analyze_common_ancestors,
+    ancestor_distances,
+)
+from .revision_limits import (
+    MAX_BRANCH_HISTORY_PAGE_SIZE,
+    require_bounded_int,
+)
 
 JsonObject = dict[str, Any]
 CommitOperation = tuple[str, str | None, JsonObject]
@@ -101,16 +109,33 @@ class RevisionWorkspace:
                 (revision_id, project_id, branch),
             )
 
-    def list_history(
+    def history_page(
         self,
         project: str,
         branch: str = "main",
         *,
         limit: int = 100,
-    ) -> list[JsonObject]:
-        current = self.branch_head(project, branch)
+    ) -> dict[str, Any]:
+        """Return a bounded first-parent page with explicit truncation evidence."""
+
+        page_size = require_bounded_int(
+            limit,
+            code="INVALID_BRANCH_HISTORY_LIMIT",
+            name="limit",
+            minimum=1,
+            maximum=MAX_BRANCH_HISTORY_PAGE_SIZE,
+        )
+        head = self.branch_head(project, branch)
+        current: str | None = head
         history: list[JsonObject] = []
-        while current and len(history) < limit:
+        seen: set[str] = set()
+        while current is not None and len(history) < page_size:
+            if current in seen:
+                raise ValidationError(
+                    "REVISION_HISTORY_CYCLE",
+                    "first-parent revision history contains a cycle",
+                )
+            seen.add(current)
             row = self.db.connection.execute(
                 """SELECT id, parent1_id, parent2_id, message, author, root_hash,
                           created_at
@@ -118,10 +143,32 @@ class RevisionWorkspace:
                 (current,),
             ).fetchone()
             if row is None:
-                break
+                raise NotFoundError(f"revision {current!r} not found")
             history.append(dict(row))
-            current = row["parent1_id"]
-        return history
+            parent = row["parent1_id"]
+            current = str(parent) if parent is not None else None
+        return {
+            "project": project,
+            "branch": branch,
+            "head_revision_id": head,
+            "limit": page_size,
+            "returned_count": len(history),
+            "truncated": current is not None,
+            "next_revision_id": current,
+            "revisions": history,
+            "limits": {"page_size": MAX_BRANCH_HISTORY_PAGE_SIZE},
+        }
+
+    def list_history(
+        self,
+        project: str,
+        branch: str = "main",
+        *,
+        limit: int = 100,
+    ) -> list[JsonObject]:
+        """Return the compatibility history list through the bounded page path."""
+
+        return list(self.history_page(project, branch, limit=limit)["revisions"])
 
     def merge(
         self,
@@ -149,7 +196,8 @@ class RevisionWorkspace:
             expected_source_head,
             code="STALE_MERGE_PREVIEW",
         )
-        base = self._common_ancestor(target_head, source_head)
+        ancestry = self._common_ancestor_analysis(target_head, source_head)
+        base = ancestry.require_single_best()
         base_state = self._state_at_revision(base)
         ours = self._state_at_revision(target_head)
         theirs = self._state_at_revision(source_head)
@@ -170,6 +218,7 @@ class RevisionWorkspace:
                         "base": base,
                         "target_head": target_head,
                         "source_head": source_head,
+                        "ancestry": ancestry.evidence(),
                     },
                 )
             ],
@@ -375,52 +424,22 @@ class RevisionWorkspace:
         return row["parent1_id"], row["parent2_id"]
 
     def _ancestor_distances(self, revision: str) -> dict[str, int]:
-        distances = {revision: 0}
-        queue: deque[str] = deque([revision])
-        while queue:
-            current = queue.popleft()
-            for parent in self._parents(current):
-                if parent is not None and parent not in distances:
-                    distances[parent] = distances[current] + 1
-                    queue.append(parent)
-        return distances
+        return ancestor_distances(self._parents, revision)
+
+    def _common_ancestor_analysis(
+        self,
+        left: str,
+        right: str,
+    ) -> RevisionDagAnalysis:
+        return analyze_common_ancestors(self._parents, left, right)
 
     def _best_common_ancestors(self, left: str, right: str) -> tuple[str, ...]:
-        """Return sorted common ancestors that are not ancestors of another common one."""
+        """Return deterministic best common ancestors from one bounded analysis."""
 
-        common = set(self._ancestor_distances(left)) & set(
-            self._ancestor_distances(right)
-        )
-        if not common:
-            raise ConflictError(["branches have no common ancestor"])
-
-        ancestor_cache: dict[str, set[str]] = {}
-
-        def ancestors(revision: str) -> set[str]:
-            if revision not in ancestor_cache:
-                ancestor_cache[revision] = set(self._ancestor_distances(revision))
-            return ancestor_cache[revision]
-
-        best = [
-            candidate
-            for candidate in common
-            if not any(
-                candidate != other and candidate in ancestors(other)
-                for other in common
-            )
-        ]
-        return tuple(sorted(best))
+        return self._common_ancestor_analysis(left, right).best_common_ancestors
 
     def _common_ancestor(self, left: str, right: str) -> str:
-        best = self._best_common_ancestors(left, right)
-        if len(best) != 1:
-            raise ConflictError(
-                [
-                    "branches have multiple best common ancestors: "
-                    + ", ".join(best)
-                ]
-            )
-        return best[0]
+        return self._common_ancestor_analysis(left, right).require_single_best()
 
     @classmethod
     def _validate_state(cls, state: dict[str, JsonObject]) -> None:

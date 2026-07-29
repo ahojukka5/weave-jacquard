@@ -83,8 +83,8 @@ Core tools:
 - `project_initialize`: create a project, initial revision, and `main` branch.
 - `branch_create`: create a branch from another branch head.
 - `branch_list`: list branches and immutable head revisions.
-- `branch_history`: compact compatibility history read.
-- `branch_history_page`: bounded first-parent history with continuation.
+- `branch_history`: bounded first-parent history with truncation evidence.
+- `branch_history_page`: continuation-oriented first-parent history paging.
 - `revision_operations_page`: exact immutable operation audit pages.
 - `branch_activity_summary`: complete first-parent workflow metrics.
 - `merge_policy_get`: read effective first-parent policy.

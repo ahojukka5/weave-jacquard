@@ -182,7 +182,7 @@ async def _run_protocol(tmp_path: Path) -> None:
             branch="main",
             limit=10,
         )
-        assert len(history) == 3
+        assert len(history["revisions"]) == 3
 
 
 async def _run_native(tmp_path: Path, compiler: Path) -> dict[str, Any]:
@@ -218,7 +218,7 @@ async def _run_native(tmp_path: Path, compiler: Path) -> dict[str, Any]:
             branch="main",
             limit=10,
         )
-        assert len(history) == 3
+        assert len(history["revisions"]) == 3
         rendered = await _call(
             session,
             trace,

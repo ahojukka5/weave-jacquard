@@ -564,7 +564,7 @@ async def run_case(case: ProgramCase, tmp_path: Path, compiler: Path) -> dict[st
         "actual_exit": executed.returncode,
         "node_count": structural_nodes,
         "tool_calls": len(trace),
-        "reachable_revisions": len(history),
+        "reachable_revisions": history["returned_count"],
         "source_bytes": canonical_path.stat().st_size,
         "wir_bytes": wir_path.stat().st_size,
         "llvm_bytes": llvm_path.stat().st_size,
