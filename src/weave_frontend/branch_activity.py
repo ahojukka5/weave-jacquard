@@ -7,14 +7,20 @@ from collections import Counter, defaultdict
 from typing import Any
 
 from .errors import NotFoundError, ValidationError
+from .revision_limits import (
+    MAX_BRANCH_ACTIVITY_REVISIONS,
+    MAX_BRANCH_HISTORY_PAGE_SIZE,
+    MAX_OPERATION_PAGE_SIZE,
+    require_bounded_int,
+    require_nonnegative_int,
+)
 from .service import RevisionWorkspace
 
-MAX_HISTORY_PAGE_SIZE = 200
-MAX_OPERATION_PAGE_SIZE = 200
+MAX_HISTORY_PAGE_SIZE = MAX_BRANCH_HISTORY_PAGE_SIZE
 
 
 class BranchActivityService:
-    """Read long branch histories without truncation and summarize edit activity."""
+    """Read bounded branch histories and summarize admitted edit activity."""
 
     def __init__(self, workspace: RevisionWorkspace) -> None:
         self.workspace = workspace
@@ -27,7 +33,13 @@ class BranchActivityService:
         start_revision_id: str | None = None,
         limit: int = 50,
     ) -> dict[str, Any]:
-        self._validate_history_limit(limit)
+        effective_limit = require_bounded_int(
+            limit,
+            code="INVALID_HISTORY_LIMIT",
+            name="limit",
+            minimum=1,
+            maximum=MAX_HISTORY_PAGE_SIZE,
+        )
         project_id = self.workspace.project_id(project)
         branch_head = self.workspace.branch_head(project, branch)
         start = start_revision_id or branch_head
@@ -51,19 +63,19 @@ class BranchActivityService:
                               r.author, r.root_hash, r.created_at, h.depth + 1
                        FROM revisions r
                        JOIN history h ON r.id = h.parent1_id
-                       WHERE r.project_id = ?
+                       WHERE r.project_id = ? AND h.depth < ?
                    )
                    SELECT id, parent1_id, parent2_id, message, author, root_hash,
                           created_at, depth
                    FROM history
                    ORDER BY depth
                    LIMIT ?""",
-            (start, project_id, project_id, limit + 1),
+            (start, project_id, project_id, effective_limit, effective_limit + 1),
         ).fetchall()
         if not rows:
             raise NotFoundError(f"revision {start!r} not found")
 
-        page_rows = rows[:limit]
+        page_rows = rows[:effective_limit]
         operation_map = self._operations_for_revisions(
             [str(row["id"]) for row in page_rows]
         )
@@ -86,16 +98,26 @@ class BranchActivityService:
                 }
             )
 
-        next_revision_id = str(rows[limit]["id"]) if len(rows) > limit else None
+        next_revision_id = (
+            str(rows[effective_limit]["id"])
+            if len(rows) > effective_limit
+            else None
+        )
+        truncated = next_revision_id is not None
         return {
             "project": project,
             "branch": branch,
             "branch_head_revision_id": branch_head,
             "start_revision_id": start,
-            "limit": limit,
+            "limit": effective_limit,
             "returned_count": len(revisions),
-            "has_more": next_revision_id is not None,
+            "has_more": truncated,
+            "truncated": truncated,
             "next_revision_id": next_revision_id,
+            "limits": {
+                "maximum_page_size": MAX_HISTORY_PAGE_SIZE,
+                "maximum_reachability_scan": MAX_BRANCH_ACTIVITY_REVISIONS,
+            },
             "revisions": revisions,
         }
 
@@ -109,16 +131,18 @@ class BranchActivityService:
     ) -> dict[str, Any]:
         """Read immutable operation audit rows in sequence-number order."""
 
-        self._validate_operation_limit(limit)
-        if (
-            isinstance(start_sequence_number, bool)
-            or not isinstance(start_sequence_number, int)
-            or start_sequence_number < 0
-        ):
-            raise ValidationError(
-                "INVALID_OPERATION_SEQUENCE",
-                "start_sequence_number must be a non-negative integer",
-            )
+        effective_limit = require_bounded_int(
+            limit,
+            code="INVALID_OPERATION_LIMIT",
+            name="limit",
+            minimum=1,
+            maximum=MAX_OPERATION_PAGE_SIZE,
+        )
+        effective_start = require_nonnegative_int(
+            start_sequence_number,
+            code="INVALID_OPERATION_SEQUENCE",
+            name="start_sequence_number",
+        )
 
         project_id = self.workspace.project_id(project)
         revision = self.workspace.db.connection.execute(
@@ -144,10 +168,10 @@ class BranchActivityService:
                WHERE revision_id = ? AND sequence_number >= ?
                ORDER BY sequence_number
                LIMIT ?""",
-            (revision_id, start_sequence_number, limit + 1),
+            (revision_id, effective_start, effective_limit + 1),
         ).fetchall()
 
-        page_rows = rows[:limit]
+        page_rows = rows[:effective_limit]
         operations = [
             {
                 "id": str(row["id"]),
@@ -159,8 +183,11 @@ class BranchActivityService:
             for row in page_rows
         ]
         next_sequence_number = (
-            int(rows[limit]["sequence_number"]) if len(rows) > limit else None
+            int(rows[effective_limit]["sequence_number"])
+            if len(rows) > effective_limit
+            else None
         )
+        truncated = next_sequence_number is not None
         return {
             "project": project,
             "revision": {
@@ -172,12 +199,14 @@ class BranchActivityService:
                 "root_hash": revision["root_hash"],
                 "created_at": revision["created_at"],
             },
-            "start_sequence_number": start_sequence_number,
-            "limit": limit,
+            "start_sequence_number": effective_start,
+            "limit": effective_limit,
             "total_operation_count": total_count,
             "returned_count": len(operations),
-            "has_more": next_sequence_number is not None,
+            "has_more": truncated,
+            "truncated": truncated,
             "next_sequence_number": next_sequence_number,
+            "limits": {"maximum_page_size": MAX_OPERATION_PAGE_SIZE},
             "operations": operations,
         }
 
@@ -198,34 +227,52 @@ class BranchActivityService:
                               r.author, r.created_at, h.depth + 1
                        FROM revisions r
                        JOIN history h ON r.id = h.parent1_id
-                       WHERE r.project_id = ?
+                       WHERE r.project_id = ? AND h.depth < ?
                    )
                    SELECT id, parent1_id, parent2_id, message, author,
                           created_at, depth
                    FROM history
-                   ORDER BY depth""",
-            (branch_head, project_id, project_id),
+                   ORDER BY depth
+                   LIMIT ?""",
+            (
+                branch_head,
+                project_id,
+                project_id,
+                MAX_BRANCH_ACTIVITY_REVISIONS,
+                MAX_BRANCH_ACTIVITY_REVISIONS + 1,
+            ),
         ).fetchall()
         if not rows:
             raise NotFoundError(f"branch {branch!r} has no reachable revisions")
+        if len(rows) > MAX_BRANCH_ACTIVITY_REVISIONS:
+            raise ValidationError(
+                "BRANCH_ACTIVITY_REVISION_LIMIT_EXCEEDED",
+                "branch activity requires more than "
+                f"{MAX_BRANCH_ACTIVITY_REVISIONS} first-parent revisions",
+            )
 
         operation_rows = self.workspace.db.connection.execute(
-            """WITH RECURSIVE history(id, parent1_id) AS (
-                       SELECT id, parent1_id
+            """WITH RECURSIVE history(id, parent1_id, depth) AS (
+                       SELECT id, parent1_id, 0
                        FROM revisions
                        WHERE id = ? AND project_id = ?
                        UNION ALL
-                       SELECT r.id, r.parent1_id
+                       SELECT r.id, r.parent1_id, h.depth + 1
                        FROM revisions r
                        JOIN history h ON r.id = h.parent1_id
-                       WHERE r.project_id = ?
+                       WHERE r.project_id = ? AND h.depth < ?
                    )
                    SELECT o.revision_id, o.operation_kind, COUNT(*) AS count
                    FROM history h
                    JOIN operations o ON o.revision_id = h.id
                    GROUP BY o.revision_id, o.operation_kind
                    ORDER BY o.revision_id, o.operation_kind""",
-            (branch_head, project_id, project_id),
+            (
+                branch_head,
+                project_id,
+                project_id,
+                MAX_BRANCH_ACTIVITY_REVISIONS,
+            ),
         ).fetchall()
 
         counts_by_revision: dict[str, int] = defaultdict(int)
@@ -277,21 +324,39 @@ class BranchActivityService:
             "newest_created_at": newest["created_at"],
             "oldest_revision_id": str(oldest["id"]),
             "oldest_created_at": oldest["created_at"],
+            "complete": True,
+            "truncated": False,
+            "limits": {
+                "maximum_first_parent_revisions": MAX_BRANCH_ACTIVITY_REVISIONS,
+            },
         }
 
     def _is_first_parent_reachable(self, head: str, target: str) -> bool:
-        row = self.workspace.db.connection.execute(
-            """WITH RECURSIVE history(id, parent1_id) AS (
-                       SELECT id, parent1_id FROM revisions WHERE id = ?
-                       UNION ALL
-                       SELECT r.id, r.parent1_id
-                       FROM revisions r
-                       JOIN history h ON r.id = h.parent1_id
-                   )
-                   SELECT 1 FROM history WHERE id = ? LIMIT 1""",
-            (head, target),
-        ).fetchone()
-        return row is not None
+        current: str | None = head
+        seen: set[str] = set()
+        while current is not None:
+            if current == target:
+                return True
+            if current in seen:
+                raise ValidationError(
+                    "REVISION_HISTORY_CYCLE",
+                    "first-parent history contains a cycle",
+                )
+            if len(seen) >= MAX_BRANCH_ACTIVITY_REVISIONS:
+                raise ValidationError(
+                    "BRANCH_HISTORY_SCAN_LIMIT_EXCEEDED",
+                    "first-parent reachability exceeds the revision scan limit "
+                    f"{MAX_BRANCH_ACTIVITY_REVISIONS}",
+                )
+            seen.add(current)
+            row = self.workspace.db.connection.execute(
+                "SELECT parent1_id FROM revisions WHERE id = ?",
+                (current,),
+            ).fetchone()
+            if row is None:
+                return False
+            current = row["parent1_id"]
+        return False
 
     def _operations_for_revisions(
         self,
@@ -314,26 +379,20 @@ class BranchActivityService:
 
     @staticmethod
     def _validate_history_limit(limit: int) -> None:
-        if isinstance(limit, bool) or not isinstance(limit, int):
-            raise ValidationError(
-                "INVALID_HISTORY_LIMIT",
-                "limit must be an integer",
-            )
-        if limit < 1 or limit > MAX_HISTORY_PAGE_SIZE:
-            raise ValidationError(
-                "INVALID_HISTORY_LIMIT",
-                f"limit must be between 1 and {MAX_HISTORY_PAGE_SIZE}",
-            )
+        require_bounded_int(
+            limit,
+            code="INVALID_HISTORY_LIMIT",
+            name="limit",
+            minimum=1,
+            maximum=MAX_HISTORY_PAGE_SIZE,
+        )
 
     @staticmethod
     def _validate_operation_limit(limit: int) -> None:
-        if isinstance(limit, bool) or not isinstance(limit, int):
-            raise ValidationError(
-                "INVALID_OPERATION_LIMIT",
-                "limit must be an integer",
-            )
-        if limit < 1 or limit > MAX_OPERATION_PAGE_SIZE:
-            raise ValidationError(
-                "INVALID_OPERATION_LIMIT",
-                f"limit must be between 1 and {MAX_OPERATION_PAGE_SIZE}",
-            )
+        require_bounded_int(
+            limit,
+            code="INVALID_OPERATION_LIMIT",
+            name="limit",
+            minimum=1,
+            maximum=MAX_OPERATION_PAGE_SIZE,
+        )

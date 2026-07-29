@@ -7,9 +7,9 @@ from typing import Any
 from .errors import ValidationError
 from .merge_impact import MergeTargetImpactService
 from .merge_validation_set import MergeValidationSetService
+from .revision_limits import MAX_PREFLIGHT_IMPACT_TARGETS
 
 MERGE_PREFLIGHT_FORMAT = "weave-merge-preflight-v1"
-MAX_PREFLIGHT_IMPACT_TARGETS = 200
 
 
 class MergePreflightService:
@@ -92,6 +92,13 @@ class MergePreflightService:
                 "affected_targets",
             )
         }
+        impact_summary["truncated"] = bool(
+            impact.get("truncated", impact["has_more"])
+        )
+        impact_summary["limits"] = impact.get(
+            "limits",
+            {"maximum_page_size": MAX_PREFLIGHT_IMPACT_TARGETS},
+        )
         identity_payload = {
             "format": MERGE_PREFLIGHT_FORMAT,
             "project": project,
@@ -99,6 +106,7 @@ class MergePreflightService:
             "source_branch": source_branch,
             "preview_id": impact["preview_id"],
             "merged_root_hash": impact["merged_root_hash"],
+            "impact_limit": MAX_PREFLIGHT_IMPACT_TARGETS,
             "impact_total_affected_target_count": impact[
                 "total_affected_target_count"
             ],
@@ -147,6 +155,10 @@ class MergePreflightService:
             "merged_root_hash": impact["merged_root_hash"],
             "allow_uncovered_documents": allow_uncovered_documents,
             "ready_for_publication": validation_set["ready_for_publication"],
+            "impact_limit": MAX_PREFLIGHT_IMPACT_TARGETS,
+            "limits": {
+                "maximum_presented_impact_targets": MAX_PREFLIGHT_IMPACT_TARGETS,
+            },
             "impact": impact_summary,
             "impact_targets_truncated": impact["has_more"],
             "validation_set": validation_set,

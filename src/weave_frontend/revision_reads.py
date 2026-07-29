@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from .errors import NotFoundError
-from .sexpr import find_parent, head_symbol, render_node, walk_nodes
+from .revision_limits import MAX_NODE_FIND_RESULTS, require_bounded_int
+from .sexpr import head_symbol, render_node
 
 
 class _Workspace(Protocol):
@@ -62,37 +63,56 @@ class RevisionReadService:
     ) -> dict[str, Any]:
         """Find stable nodes in one document from an exact immutable state."""
 
+        effective_limit = require_bounded_int(
+            limit,
+            code="INVALID_NODE_FIND_LIMIT",
+            name="limit",
+            minimum=1,
+            maximum=MAX_NODE_FIND_RESULTS,
+        )
         selection, root = self._document(project, branch, document, revision_id)
         matches: list[dict[str, Any]] = []
-        for node in walk_nodes(root):
-            if head is not None and head_symbol(node) != head:
-                continue
-            if kind is not None and node.get("kind") != kind:
-                continue
-            if value is not None and node.get("value") != value:
-                continue
-            try:
-                parent, index = find_parent(root, node["id"])
-                parent_id: str | None = str(parent["id"])
-            except NotFoundError:
-                parent_id = None
-                index = None
-            matches.append(
-                {
-                    "node_id": node["id"],
-                    "kind": node["kind"],
-                    "head": head_symbol(node),
-                    "value": node.get("value"),
-                    "parent_id": parent_id,
-                    "position": index,
-                }
+        total_match_count = 0
+        stack: list[tuple[dict[str, Any], str | None, int | None]] = [
+            (root, None, None)
+        ]
+        while stack:
+            node, parent_id, position = stack.pop()
+            matches_filter = (
+                (head is None or head_symbol(node) == head)
+                and (kind is None or node.get("kind") == kind)
+                and (value is None or node.get("value") == value)
             )
-            if len(matches) >= limit:
-                break
+            if matches_filter:
+                total_match_count += 1
+                if len(matches) < effective_limit:
+                    matches.append(
+                        {
+                            "node_id": node["id"],
+                            "kind": node["kind"],
+                            "head": head_symbol(node),
+                            "value": node.get("value"),
+                            "parent_id": parent_id,
+                            "position": position,
+                        }
+                    )
+            children = node.get("children") if node.get("kind") == "list" else None
+            if isinstance(children, list):
+                node_id = str(node["id"])
+                for index in range(len(children) - 1, -1, -1):
+                    stack.append((children[index], node_id, index))
+
+        truncated = total_match_count > len(matches)
         return {
             **selection,
             "document": document,
+            "limit": effective_limit,
+            "returned_count": len(matches),
             "matched_count": len(matches),
+            "total_match_count": total_match_count,
+            "truncated": truncated,
+            "has_more": truncated,
+            "limits": {"maximum_results": MAX_NODE_FIND_RESULTS},
             "matches": matches,
         }
 
