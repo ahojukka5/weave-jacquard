@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import os
-from functools import lru_cache
 from typing import Any
 
 from .batch_edit import EditBatchExecutor
 from .branch_activity import BranchActivityService
 from .build_inspection import BuildInspectionService
 from .build_targets import BuildTargetRegistry
-from .compiler_bridge import CompilerBridge
 from .errors import ValidationError
 from .mcp_guidance import install_runtime_guidance
 from .mcp_server import _result, mcp, workspace
@@ -18,8 +15,15 @@ from .merge_impact import MergeTargetImpactService
 from .merge_preview import MergePreviewService
 from .merge_validation import MergeValidationService
 from .merge_validation_set import MergeValidationSetService
+from .quota_aware_compiler_bridge import CompilerBridge
 from .revision_diff import RevisionNodeDiffService
 from .revision_inspection import RevisionNodeInspectionService
+from .runtime_container import (
+    clear_runtime_compiler_bridge,
+    compiler_bridge_cache_info,
+    runtime_service,
+    runtime_services,
+)
 from .target_validation import BuildTargetValidator
 
 install_runtime_guidance(mcp)
@@ -27,65 +31,76 @@ mcp.remove_tool("node_inspect")
 mcp.remove_tool("branch_merge")
 
 
-@lru_cache(maxsize=1)
+@runtime_service("edit_batches", depends_on=("workspace",))
 def edit_batches() -> EditBatchExecutor:
     return EditBatchExecutor(workspace())
 
 
-@lru_cache(maxsize=1)
+@runtime_service("branch_activity", depends_on=("workspace",))
 def branch_activity() -> BranchActivityService:
     return BranchActivityService(workspace())
 
 
-@lru_cache(maxsize=1)
+@runtime_service("revision_inspection", depends_on=("workspace",))
 def revision_inspection() -> RevisionNodeInspectionService:
     return RevisionNodeInspectionService(workspace())
 
 
-@lru_cache(maxsize=1)
+@runtime_service("revision_diffs", depends_on=("workspace",))
 def revision_diffs() -> RevisionNodeDiffService:
     return RevisionNodeDiffService(workspace())
 
 
-@lru_cache(maxsize=1)
+@runtime_service("merge_previews", depends_on=("workspace",))
 def merge_previews() -> MergePreviewService:
     return MergePreviewService(workspace())
 
 
-@lru_cache(maxsize=1)
 def compiler_bridge() -> CompilerBridge:
-    return CompilerBridge(
-        workspace(),
-        build_root=os.environ.get("WEAVE_BUILD_ROOT"),
-    )
+    """Return the compiler bridge owned by the immutable process runtime."""
+
+    return runtime_services().compiler_bridge()
 
 
-@lru_cache(maxsize=1)
+compiler_bridge.cache_clear = clear_runtime_compiler_bridge  # type: ignore[attr-defined]
+compiler_bridge.cache_info = compiler_bridge_cache_info  # type: ignore[attr-defined]
+
+
+@runtime_service("build_inspection", depends_on=("compiler_bridge",))
 def build_inspection() -> BuildInspectionService:
     return BuildInspectionService(compiler_bridge())
 
 
-@lru_cache(maxsize=1)
+@runtime_service("build_targets", depends_on=("workspace",))
 def build_targets() -> BuildTargetRegistry:
     return BuildTargetRegistry(workspace())
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "merge_impacts",
+    depends_on=("merge_previews", "build_targets"),
+)
 def merge_impacts() -> MergeTargetImpactService:
     return MergeTargetImpactService(merge_previews(), build_targets())
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "merge_validations",
+    depends_on=("workspace", "merge_previews", "build_targets"),
+)
 def merge_validations() -> MergeValidationService:
     return MergeValidationService(workspace(), merge_previews(), build_targets())
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "merge_validation_sets",
+    depends_on=("merge_impacts", "merge_validations"),
+)
 def merge_validation_sets() -> MergeValidationSetService:
     return MergeValidationSetService(merge_impacts(), merge_validations())
 
 
-@lru_cache(maxsize=1)
+@runtime_service("build_target_validator", depends_on=("build_targets",))
 def build_target_validator() -> BuildTargetValidator:
     return BuildTargetValidator(build_targets())
 

@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_build import compiler_bridge
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_runs import test_runs
-from .runtime_container import runtime_config
+from .runtime_container import runtime_config, runtime_service, runtime_services
 from .runtime_identity import RuntimeIdentityService
 
 
@@ -20,22 +19,43 @@ def _application_manifest() -> dict[str, Any]:
     return dict(PUBLIC_APPLICATION_MANIFEST)
 
 
-@lru_cache(maxsize=1)
-def runtime_identities() -> RuntimeIdentityService:
-    """Return the shared runtime identity service."""
+class RuntimeIdentityWithServices:
+    """Bind the stable typed service composition into normal runtime identity."""
+
+    def __init__(self, identity: RuntimeIdentityService) -> None:
+        self.identity = identity
+
+    def report(self) -> dict[str, Any]:
+        result = self.identity.report()
+        result.pop("runtime_id", None)
+        result["service_graph"] = runtime_services().service_manifest(
+            include_state=False
+        )
+        result["runtime_id"] = RuntimeIdentityService._hash_json(result)
+        return result
+
+
+@runtime_service(
+    "runtime_identity",
+    depends_on=("workspace", "compiler_bridge"),
+)
+def runtime_identities() -> RuntimeIdentityWithServices:
+    """Return the runtime-owned identity service."""
 
     runs = test_runs()
-    return RuntimeIdentityService(
-        workspace(),
-        compiler_bridge(),
-        runs.sandbox,
-        _application_manifest,
-        environ=runtime_config().configured_environment,
+    return RuntimeIdentityWithServices(
+        RuntimeIdentityService(
+            workspace(),
+            compiler_bridge(),
+            runs.sandbox,
+            _application_manifest,
+            environ=runtime_config().configured_environment,
+        )
     )
 
 
 def install_capability() -> None:
-    """Discard stale runtime identity dependencies during recomposition."""
+    """Discard stale runtime identity evidence during recomposition."""
 
     runtime_identities.cache_clear()
 

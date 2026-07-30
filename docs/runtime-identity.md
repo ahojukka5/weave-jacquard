@@ -12,6 +12,7 @@ contract can be identified. The report binds:
 - public application ID;
 - public MCP tool-manifest ID and tool count;
 - capability count;
+- the typed runtime service graph and its content-derived graph ID;
 - Python implementation, version, and executable hash;
 - MCP SDK version;
 - SQLite schema version, busy timeout, journal mode, foreign-key policy, and an
@@ -24,6 +25,25 @@ contract can be identified. The report binds:
 
 The application and tool-manifest IDs come from the completed public composition,
 not from a parallel hand-maintained inventory.
+
+## Typed service graph
+
+The `service_graph` section uses
+`weave-jacquard-runtime-service-graph-v1`. It records every service currently owned
+by the typed runtime registry as a lexical list containing:
+
+- stable service name;
+- Python factory origin;
+- explicit dependency names.
+
+Its `service_graph_id` covers the graph format, service count, and complete service
+list. Lazy initialization state is deliberately excluded. Calling a previously
+unused service therefore does not redefine the runtime identity.
+
+The graph is incremental while issue #106 is open. It currently includes the
+workspace, compiler bridge, foundational build and merge services, and runtime
+identity itself. Legacy capability caches are not falsely represented as
+runtime-owned services before they migrate.
 
 ## Redaction and opaque configuration IDs
 
@@ -83,6 +103,7 @@ every field except `runtime_id` itself.
 The ID changes when any bound component changes, including:
 
 - application or tool contract;
+- typed runtime service composition;
 - Jacquard, MCP, or Python version;
 - Python, compiler, Bubblewrap, or `prlimit` binary content;
 - database location or runtime policy;
@@ -91,9 +112,9 @@ The ID changes when any bound component changes, including:
 - which public configuration variables are set;
 - any configured public value, through its opaque value ID.
 
-The report intentionally contains no wall-clock timestamp, random identifier, or
-mutable counter, so repeated calls against an unchanged process return the same
-identity.
+The report intentionally contains no wall-clock timestamp, random identifier,
+mutable counter, or lazy-initialization state, so repeated calls against an
+unchanged process return the same identity.
 
 ## Relationship to qualification
 

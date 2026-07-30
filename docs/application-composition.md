@@ -8,11 +8,11 @@ application object is the final startup boundary for:
 
 - the validated capability dependency graph;
 - typed immutable runtime configuration;
-- deterministic ownership of the workspace and compiler bridge;
-- final capability installation, including idempotent cached-module installers;
-- the exact registered public MCP tool contracts;
-- content-derived capability, tool-contract, tool-manifest, application, and runtime
-  identities.
+- deterministic ownership of runtime services;
+- final idempotent capability installation;
+- exact registered public MCP tool contracts;
+- content-derived capability, tool-contract, tool-manifest, application, service
+  graph, and runtime identities.
 
 The public entry point exports:
 
@@ -45,13 +45,13 @@ list.
 
 Changing a parameter type, required argument, default encoded in JSON Schema,
 output schema, description, annotation, icon, or metadata changes the individual
-tool identity and the complete manifest identity even when the tool name is
-unchanged. Registry insertion order does not affect either identity.
+tool identity and complete manifest identity even when the tool name is unchanged.
+Registry insertion order does not affect either identity.
 
-Jacquard captures one registry snapshot for each extraction. Registry keys must
-already be non-empty strings; they are never coerced with `str()`. Contracts may
-contain only the supported protocol fields. Unknown fields are rejected rather than
-silently excluded from identity.
+Jacquard captures one registry snapshot for each extraction. Registry keys must be
+non-empty strings and are never coerced with `str()`. Contracts may contain only the
+supported protocol fields. Unknown fields are rejected rather than silently
+excluded from identity.
 
 The normalizer accepts JSON primitives, finite numbers, string-keyed mappings,
 sequences, dataclasses, enums, and Pydantic values through
@@ -70,60 +70,86 @@ service state, database contents, or artifact paths.
 - `tool_manifest_id` and tool count;
 - every supported runtime configuration-variable name in lexical order.
 
-Its `application_id` therefore changes when the public tool contract, capability
-graph, or configuration surface changes. It is not a security token, release
-version, or proof that every tool behaves correctly. Syntax, unit, real-MCP,
+Its `application_id` changes when the public tool contract, capability graph, or
+configuration surface changes. It is not a security token, release version, or
+proof that every tool behaves correctly. Syntax, unit, real-MCP,
 packaged-compiler, sandbox, and native execution qualification remain required.
 
 ## Typed runtime configuration
 
 Before a production service is first used, `RuntimeConfig` captures all supported
 environment values into one frozen typed snapshot. Empty values are treated as
-unset and the aggregate artifact quota is parsed immediately. A running process does
-not observe later environment mutations.
+unset and the aggregate artifact quota is parsed immediately. A running process
+does not observe later environment mutations.
 
 The snapshot includes database, compiler, sandbox, artifact-root, backup-root, and
-quota configuration. The application manifest exposes only the supported variable
+quota configuration. The application manifest exposes only supported variable
 names. Runtime identity receives an immutable mapping of explicitly configured
 values and emits opaque matching IDs rather than raw values or paths.
 
 See [typed runtime configuration and service ownership](runtime-container.md).
 
-## Runtime-owned service roots
+## Runtime-owned services
 
-`RuntimeServices` owns the roots of the production dependency graph:
+`RuntimeServices` owns the production roots:
 
 - one race-safe `SExpressionWorkspace` and SQLite connection;
 - one quota-capable committed-build `CompilerBridge`.
 
-Both are lazy, identity-stable, and protected by one reentrant lock. The first
-capability installs runtime-backed `workspace()` and `compiler_bridge()` factories
-before dependent capability modules are imported. Dependent build, test, merge,
-backup, quota, evidence, and identity services therefore share the same roots.
+It also provides a named lazy-service registry. Production factories migrated with
+`runtime_service()` retain their existing callable and cache-adapter surface while
+the container owns identity, dependency evidence, invalidation, and shutdown.
+
+The foundational build and merge graph is runtime-owned in this slice:
+
+- edit batches and branch activity;
+- revision inspection and diff;
+- merge preview, impact, validation, and validation sets;
+- build targets, target validation, build inspection, and compiler bridge;
+- production runtime identity.
+
+`mcp_server.workspace`, `mcp_build.workspace`, and
+`mcp_concurrent_nodes.workspace` are the same stable runtime-backed function from
+their first import. The compiler bridge has the same stable-proxy property.
+Capability installation no longer scans `sys.modules`, replaces bindings in
+previously imported modules, or clears a hand-maintained list of foundational
+service caches.
 
 The compiler bridge is constructed directly as the production quota-aware class.
-The historical in-place bridge upgrade remains only as a narrow compatibility path
-for standalone module composition and older tests; normal public startup does not
-rely on class mutation.
+The historical in-place bridge upgrade remains only as a narrow standalone
+compatibility path; normal public startup does not rely on class mutation.
+
+## Runtime service graph
+
+`weave-jacquard-runtime-service-graph-v1` records the service name, factory origin,
+and explicit dependencies for every service known to the typed registry. Its
+`service_graph_id` excludes lazy initialization state, so first use of an already
+composed service does not redefine runtime identity.
+
+Optional container diagnostics may report initialized service names separately.
+The public `runtime_identity` report binds only the stable composition graph.
+
+The service graph is incremental while issue #106 remains open. Module-local
+factories that have not migrated are not falsely represented as runtime-owned.
 
 ## Runtime identity v1
 
 The application manifest intentionally excludes live component values. The public
-`runtime_identity` tool adds a separate content-derived report that binds:
+`runtime_identity` tool adds a separate content-derived report binding:
 
 - `application_id`, `tool_manifest_id`, tool count, and capability count;
+- typed service graph and graph ID;
 - Jacquard, Python, and MCP versions;
 - Python executable hash;
 - database schema and connection policy;
 - final compiler binary hash and bounded version evidence;
 - sandbox policy and Bubblewrap and `prlimit` binary hashes;
-- which public configuration variables were set at startup and domain-separated
-  opaque IDs for their values.
+- configured public variable names and domain-separated opaque value IDs.
 
-The runtime identity tool is itself part of the tool manifest. It reads the completed
-public application manifest lazily. There is no hash cycle: application identity
-binds the tool contract, while runtime identity binds the completed application ID
-and current component evidence.
+The runtime identity tool is itself part of the tool manifest. It reads the
+completed public application manifest lazily. There is no hash cycle: application
+identity binds the tool contract, while runtime identity binds the completed
+application ID and current component evidence.
 
 Runtime identity is diagnostic and audit-correlation evidence, not a qualification
 result. See [runtime identity](runtime-identity.md) and
@@ -135,10 +161,10 @@ Production startup follows one explicit sequence:
 
 ```text
 base decorated server
-→ ordered capability installation
 → immutable RuntimeConfig snapshot
-→ RuntimeServices workspace/compiler factory installation
-→ dependent service composition
+→ RuntimeServices creation
+→ ordered capability installation
+→ runtime-owned lazy service declarations
 → artifact-root composition and optional quota attachment
 → final guidance installation
 → one registered tool-registry snapshot
@@ -166,39 +192,39 @@ Composition fails before serving requests when:
 
 ## Lifecycle
 
-`RuntimeServices.close()` is idempotent. It closes the owned workspace exactly once,
-clears owned references, and rejects later access through the closed container. An
-explicit replacement closes the previous runtime. Process shutdown is registered
-through `atexit`.
+`RuntimeServices.close()` is idempotent. It closes realized services once in
+reverse dependency order, clears owned references, and rejects later access through
+the closed container. An explicit replacement closes the previous runtime. Process
+shutdown is registered through `atexit`.
 
-Compatibility `cache_clear()` and `cache_info()` adapters remain on the production
-workspace and compiler factories because the existing qualification suite and some
-incremental capability installers use that interface. Clearing the workspace closes
-and resets the complete runtime; clearing only the compiler bridge retains the
-workspace and recreates a bridge against it.
+Clearing a named dependency invalidates every realized runtime-owned dependent.
+Compatibility `cache_clear()` and `cache_info()` adapters remain on migrated
+factories for qualification and embedding. Clearing the workspace resets the whole
+process runtime; clearing the compiler bridge preserves the workspace while
+invalidating bridge-dependent services.
 
-These hooks support tests and embedding. They are not a live process
-reconfiguration API. Operators restart the MCP process to apply environment changes.
+These hooks are not live reconfiguration APIs. Operators restart the MCP process to
+apply environment changes.
 
 ## MCP SDK compatibility boundary
 
 Most MCP modules still register decorated tools on the shared server at import time.
 The application object does not hide that fact. It provides the stable outer
-composition boundary needed to migrate individual dependent services incrementally
-without changing public names or schemas.
+composition boundary needed to migrate dependent services without changing public
+names or schemas.
 
-The v1 MCP Python SDK exposes tool metadata through the FastMCP tool-manager
-registry. Jacquard supports its mapping-backed `_tools` shape and the mapping-backed
-fake-server shape used by tests. This remains an SDK compatibility boundary even
-though the extracted fields correspond to the protocol `tools/list` contract.
+The MCP Python SDK exposes tool metadata through the FastMCP tool-manager registry.
+Jacquard supports its mapping-backed `_tools` shape and the mapping-backed fake
+server used by tests. This remains an SDK compatibility boundary even though the
+extracted fields correspond to the protocol `tools/list` contract.
 
-A later MCP SDK should be adopted through a supported public tool-list API when one
-is available synchronously at startup. The migration must not introduce a second
+A later SDK should be adopted through a supported public tool-list API when one is
+available synchronously at startup. The migration must not introduce a second
 production server assembly path.
 
 ## Configuration contract
 
-The application manifest names, but does not reveal values for, these variables:
+The application manifest names, but does not reveal values for:
 
 - `WEAVEC_BIN`;
 - `WEAVEC_SOURCE_ROOT`;
@@ -218,17 +244,16 @@ Paths and values are absent from composition metadata. Artifact manifests contin
 to bind exact compiler, executable, sandbox, and content hashes where those
 identities matter.
 
-## Remaining migration boundary
+## Remaining issue #106 work
 
-The typed container now owns configuration, the database workspace, and the compiler
-bridge. Dependent MCP services still use module-local lazy caches. Their dependencies
-are rooted in the container, and installers clear stale compositions in dependency
-order, but they are not yet typed fields of one complete service graph.
+The typed container now owns the production roots and foundational build/merge
+graph. Test, task, checkpoint, backup, artifact, project-supervision, and selected
+merge workflow factories still include module-local caches.
 
-Future slices can move those dependent caches into `RuntimeServices`, add explicit
-construction phases, and reduce module import side effects without changing public
-MCP contracts. The runtime-container boundary is deliberately incremental rather
-than a simultaneous rewrite of every capability.
+Follow-up slices will migrate those services, pass an explicit runtime/application
+context through capability installation, isolate FastMCP private-registry access in
+one adapter, and prove that two complete applications can coexist in one process
+without cross-contamination.
 
 ## Contributor rules
 
@@ -236,6 +261,7 @@ than a simultaneous rewrite of every capability.
 - Never create a production entry point that bypasses `JacquardApp.compose()`.
 - Read production configuration through `RuntimeConfig`, not ad hoc environment
   access in MCP composition modules.
+- Add production lazy services through the typed runtime registry.
 - Treat tool-contract and manifest changes as public API changes requiring review
   and real-MCP qualification.
 - Keep schemas and metadata JSON-canonical and deterministic.
