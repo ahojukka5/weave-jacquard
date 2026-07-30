@@ -2,71 +2,20 @@
 
 from __future__ import annotations
 
-import sys
 from typing import Any
 
 from . import mcp_build as _build
 from . import mcp_server as _server
-from .runtime_container import (
-    clear_runtime_compiler_bridge,
-    compiler_bridge_cache_info,
-    reset_runtime_services,
-    runtime_services,
-    workspace_cache_info,
-)
+from .runtime_container import runtime_services
 
-
-def workspace() -> Any:
-    """Return the race-safe workspace owned by the typed process runtime."""
-
-    return runtime_services().workspace()
-
-
-def compiler_bridge() -> Any:
-    """Return the quota-capable compiler bridge owned by the typed process runtime."""
-
-    return runtime_services().compiler_bridge()
-
-
-workspace.cache_clear = reset_runtime_services  # type: ignore[attr-defined]
-workspace.cache_info = workspace_cache_info  # type: ignore[attr-defined]
-compiler_bridge.cache_clear = clear_runtime_compiler_bridge  # type: ignore[attr-defined]
-compiler_bridge.cache_info = compiler_bridge_cache_info  # type: ignore[attr-defined]
+workspace = _server.workspace
+compiler_bridge = _build.compiler_bridge
 
 
 def install_capability() -> None:
-    """Install runtime-backed factories before dependent capabilities are imported."""
+    """Initialize the explicit process runtime without mutating imported modules."""
 
-    previous_server = _server.workspace
-    previous_build = _build.workspace
-    _server.workspace = workspace
-    _build.workspace = workspace
-    _build.compiler_bridge = compiler_bridge
-    # Modules that already did `from .mcp_server import workspace` keep the old
-    # binding; rebind them so production and direct test imports share one root.
-    for module in tuple(sys.modules.values()):
-        if module is None:
-            continue
-        name = getattr(module, "__name__", "")
-        if not isinstance(name, str) or not name.startswith("weave_frontend."):
-            continue
-        bound = getattr(module, "workspace", None)
-        if bound is previous_server or bound is previous_build:
-            module.workspace = workspace
-    for factory in (
-        _build.edit_batches,
-        _build.branch_activity,
-        _build.revision_inspection,
-        _build.revision_diffs,
-        _build.merge_previews,
-        _build.build_inspection,
-        _build.build_targets,
-        _build.merge_impacts,
-        _build.merge_validations,
-        _build.merge_validation_sets,
-        _build.build_target_validator,
-    ):
-        factory.cache_clear()
+    runtime_services()
 
 
 install_capability()

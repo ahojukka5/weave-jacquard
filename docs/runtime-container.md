@@ -1,9 +1,9 @@
 # Typed runtime configuration and service ownership
 
 Jacquard's production MCP application captures supported process configuration once
-and owns its core shared services through an explicit runtime container. This makes
-startup configuration, service identity, and shutdown behavior stable for the life
-of one server process.
+and owns shared services through an explicit runtime container. Startup
+configuration, service identity, dependency ownership, and shutdown behavior remain
+stable for the life of one server process.
 
 ## Immutable configuration snapshot
 
@@ -30,70 +30,125 @@ typed values, while an immutable mapping of explicitly configured string values 
 retained for redacted runtime identity.
 
 Changing `os.environ` after the snapshot exists does not reconfigure a running
-server. Operators must restart the process to apply configuration changes. This
-prevents different lazily created services from observing different generations of
-environment state.
+server. Operators restart the process to apply configuration changes. This prevents
+lazily created services from observing different generations of environment state.
 
-The application manifest binds the variable names only. `runtime_identity` reads the
+The application manifest binds variable names only. `runtime_identity` reads the
 same startup snapshot and publishes domain-separated opaque value IDs without
 revealing paths or values.
 
-## Runtime-owned services
+## Runtime-owned service registry
 
-`RuntimeServices` currently owns the two roots of the production service graph:
+`RuntimeServices` owns the roots of the production graph:
 
-- the race-safe `SExpressionWorkspace` and its SQLite connection;
+- the race-safe `SExpressionWorkspace` and SQLite connection;
 - the quota-capable committed-build `CompilerBridge`.
 
-Both are created lazily under one reentrant lock and returned by identity on every
-subsequent request. The compiler bridge is constructed directly as the quota-aware
-production class; normal production startup no longer mutates a cached plain bridge
-into another class.
+It also supplies a named lazy-service registry. The `runtime_service()` decorator
+moves a no-argument production factory into that registry while retaining the
+historical callable, `cache_clear()`, and `cache_info()` surface expected by existing
+qualification code.
 
-The first declared MCP capability installs runtime-backed `workspace()` and
-`compiler_bridge()` factories before dependent capability modules are loaded. Their
-public tool names and schemas are unchanged. Existing module factories then compose
-build, test, candidate, backup, quota, attestation, and identity services around
-those runtime-owned roots.
+The first migrated dependent services are the foundational build and merge graph:
 
-Artifact roots, sandbox selection, backup location, and quota policy are taken from
-the same immutable configuration snapshot when those services are composed.
+```text
+workspace
+├── edit_batches
+├── branch_activity
+├── revision_inspection
+├── revision_diffs
+├── merge_previews
+└── build_targets
+    ├── build_target_validator
+    ├── merge_impacts
+    └── merge_validations
+        └── merge_validation_sets
 
-## Lifecycle
+compiler_bridge
+└── build_inspection
+```
 
-The process runtime has one deterministic lifecycle:
+Factories are created lazily under one reentrant lock. Nested factory calls record
+dependency edges automatically, while declared dependencies document edges before a
+service is materialized. Repeated calls return the same object identity.
+
+## Stable production proxies
+
+`mcp_server.workspace` is now a stable runtime-backed function from its first import.
+`mcp_build.workspace` and `mcp_concurrent_nodes.workspace` reference that same
+function object. The committed compiler factory is similarly a stable proxy to the
+container-owned compiler bridge.
+
+Production capability installation no longer scans or mutates `sys.modules`, swaps
+previously imported workspace bindings, or clears an ad hoc list of build caches.
+The first capability only ensures that the immutable process runtime exists. Tool
+names and schemas are unchanged.
+
+The standalone service classes and `weave-build` CLI remain explicit embedding
+boundaries. They may use constructor arguments or documented legacy fallbacks; they
+are not silently attached to the MCP process runtime.
+
+## Dependency-aware lifecycle
+
+The process runtime follows this lifecycle:
 
 ```text
 capture RuntimeConfig
 → create RuntimeServices
-→ lazily open workspace
-→ lazily create compiler bridge
-→ compose dependent services
+→ lazily create named services
+→ record service dependencies
 → serve MCP requests
-→ close workspace once at process shutdown
+→ close realized services in reverse dependency order
 ```
 
-`close_runtime_services()` is idempotent. Closing a container clears its owned
-references, closes the workspace exactly once, and rejects later access through that
-container. Installing a replacement container closes the previous one before the
-replacement is used. Replacement and reset hooks exist for qualification and
-embedding; they are not live reconfiguration APIs for a running MCP server.
+The container derives close order from service dependencies, not only from creation
+order. Dependents therefore close before the resources they use even when a declared
+dependency was materialized later. Duplicate object identities are closed only once.
+Closing is idempotent, clears owned references, and rejects later access through the
+closed container.
 
-Historical `cache_clear()` and `cache_info()` calls on the production workspace and
-compiler factories remain as narrow compatibility adapters for the existing test
-suite and incremental migration. Clearing the workspace factory closes the complete
-runtime. Clearing only the compiler factory preserves the workspace and recreates a
-bridge against that same workspace.
+Clearing one named dependency also clears every realized dependent recorded in the
+graph. Clearing the compiler bridge therefore cannot leave a runtime-owned build
+inspection service holding the discarded bridge. Replacing the process container
+closes the previous container before the replacement is used.
 
-## Production boundary
+`workspace.cache_clear()` remains the compatibility operation that closes and resets
+the entire process runtime. `compiler_bridge.cache_clear()` clears the bridge and
+its runtime-owned dependents while preserving the workspace.
 
-The guarantee applies to the application assembled through `JacquardApp.compose()`.
-Standalone service classes and `weave-build` remain explicit embedding and CLI
-interfaces. They may read their own constructor arguments or legacy environment
-fallbacks and are not silently attached to the MCP process runtime.
+## Service-graph identity
 
-The remaining module-level service caches are dependent graph nodes rather than
-owners of database or compiler roots. Future slices can move them into typed
-container fields without changing public MCP contracts. The immediate invariant is
-that every production service graph begins from one immutable configuration, one
-workspace, and one quota-capable compiler bridge.
+`RuntimeServices.service_manifest()` returns
+`weave-jacquard-runtime-service-graph-v1` evidence containing:
+
+- each known service name;
+- its factory origin;
+- deterministic dependency names;
+- the complete service count;
+- a content-derived `service_graph_id`.
+
+Decorator declarations are registered when their modules are composed. The graph ID
+therefore describes service composition and does not change merely because another
+lazy service is used for the first time. Optional state evidence reports the current
+`initialized_services` and `initialized_service_count` separately and is excluded
+from the graph hash.
+
+The production `runtime_identity` report includes the state-free graph manifest and
+recomputes its `runtime_id` over that stable composition evidence. Filesystem paths,
+configured values, and incidental lazy-initialization order are not included in the
+service graph.
+
+The graph describes runtime-owned services known to the current container. It does
+not claim that the remaining legacy capability factories have already migrated.
+
+## Remaining issue #106 work
+
+This slice removes the hidden module-rebinding mechanism, removes the duplicate
+environment-reading base workspace from production composition, and migrates the
+foundational build/merge services.
+
+Other capability modules still contain module-local lazy caches. Follow-up work will
+move those factories onto the same registry, inject an explicit runtime/application
+context into capability installation, isolate FastMCP registry compatibility, and
+prove that two complete applications can coexist in one process without global
+cross-contamination.

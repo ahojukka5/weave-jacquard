@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-import atexit
-import os
 from collections.abc import Callable
 from dataclasses import asdict, is_dataclass
-from functools import lru_cache
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
 from .errors import ConflictError, ValidationError, WeaveFrontendError
+from .runtime_container import (
+    reset_runtime_services,
+    runtime_services,
+    workspace_cache_info,
+)
 from .verified_workspace import SExpressionWorkspace
 
 INSTRUCTIONS = """
@@ -25,20 +27,14 @@ configured weavec frontend is the authoritative language validator.
 mcp = FastMCP("weave-mcp", instructions=INSTRUCTIONS)
 
 
-@lru_cache(maxsize=1)
 def workspace() -> SExpressionWorkspace:
-    return SExpressionWorkspace(
-        os.environ.get("WEAVE_DB_PATH", "weave.db"),
-        weavec_source_root=os.environ.get("WEAVEC_SOURCE_ROOT"),
-        weavec_binary=os.environ.get("WEAVEC_BIN"),
-    )
+    """Return the workspace owned by the immutable process runtime."""
+
+    return runtime_services().workspace()
 
 
-@atexit.register
-def _close_workspace() -> None:
-    if workspace.cache_info().currsize:
-        workspace().close()
-        workspace.cache_clear()
+workspace.cache_clear = reset_runtime_services  # type: ignore[attr-defined]
+workspace.cache_info = workspace_cache_info  # type: ignore[attr-defined]
 
 
 def _jsonable(value: Any) -> Any:
