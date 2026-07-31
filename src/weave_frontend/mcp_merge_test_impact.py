@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_build import build_targets, merge_previews
@@ -12,13 +11,17 @@ from .mcp_test_targets import (
     test_targets,
 )
 from .merge_test_impact import MergeCandidateTestImpactService
+from .runtime_container import runtime_service
 from .test_impact import (
     DEFAULT_TEST_IMPACT_EVIDENCE_LIMIT,
     DEFAULT_TEST_IMPACT_PAGE_SIZE,
 )
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "merge_test_impact_plans",
+    depends_on=("merge_previews", "build_targets", "test_targets"),
+)
 def merge_test_impact_plans() -> MergeCandidateTestImpactService:
     """Return the shared virtual merge-candidate impact service."""
 
