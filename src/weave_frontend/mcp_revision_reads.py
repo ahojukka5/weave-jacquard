@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_server import _result, mcp, workspace
 from .revision_reads import RevisionReadService
+from .runtime_container import runtime_service
 
 for _tool_name in ("branch_history", "node_find", "program_render"):
     mcp.remove_tool(_tool_name)
 
 
-@lru_cache(maxsize=1)
+@runtime_service("revision_reads", depends_on=("workspace",))
 def revision_reads() -> RevisionReadService:
     return RevisionReadService(workspace())
 

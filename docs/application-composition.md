@@ -100,13 +100,14 @@ It also provides a named lazy-service registry. Production factories migrated wi
 `runtime_service()` retain their existing callable and cache-adapter surface while
 the container owns identity, dependency evidence, invalidation, and shutdown.
 
-The foundational build and merge graph is runtime-owned in this slice:
+The runtime-owned graph in this slice includes:
 
 - edit batches and branch activity;
-- revision inspection and diff;
+- revision inspection, diff, pinned reads, and stable-ID revert composition;
 - merge preview, impact, validation, and validation sets;
-- build targets, target validation, build inspection, and compiler bridge;
-- production runtime identity.
+- build targets, target validation, build inspection, and verified build discovery;
+- verified online database backups;
+- compiler bridge and production runtime identity.
 
 `mcp_server.workspace`, `mcp_build.workspace`, and
 `mcp_concurrent_nodes.workspace` are the same stable runtime-backed function from
@@ -246,14 +247,15 @@ identities matter.
 
 ## Remaining issue #106 work
 
-The typed container now owns the production roots and foundational build/merge
-graph. Test, task, checkpoint, backup, artifact, project-supervision, and selected
-merge workflow factories still include module-local caches.
+The typed container now owns the production roots, foundational build and merge
+graph, revision-pinned read and revert services, verified build discovery, and
+database backup composition.
 
-Follow-up slices will migrate those services, pass an explicit runtime/application
-context through capability installation, isolate FastMCP private-registry access in
-one adapter, and prove that two complete applications can coexist in one process
-without cross-contamination.
+Test, task, checkpoint, artifact, project-supervision, selected-merge, and retained
+evidence factories still include module-local caches. Follow-up slices will migrate
+those services, pass an explicit runtime/application context through capability
+installation, isolate FastMCP private-registry access in one adapter, and prove that
+two complete applications can coexist in one process without cross-contamination.
 
 ## Contributor rules
 
