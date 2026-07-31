@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
-
 from .mcp_build import merge_impacts, merge_validation_sets
 from .mcp_server import _result, mcp, workspace
 from .merge_policy import MergePolicyRegistry
 from .merge_preflight import MergePreflightService
+from .runtime_container import runtime_service
 
 
-@lru_cache(maxsize=1)
+@runtime_service("merge_policies", depends_on=("workspace",))
 def merge_policies() -> MergePolicyRegistry:
     return MergePolicyRegistry(workspace())
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "merge_preflights",
+    depends_on=("merge_impacts", "merge_validation_sets", "merge_policies"),
+)
 def merge_preflights() -> MergePreflightService:
     return MergePreflightService(
         merge_impacts(),
