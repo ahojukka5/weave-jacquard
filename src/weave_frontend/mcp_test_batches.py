@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_runs import test_runs
 from .mcp_test_targets import test_targets
 from .quota_aware_test_batches import TestBatchService
-from .runtime_container import runtime_config
+from .runtime_container import runtime_config, runtime_service
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "test_batches",
+    depends_on=("workspace", "test_targets", "test_runs"),
+)
 def test_batches() -> TestBatchService:
     """Return the shared immutable explicit test-batch service."""
 

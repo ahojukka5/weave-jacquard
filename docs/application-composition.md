@@ -100,14 +100,21 @@ It also provides a named lazy-service registry. Production factories migrated wi
 `runtime_service()` retain their existing callable and cache-adapter surface while
 the container owns identity, dependency evidence, invalidation, and shutdown.
 
-The runtime-owned graph in this slice includes:
+The runtime-owned graph now includes:
 
 - edit batches and branch activity;
 - revision inspection, diff, pinned reads, and stable-ID revert composition;
 - merge preview, impact, validation, and validation sets;
 - build targets, target validation, build inspection, and verified build discovery;
 - verified online database backups;
+- committed-revision behavioral-test definitions and bounded pages;
+- strict behavioral-test execution, explicit batches, and structural impact plans;
 - compiler bridge and production runtime identity.
+
+The behavioral-test graph records exact dependencies on the workspace, build-target
+registry, test-definition registry, compiler bridge, and immutable runtime
+configuration. Clearing a root therefore invalidates every realized execution,
+batch, page, and impact service that captured it.
 
 `mcp_server.workspace`, `mcp_build.workspace`, and
 `mcp_concurrent_nodes.workspace` are the same stable runtime-backed function from
@@ -202,7 +209,7 @@ Clearing a named dependency invalidates every realized runtime-owned dependent.
 Compatibility `cache_clear()` and `cache_info()` adapters remain on migrated
 factories for qualification and embedding. Clearing the workspace resets the whole
 process runtime; clearing the compiler bridge preserves the workspace while
-invalidating bridge-dependent services.
+invalidating bridge-dependent build and behavioral-test services.
 
 These hooks are not live reconfiguration APIs. Operators restart the MCP process to
 apply environment changes.
@@ -248,14 +255,15 @@ identities matter.
 ## Remaining issue #106 work
 
 The typed container now owns the production roots, foundational build and merge
-graph, revision-pinned read and revert services, verified build discovery, and
-database backup composition.
+graph, revision-pinned read and recovery services, and the complete
+committed-revision behavioral-test graph.
 
-Test, task, checkpoint, artifact, project-supervision, selected-merge, and retained
-evidence factories still include module-local caches. Follow-up slices will migrate
-those services, pass an explicit runtime/application context through capability
-installation, isolate FastMCP private-registry access in one adapter, and prove that
-two complete applications can coexist in one process without cross-contamination.
+Task, checkpoint, artifact, project-supervision, selected-merge, virtual-candidate
+test, attestation, and retained-evidence factories still include module-local
+caches. Follow-up slices will migrate those services, pass an explicit
+runtime/application context through capability installation, isolate FastMCP
+private-registry access in one adapter, and prove that two complete applications can
+coexist in one process without cross-contamination.
 
 ## Contributor rules
 

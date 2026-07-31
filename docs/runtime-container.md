@@ -49,7 +49,7 @@ moves a no-argument production factory into that registry while retaining the
 historical callable, `cache_clear()`, and `cache_info()` surface expected by existing
 qualification code.
 
-The migrated foundational build, merge, read, and recovery graph now includes:
+The migrated foundational build, merge, read, and recovery graph includes:
 
 ```text
 workspace
@@ -72,10 +72,25 @@ compiler_bridge
 └── build_discovery
 ```
 
-`reverts` also declares its direct workspace dependency. Factories are created
-lazily under one reentrant lock. Nested factory calls record dependency edges
-automatically, while declared dependencies document edges before a service is
-materialized. Repeated calls return the same object identity.
+The committed-revision behavioral-test graph is also runtime-owned:
+
+```text
+workspace
+└── test_targets
+    ├── test_target_pages
+    ├── test_runs
+    │   └── test_batches
+    └── test_impact_plans
+```
+
+`test_runs` additionally depends on `workspace`, `build_targets`, and
+`compiler_bridge`. `test_batches` additionally declares its direct workspace
+dependency, and `test_impact_plans` also depends on `workspace` and `build_targets`.
+`reverts` similarly declares its direct workspace dependency.
+
+Factories are created lazily under one reentrant lock. Nested factory calls record
+dependency edges automatically, while declared dependencies document edges before a
+service is materialized. Repeated calls return the same object identity.
 
 ## Stable production proxies
 
@@ -114,10 +129,11 @@ closed container.
 
 Clearing one named dependency also clears every realized dependent recorded in the
 graph. Clearing the compiler bridge therefore cannot leave runtime-owned build
-inspection or build-discovery services holding the discarded bridge. Clearing the
-workspace also invalidates revision reads, revert composition, database backups, and
-their transitive runtime-owned dependencies. Replacing the process container closes
-the previous container before the replacement is used.
+inspection, build-discovery, or behavioral-test execution services holding the
+discarded bridge. Clearing the workspace also invalidates revision reads, revert
+composition, database backups, behavioral-test definitions, executions, batches,
+impact plans, and their transitive runtime-owned dependencies. Replacing the process
+container closes the previous container before the replacement is used.
 
 `workspace.cache_clear()` remains the compatibility operation that closes and resets
 the entire process runtime. `compiler_bridge.cache_clear()` clears the bridge and
@@ -150,12 +166,13 @@ not claim that the remaining legacy capability factories have already migrated.
 
 ## Remaining issue #106 work
 
-This slice adds revision-pinned reads, stable-ID revert composition, verified build
-discovery, and database backups to the typed runtime graph.
+The typed graph now owns committed-revision behavioral-test definitions, pages,
+execution, batches, and structural impact planning in addition to the foundational
+build, merge, read, and recovery services.
 
-Test, task, checkpoint, artifact, project-supervision, selected-merge, and retained
-evidence factories still contain module-local lazy caches. Follow-up work will move
-those factories onto the same registry, inject an explicit runtime/application
-context into capability installation, isolate FastMCP registry compatibility, and
-prove that two complete applications can coexist in one process without global
-cross-contamination.
+Task, checkpoint, artifact, project-supervision, selected-merge, virtual-candidate
+test, attestation, and retained-evidence factories still contain module-local lazy
+caches. Follow-up work will move those factories onto the same registry, inject an
+explicit runtime/application context into capability installation, isolate FastMCP
+registry compatibility, and prove that two complete applications can coexist in one
+process without global cross-contamination.
