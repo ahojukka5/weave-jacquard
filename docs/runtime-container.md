@@ -49,7 +49,7 @@ moves a no-argument production factory into that registry while retaining the
 historical callable, `cache_clear()`, and `cache_info()` surface expected by existing
 qualification code.
 
-The migrated foundational build, merge, read, and recovery graph includes:
+The foundational build, merge, read, and recovery graph includes:
 
 ```text
 workspace
@@ -72,7 +72,7 @@ compiler_bridge
 └── build_discovery
 ```
 
-The committed-revision behavioral-test graph is also runtime-owned:
+The committed-revision behavioral-test graph is runtime-owned:
 
 ```text
 workspace
@@ -94,7 +94,7 @@ workspace
     └── project_agent_statuses
 ```
 
-Merge review and restart orientation now belong to the same graph:
+Merge review and restart orientation belong to the same graph:
 
 ```text
 workspace
@@ -142,6 +142,18 @@ project_merge_queues
 `project_agent_statuses`. `project_merge_impact_queues` additionally depends on
 `merge_impacts` and `merge_policies`. `selected_merge_preflight_batches`
 additionally depends on `merge_preflights`.
+
+Retained revision-evidence discovery is runtime-owned:
+
+```text
+workspace
+└── revision_evidence
+```
+
+`revision_evidence` additionally depends on the compiler bridge, committed test runs
+and batches, virtual-candidate test qualifications, and tested-merge attestations.
+It captures publisher roots and verifier callables without scanning artifacts during
+composition.
 
 `merge_candidate_builds` additionally depends on `build_targets` and
 `compiler_bridge`. `merge_candidate_test_batches` also depends on `test_targets`,
@@ -196,19 +208,20 @@ Closing is idempotent, clears owned references, and rejects later access through
 closed container.
 
 Clearing one named dependency also clears every realized dependent recorded in the
-graph. Clearing any retained publisher invalidates aggregate accounting and quota
-attachment, so a rebuilt publisher cannot remain attached to a stale guard. Clearing
-project merge queues invalidates impact queues, selected merge-train previews, and
-selected preflight batches. Clearing the compiler bridge therefore cannot leave
-runtime-owned build, virtual-candidate build, inspection, test-execution, accounting,
-or quota services holding the discarded bridge. Clearing the workspace also
+graph. Clearing any retained publisher invalidates aggregate accounting, quota
+attachment, and revision-evidence discovery where applicable. A rebuilt publisher
+therefore cannot remain attached to a stale guard or verifier graph. Clearing project
+merge queues invalidates impact queues, selected merge-train previews, and selected
+preflight batches. Clearing the compiler bridge cannot leave runtime-owned build,
+virtual-candidate build, inspection, test-execution, accounting, quota, or revision-
+evidence services holding the discarded bridge. Clearing the workspace also
 invalidates revision reads, revert composition, database backups, behavioral-test
 services, task services, checkpoint services, merge policies, preflight composition,
 resume snapshots, virtual-candidate qualification, tested-merge attestations,
 artifact accounting, quota attachment, project merge orchestration, selected-source
-workflows, project agent-status pages, and their transitive runtime-owned
-dependencies. Replacing the process container closes the previous container before
-the replacement is used.
+workflows, retained revision evidence, project agent-status pages, and their
+transitive runtime-owned dependencies. Replacing the process container closes the
+previous container before the replacement is used.
 
 `workspace.cache_clear()` remains the compatibility operation that closes and resets
 the entire process runtime. `compiler_bridge.cache_clear()` clears the bridge and
@@ -236,18 +249,19 @@ recomputes its `runtime_id` over that stable composition evidence. Filesystem pa
 configured values, and incidental lazy-initialization order are not included in the
 service graph.
 
-The graph describes runtime-owned services known to the current container. It does
-not claim that the remaining legacy capability factories have already migrated.
+Every production service factory is now represented in the typed runtime graph. The
+remaining issue #106 work concerns the application and registration boundaries, not
+untracked service ownership.
 
 ## Remaining issue #106 work
 
-The typed graph now owns project merge queues, project merge-impact queues, selected
-merge-train previews, and selected preflight batches in addition to the foundational,
-behavioral-test, task, agent-continuity, preflight, resume, virtual-candidate,
-tested-merge attestation, artifact-accounting, and quota graphs.
+The typed container now deterministically supplies the complete production service
+graph, including retained revision-evidence discovery. Production factories no
+longer use independent module-local `lru_cache` ownership.
 
-The retained revision-evidence factory still contains the final module-local lazy
-cache. Follow-up work will move it onto the same registry, inject an explicit
-runtime/application context into capability installation, isolate FastMCP registry
-compatibility, and prove that two complete applications can coexist in one process
-without global cross-contamination.
+Follow-up work must pass an explicit runtime/application context through capability
+installation, isolate FastMCP private-registry compatibility in one adapter, replace
+remaining process-global installation assumptions, and prove that two complete
+applications with different databases and artifact roots can coexist in one process
+without cross-contamination. Final fixture cleanup and documentation should then
+describe that completed application ownership model.
