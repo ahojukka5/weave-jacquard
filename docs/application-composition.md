@@ -114,6 +114,7 @@ The runtime-owned graph now includes:
 - bounded revision-pinned resume snapshots;
 - virtual-candidate builds, diagnostics, test-impact plans, and strict test batches;
 - tested-merge state-identity attestations;
+- aggregate retained-artifact accounting and quota attachment;
 - compiler bridge and production runtime identity.
 
 The behavioral-test graph records exact dependencies on the workspace, build-target
@@ -125,7 +126,9 @@ target-branch policy. Resume snapshots bind workspace, build targets, policy,
 checkpoints, behavioral tests, and task contracts. Virtual-candidate qualification
 binds merge previews, build targets, test definitions, the compiler bridge, and the
 immutable artifact-root configuration. Tested-merge attestations bind the workspace
-to exact candidate test qualifications. Clearing a root therefore invalidates every
+to exact candidate test qualifications. Artifact accounting binds every retained
+publisher root, while quota attachment binds that accounting, the workspace, and all
+publishers that receive the shared guard. Clearing a root therefore invalidates every
 realized dependent that captured it.
 
 `mcp_server.workspace`, `mcp_build.workspace`, and
@@ -219,9 +222,11 @@ shutdown is registered through `atexit`.
 
 Clearing a named dependency invalidates every realized runtime-owned dependent.
 Compatibility `cache_clear()` and `cache_info()` adapters remain on migrated
-factories for qualification and embedding. Clearing the workspace resets the whole
-process runtime; clearing the compiler bridge preserves the workspace while
-invalidating bridge-dependent committed and virtual-candidate build services.
+factories for qualification and embedding. Clearing any retained publisher also
+invalidates aggregate accounting and quota attachment. Clearing the workspace resets
+the whole process runtime; clearing the compiler bridge preserves the workspace
+while invalidating bridge-dependent committed and virtual-candidate build,
+accounting, and quota services.
 
 These hooks are not live reconfiguration APIs. Operators restart the MCP process to
 apply environment changes.
@@ -266,17 +271,16 @@ identities matter.
 
 ## Remaining issue #106 work
 
-The typed container now owns virtual-candidate build, inspection, test-impact,
-execution, and tested-merge attestation services in addition to the production
-roots, foundational graph, behavioral-test graph, agent-continuity graph, preflight,
-and resume composition.
+The typed container now owns aggregate retained-artifact accounting and quota
+attachment in addition to the production roots, foundational graph, behavioral-test
+graph, agent-continuity graph, preflight, resume, virtual-candidate, and tested-merge
+attestation composition.
 
-Artifact accounting and quota attachment, project merge orchestration,
-selected-merge workflows, and retained-evidence factories still include module-local
-caches. Follow-up slices will migrate those services, pass an explicit
-runtime/application context through capability installation, isolate FastMCP
-private-registry access in one adapter, and prove that two complete applications can
-coexist in one process without cross-contamination.
+Project merge orchestration, selected-merge workflows, and retained-evidence
+factories still include module-local caches. Follow-up slices will migrate those
+services, pass an explicit runtime/application context through capability
+installation, isolate FastMCP private-registry access in one adapter, and prove that
+two complete applications can coexist in one process without cross-contamination.
 
 ## Contributor rules
 

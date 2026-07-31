@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +18,7 @@ from .mcp_test_batches import test_batches
 from .mcp_test_runs import test_runs
 from .mcp_tested_merge_attestations import tested_merge_attestations
 from .quota_aware_compiler_bridge import install_quota_aware_compiler_bridge
-from .runtime_container import runtime_config
+from .runtime_container import runtime_config, runtime_service
 
 
 def _artifact_roots() -> dict[str, Path]:
@@ -40,14 +39,38 @@ def _artifact_roots() -> dict[str, Path]:
     }
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "artifact_storage",
+    depends_on=(
+        "compiler_bridge",
+        "merge_candidate_builds",
+        "test_runs",
+        "test_batches",
+        "merge_candidate_test_batches",
+        "tested_merge_attestations",
+        "database_backups",
+    ),
+)
 def artifact_storage() -> ArtifactStorageService:
     """Return bounded accounting for all live retained-artifact roots."""
 
     return ArtifactStorageService(_artifact_roots())
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "artifact_quota",
+    depends_on=(
+        "workspace",
+        "artifact_storage",
+        "compiler_bridge",
+        "merge_candidate_builds",
+        "test_runs",
+        "test_batches",
+        "merge_candidate_test_batches",
+        "tested_merge_attestations",
+        "database_backups",
+    ),
+)
 def artifact_quota() -> ArtifactQuotaService:
     """Return and attach the shared aggregate publication quota guard."""
 
