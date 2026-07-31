@@ -64,6 +64,16 @@ Common commit types include:
 - `build`: change packaging or build tooling;
 - `chore`: perform repository maintenance.
 
+### Commit scope
+
+Prefer one commit per pull request when the whole change is one coherent
+migration or fix, even if it was authored in several small steps. A `test:`
+commit that only exercises code introduced by several preceding `refactor:`
+commits, or a `docs:` commit describing their combined effect, means those
+commits were never independently revertable — squash them into one commit
+before the pull request is reviewed. Split into separate commits only when a
+piece could be reviewed, reverted, or explained on its own.
+
 ## Pull requests
 
 Keep pull requests focused on one topic. Explain the architectural effect of the
@@ -77,6 +87,29 @@ Every pull request should include:
 - documentation for public APIs or architectural decisions;
 - migration notes when persistent data changes;
 - a clear description of validation performed.
+
+When the author's environment cannot run `compileall`, `ruff`, or `pytest` (no
+repository checkout, no network access), the pull request description must say
+so explicitly rather than leave validation implied. Treat that pull request as
+unverified: whoever merges it must run the full validation suite from
+"Development setup" locally, against the actual commit being merged, before
+merging.
+
+When checking `ruff check .` or `pytest` output, compare it against the same
+commands run on `main`, not against an absolute zero-error bar — this
+repository carries pre-existing `ruff` findings that are not introduced by any
+one pull request. Fix only newly introduced findings, and fold that fix into
+the commit that introduced them rather than adding a separate cleanup commit.
+
+`tests/test_validator_process_failures.py::test_validator_timeout_preserves_partial_output`
+is a known flaky test: it races a subprocess timeout against captured stdout
+and fails intermittently under load, independent of any particular change. If
+it fails, rerun it in isolation before treating it as a regression.
+
+Pull requests are merged by rebase, preserving individual commits in `main`'s
+history rather than squashing at merge time. Rewrite commit history —
+including squashing over-split commits per "Commit scope" above — before
+merging, not after.
 
 ## Architecture rules
 
