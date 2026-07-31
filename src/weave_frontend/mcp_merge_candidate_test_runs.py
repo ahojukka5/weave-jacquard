@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .build_inspection import BuildInspectionService
@@ -10,13 +9,16 @@ from .mcp_build import build_targets, compiler_bridge, merge_previews
 from .mcp_server import _result, mcp
 from .mcp_test_targets import install_metadata_aware_merge_services, test_targets
 from .merge_candidate_test_runs import DEFAULT_OUTPUT_PAGE_BYTES
-from .runtime_container import runtime_config
+from .runtime_container import runtime_config, runtime_service
 from .runtime_sandbox import RuntimeBubblewrapSandbox
 from .verified_merge_candidate_build import MergeCandidateBuildService
 from .verified_merge_candidate_test_runs import MergeCandidateTestBatchService
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "merge_candidate_builds",
+    depends_on=("merge_previews", "build_targets", "compiler_bridge"),
+)
 def merge_candidate_builds() -> MergeCandidateBuildService:
     """Return the shared verified virtual-candidate build service."""
 
@@ -28,14 +30,24 @@ def merge_candidate_builds() -> MergeCandidateBuildService:
     )
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "merge_candidate_build_inspection",
+    depends_on=("merge_candidate_builds",),
+)
 def merge_candidate_build_inspection() -> BuildInspectionService:
     """Return bounded diagnostics inspection for candidate build artifacts."""
 
     return BuildInspectionService(merge_candidate_builds())
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "merge_candidate_test_batches",
+    depends_on=(
+        "merge_previews",
+        "test_targets",
+        "merge_candidate_builds",
+    ),
+)
 def merge_candidate_test_batches() -> MergeCandidateTestBatchService:
     """Return the shared strict virtual-candidate test execution service."""
 

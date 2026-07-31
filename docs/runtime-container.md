@@ -103,6 +103,23 @@ workspace
     └── resume_snapshots
 ```
 
+Virtual-candidate qualification and attestation are runtime-owned too:
+
+```text
+merge_previews
+├── merge_candidate_builds
+│   ├── merge_candidate_build_inspection
+│   └── merge_candidate_test_batches
+└── merge_test_impact_plans
+
+merge_candidate_test_batches
+└── tested_merge_attestations
+```
+
+`merge_candidate_builds` additionally depends on `build_targets` and
+`compiler_bridge`. `merge_candidate_test_batches` also depends on `test_targets`,
+and `merge_test_impact_plans` depends on `build_targets` and `test_targets`.
+`tested_merge_attestations` additionally declares its direct workspace dependency.
 `merge_preflights` additionally depends on `merge_impacts` and
 `merge_validation_sets`. `resume_snapshots` additionally depends on
 `build_targets`, `agent_checkpoints`, `test_targets`, and `task_contracts`.
@@ -152,13 +169,14 @@ Closing is idempotent, clears owned references, and rejects later access through
 closed container.
 
 Clearing one named dependency also clears every realized dependent recorded in the
-graph. Clearing the compiler bridge therefore cannot leave runtime-owned build
-inspection, build-discovery, or behavioral-test execution services holding the
+graph. Clearing the compiler bridge therefore cannot leave runtime-owned build,
+virtual-candidate build, inspection, or test-execution services holding the
 discarded bridge. Clearing the workspace also invalidates revision reads, revert
 composition, database backups, behavioral-test services, task services, checkpoint
-services, merge policies, preflight composition, resume snapshots, project
-agent-status pages, and their transitive runtime-owned dependencies. Replacing the
-process container closes the previous container before the replacement is used.
+services, merge policies, preflight composition, resume snapshots,
+virtual-candidate qualification, tested-merge attestations, project agent-status
+pages, and their transitive runtime-owned dependencies. Replacing the process
+container closes the previous container before the replacement is used.
 
 `workspace.cache_clear()` remains the compatibility operation that closes and resets
 the entire process runtime. `compiler_bridge.cache_clear()` clears the bridge and
@@ -191,13 +209,13 @@ not claim that the remaining legacy capability factories have already migrated.
 
 ## Remaining issue #106 work
 
-The typed graph now owns merge policies, one-call merge preflights, and bounded
-restart snapshots in addition to the foundational, behavioral-test, task, and
-agent-continuity graphs.
+The typed graph now owns virtual-candidate build, inspection, test-impact,
+execution, and tested-merge attestation services in addition to the foundational,
+behavioral-test, task, agent-continuity, preflight, and resume graphs.
 
-Artifact services, project merge orchestration, selected-merge workflows,
-virtual-candidate tests, attestations, and retained-evidence factories still contain
-module-local lazy caches. Follow-up work will move those factories onto the same
-registry, inject an explicit runtime/application context into capability
-installation, isolate FastMCP registry compatibility, and prove that two complete
-applications can coexist in one process without global cross-contamination.
+Artifact accounting and quota attachment, project merge orchestration,
+selected-merge workflows, and retained-evidence factories still contain module-local
+lazy caches. Follow-up work will move those factories onto the same registry, inject
+an explicit runtime/application context into capability installation, isolate
+FastMCP registry compatibility, and prove that two complete applications can coexist
+in one process without global cross-contamination.
