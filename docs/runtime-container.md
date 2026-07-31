@@ -94,6 +94,18 @@ workspace
     └── project_agent_statuses
 ```
 
+Merge review and restart orientation now belong to the same graph:
+
+```text
+workspace
+└── merge_policies
+    ├── merge_preflights
+    └── resume_snapshots
+```
+
+`merge_preflights` additionally depends on `merge_impacts` and
+`merge_validation_sets`. `resume_snapshots` additionally depends on
+`build_targets`, `agent_checkpoints`, `test_targets`, and `task_contracts`.
 `test_runs` additionally depends on `workspace`, `build_targets`, and
 `compiler_bridge`. `test_batches` additionally declares its direct workspace
 dependency, and `test_impact_plans` also depends on `workspace` and `build_targets`.
@@ -144,9 +156,9 @@ graph. Clearing the compiler bridge therefore cannot leave runtime-owned build
 inspection, build-discovery, or behavioral-test execution services holding the
 discarded bridge. Clearing the workspace also invalidates revision reads, revert
 composition, database backups, behavioral-test services, task services, checkpoint
-services, project agent-status pages, and their transitive runtime-owned
-dependencies. Replacing the process container closes the previous container before
-the replacement is used.
+services, merge policies, preflight composition, resume snapshots, project
+agent-status pages, and their transitive runtime-owned dependencies. Replacing the
+process container closes the previous container before the replacement is used.
 
 `workspace.cache_clear()` remains the compatibility operation that closes and resets
 the entire process runtime. `compiler_bridge.cache_clear()` clears the bridge and
@@ -179,14 +191,13 @@ not claim that the remaining legacy capability factories have already migrated.
 
 ## Remaining issue #106 work
 
-The typed graph now owns the task-contract, task-scoped edit, checkpoint, checkpoint
-timeline, and project agent-status services in addition to the foundational and
-committed-revision behavioral-test graphs.
+The typed graph now owns merge policies, one-call merge preflights, and bounded
+restart snapshots in addition to the foundational, behavioral-test, task, and
+agent-continuity graphs.
 
-Resume snapshots, merge-policy and preflight composition, artifact services,
-project merge orchestration, selected-merge workflows, virtual-candidate tests,
-attestations, and retained-evidence factories still contain module-local lazy
-caches. Follow-up work will move those factories onto the same registry, inject an
-explicit runtime/application context into capability installation, isolate FastMCP
-registry compatibility, and prove that two complete applications can coexist in one
-process without global cross-contamination.
+Artifact services, project merge orchestration, selected-merge workflows,
+virtual-candidate tests, attestations, and retained-evidence factories still contain
+module-local lazy caches. Follow-up work will move those factories onto the same
+registry, inject an explicit runtime/application context into capability
+installation, isolate FastMCP registry compatibility, and prove that two complete
+applications can coexist in one process without global cross-contamination.

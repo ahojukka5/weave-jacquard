@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_agent_checkpoint import agent_checkpoints
@@ -12,10 +11,21 @@ from .mcp_server import _result, mcp, workspace
 from .mcp_task_contracts import task_contracts
 from .mcp_test_targets import test_targets
 from .resume_snapshot import ResumeSnapshotService
+from .runtime_container import runtime_service
 from .task_resume_snapshot import TaskResumeSnapshotService
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "resume_snapshots",
+    depends_on=(
+        "workspace",
+        "build_targets",
+        "merge_policies",
+        "agent_checkpoints",
+        "test_targets",
+        "task_contracts",
+    ),
+)
 def resume_snapshots() -> ResumeSnapshotService:
     """Return the shared bounded resume-snapshot service."""
 
