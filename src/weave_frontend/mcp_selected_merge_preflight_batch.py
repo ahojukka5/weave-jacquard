@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_preflight import merge_preflights
 from .mcp_project_merge_queue import project_merge_queues
 from .mcp_server import _result, mcp
+from .runtime_container import runtime_service
 from .selected_merge_preflight_batch import SelectedMergePreflightBatchService
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "selected_merge_preflight_batches",
+    depends_on=("project_merge_queues", "merge_preflights"),
+)
 def selected_merge_preflight_batches() -> SelectedMergePreflightBatchService:
     """Return the shared explicit compiler-backed preflight batch service."""
 

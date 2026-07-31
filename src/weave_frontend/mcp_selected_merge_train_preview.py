@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_project_merge_queue import project_merge_queues
 from .mcp_server import _result, mcp
+from .runtime_container import runtime_service
 from .selected_merge_train_preview import SelectedMergeTrainPreviewService
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "selected_merge_train_previews",
+    depends_on=("project_merge_queues",),
+)
 def selected_merge_train_previews() -> SelectedMergeTrainPreviewService:
     """Return the shared in-memory selected merge-train preview service."""
 

@@ -129,6 +129,20 @@ attestations, and database backups. `artifact_quota` depends on that accounting
 service, the workspace, and every retained publisher because it attaches one shared
 quota guard to each publisher.
 
+Project merge orchestration and explicit selected-source workflows are runtime-owned:
+
+```text
+project_merge_queues
+├── project_merge_impact_queues
+├── selected_merge_train_previews
+└── selected_merge_preflight_batches
+```
+
+`project_merge_queues` depends on `merge_previews` and
+`project_agent_statuses`. `project_merge_impact_queues` additionally depends on
+`merge_impacts` and `merge_policies`. `selected_merge_preflight_batches`
+additionally depends on `merge_preflights`.
+
 `merge_candidate_builds` additionally depends on `build_targets` and
 `compiler_bridge`. `merge_candidate_test_batches` also depends on `test_targets`,
 and `merge_test_impact_plans` depends on `build_targets` and `test_targets`.
@@ -184,13 +198,15 @@ closed container.
 Clearing one named dependency also clears every realized dependent recorded in the
 graph. Clearing any retained publisher invalidates aggregate accounting and quota
 attachment, so a rebuilt publisher cannot remain attached to a stale guard. Clearing
-the compiler bridge therefore cannot leave runtime-owned build, virtual-candidate
-build, inspection, test-execution, accounting, or quota services holding the
-discarded bridge. Clearing the workspace also invalidates revision reads, revert
-composition, database backups, behavioral-test services, task services, checkpoint
-services, merge policies, preflight composition, resume snapshots,
-virtual-candidate qualification, tested-merge attestations, artifact accounting,
-quota attachment, project agent-status pages, and their transitive runtime-owned
+project merge queues invalidates impact queues, selected merge-train previews, and
+selected preflight batches. Clearing the compiler bridge therefore cannot leave
+runtime-owned build, virtual-candidate build, inspection, test-execution, accounting,
+or quota services holding the discarded bridge. Clearing the workspace also
+invalidates revision reads, revert composition, database backups, behavioral-test
+services, task services, checkpoint services, merge policies, preflight composition,
+resume snapshots, virtual-candidate qualification, tested-merge attestations,
+artifact accounting, quota attachment, project merge orchestration, selected-source
+workflows, project agent-status pages, and their transitive runtime-owned
 dependencies. Replacing the process container closes the previous container before
 the replacement is used.
 
@@ -225,12 +241,13 @@ not claim that the remaining legacy capability factories have already migrated.
 
 ## Remaining issue #106 work
 
-The typed graph now owns aggregate retained-artifact accounting and quota attachment
-in addition to the foundational, behavioral-test, task, agent-continuity, preflight,
-resume, virtual-candidate, and tested-merge attestation graphs.
+The typed graph now owns project merge queues, project merge-impact queues, selected
+merge-train previews, and selected preflight batches in addition to the foundational,
+behavioral-test, task, agent-continuity, preflight, resume, virtual-candidate,
+tested-merge attestation, artifact-accounting, and quota graphs.
 
-Project merge orchestration, selected-merge workflows, and retained-evidence
-factories still contain module-local lazy caches. Follow-up work will move those
-factories onto the same registry, inject an explicit runtime/application context into
-capability installation, isolate FastMCP registry compatibility, and prove that two
-complete applications can coexist in one process without global cross-contamination.
+The retained revision-evidence factory still contains the final module-local lazy
+cache. Follow-up work will move it onto the same registry, inject an explicit
+runtime/application context into capability installation, isolate FastMCP registry
+compatibility, and prove that two complete applications can coexist in one process
+without global cross-contamination.

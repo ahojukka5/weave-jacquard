@@ -115,6 +115,8 @@ The runtime-owned graph now includes:
 - virtual-candidate builds, diagnostics, test-impact plans, and strict test batches;
 - tested-merge state-identity attestations;
 - aggregate retained-artifact accounting and quota attachment;
+- project merge queues and non-compiling project merge-impact queues;
+- selected merge-train previews and selected compiler-backed preflight batches;
 - compiler bridge and production runtime identity.
 
 The behavioral-test graph records exact dependencies on the workspace, build-target
@@ -128,8 +130,10 @@ binds merge previews, build targets, test definitions, the compiler bridge, and 
 immutable artifact-root configuration. Tested-merge attestations bind the workspace
 to exact candidate test qualifications. Artifact accounting binds every retained
 publisher root, while quota attachment binds that accounting, the workspace, and all
-publishers that receive the shared guard. Clearing a root therefore invalidates every
-realized dependent that captured it.
+publishers that receive the shared guard. Project merge queues bind merge previews
+to agent-status catalogs. Impact queues add target coverage and policy, while
+selected train and preflight workflows bind their exact catalog to that shared queue.
+Clearing a root therefore invalidates every realized dependent that captured it.
 
 `mcp_server.workspace`, `mcp_build.workspace`, and
 `mcp_concurrent_nodes.workspace` are the same stable runtime-backed function from
@@ -223,10 +227,11 @@ shutdown is registered through `atexit`.
 Clearing a named dependency invalidates every realized runtime-owned dependent.
 Compatibility `cache_clear()` and `cache_info()` adapters remain on migrated
 factories for qualification and embedding. Clearing any retained publisher also
-invalidates aggregate accounting and quota attachment. Clearing the workspace resets
-the whole process runtime; clearing the compiler bridge preserves the workspace
-while invalidating bridge-dependent committed and virtual-candidate build,
-accounting, and quota services.
+invalidates aggregate accounting and quota attachment. Clearing project merge queues
+invalidates their impact and selected-source workflow dependents. Clearing the
+workspace resets the whole process runtime; clearing the compiler bridge preserves
+the workspace while invalidating bridge-dependent committed and virtual-candidate
+build, accounting, and quota services.
 
 These hooks are not live reconfiguration APIs. Operators restart the MCP process to
 apply environment changes.
@@ -271,16 +276,17 @@ identities matter.
 
 ## Remaining issue #106 work
 
-The typed container now owns aggregate retained-artifact accounting and quota
-attachment in addition to the production roots, foundational graph, behavioral-test
-graph, agent-continuity graph, preflight, resume, virtual-candidate, and tested-merge
-attestation composition.
+The typed container now owns project merge queues, project merge-impact queues,
+selected merge-train previews, and selected preflight batches in addition to the
+production roots, foundational graph, behavioral-test graph, agent-continuity graph,
+preflight, resume, virtual-candidate, tested-merge attestation, artifact-accounting,
+and quota composition.
 
-Project merge orchestration, selected-merge workflows, and retained-evidence
-factories still include module-local caches. Follow-up slices will migrate those
-services, pass an explicit runtime/application context through capability
-installation, isolate FastMCP private-registry access in one adapter, and prove that
-two complete applications can coexist in one process without cross-contamination.
+The retained revision-evidence factory still contains the final module-local cache.
+Follow-up work will migrate that service, pass an explicit runtime/application
+context through capability installation, isolate FastMCP private-registry access in
+one adapter, and prove that two complete applications can coexist in one process
+without cross-contamination.
 
 ## Contributor rules
 
