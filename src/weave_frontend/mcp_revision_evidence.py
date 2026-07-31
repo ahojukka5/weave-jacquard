@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_build import compiler_bridge
@@ -12,9 +11,20 @@ from .mcp_test_batches import test_batches
 from .mcp_test_runs import test_runs
 from .mcp_tested_merge_attestations import tested_merge_attestations
 from .revision_evidence import RevisionEvidenceService
+from .runtime_container import runtime_service
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "revision_evidence",
+    depends_on=(
+        "workspace",
+        "compiler_bridge",
+        "test_runs",
+        "test_batches",
+        "merge_candidate_test_batches",
+        "tested_merge_attestations",
+    ),
+)
 def revision_evidence() -> RevisionEvidenceService:
     """Return the shared retained-evidence discovery service."""
 

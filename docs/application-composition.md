@@ -117,6 +117,7 @@ The runtime-owned graph now includes:
 - aggregate retained-artifact accounting and quota attachment;
 - project merge queues and non-compiling project merge-impact queues;
 - selected merge-train previews and selected compiler-backed preflight batches;
+- bounded retained revision-evidence discovery;
 - compiler bridge and production runtime identity.
 
 The behavioral-test graph records exact dependencies on the workspace, build-target
@@ -133,7 +134,9 @@ publisher root, while quota attachment binds that accounting, the workspace, and
 publishers that receive the shared guard. Project merge queues bind merge previews
 to agent-status catalogs. Impact queues add target coverage and policy, while
 selected train and preflight workflows bind their exact catalog to that shared queue.
-Clearing a root therefore invalidates every realized dependent that captured it.
+Revision-evidence discovery binds the workspace and retained publisher verifiers so
+publisher replacement invalidates the captured evidence graph. Clearing a root
+therefore invalidates every realized dependent that captured it.
 
 `mcp_server.workspace`, `mcp_build.workspace`, and
 `mcp_concurrent_nodes.workspace` are the same stable runtime-backed function from
@@ -156,8 +159,9 @@ composed service does not redefine runtime identity.
 Optional container diagnostics may report initialized service names separately.
 The public `runtime_identity` report binds only the stable composition graph.
 
-The service graph is incremental while issue #106 remains open. Module-local
-factories that have not migrated are not falsely represented as runtime-owned.
+Every production service factory is represented in the typed service graph. Issue
+#106 remains open for the application and registration boundaries rather than for
+untracked production service ownership.
 
 ## Runtime identity v1
 
@@ -227,11 +231,12 @@ shutdown is registered through `atexit`.
 Clearing a named dependency invalidates every realized runtime-owned dependent.
 Compatibility `cache_clear()` and `cache_info()` adapters remain on migrated
 factories for qualification and embedding. Clearing any retained publisher also
-invalidates aggregate accounting and quota attachment. Clearing project merge queues
-invalidates their impact and selected-source workflow dependents. Clearing the
-workspace resets the whole process runtime; clearing the compiler bridge preserves
-the workspace while invalidating bridge-dependent committed and virtual-candidate
-build, accounting, and quota services.
+invalidates aggregate accounting, quota attachment, and retained revision evidence
+where applicable. Clearing project merge queues invalidates their impact and
+selected-source workflow dependents. Clearing the workspace resets the whole process
+runtime; clearing the compiler bridge preserves the workspace while invalidating
+bridge-dependent committed and virtual-candidate build, accounting, quota, and
+revision-evidence services.
 
 These hooks are not live reconfiguration APIs. Operators restart the MCP process to
 apply environment changes.
@@ -276,17 +281,16 @@ identities matter.
 
 ## Remaining issue #106 work
 
-The typed container now owns project merge queues, project merge-impact queues,
-selected merge-train previews, and selected preflight batches in addition to the
-production roots, foundational graph, behavioral-test graph, agent-continuity graph,
-preflight, resume, virtual-candidate, tested-merge attestation, artifact-accounting,
-and quota composition.
+The typed container now deterministically supplies every production service,
+including retained revision-evidence discovery. No production service factory uses
+independent module-local `lru_cache` ownership.
 
-The retained revision-evidence factory still contains the final module-local cache.
-Follow-up work will migrate that service, pass an explicit runtime/application
-context through capability installation, isolate FastMCP private-registry access in
-one adapter, and prove that two complete applications can coexist in one process
-without cross-contamination.
+Follow-up work must inject an explicit runtime/application context into capability
+installation, isolate all FastMCP private-registry access in one adapter, remove the
+remaining shared-server installation assumptions, and prove that two complete
+applications with different databases and artifact roots can coexist in one process
+without cross-contamination. Fixture cleanup and final documentation should then
+state the completed per-application ownership model.
 
 ## Contributor rules
 
