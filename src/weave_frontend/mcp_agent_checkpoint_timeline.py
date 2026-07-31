@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .agent_checkpoint_timeline import AgentCheckpointTimelineService
 from .mcp_agent_checkpoint import agent_checkpoints
 from .mcp_server import _result, mcp
+from .runtime_container import runtime_service
 
 
-@lru_cache(maxsize=1)
+@runtime_service("checkpoint_timelines", depends_on=("agent_checkpoints",))
 def checkpoint_timelines() -> AgentCheckpointTimelineService:
     """Return the shared bounded checkpoint timeline service."""
 

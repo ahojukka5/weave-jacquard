@@ -2,23 +2,26 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from . import mcp_build as _build
 from .mcp_server import _result, mcp, workspace
+from .runtime_container import runtime_service
 from .task_contracts import TaskContractRegistry
 from .task_scoped_batch import TaskScopedBatchExecutor
 
 
-@lru_cache(maxsize=1)
+@runtime_service("task_contracts", depends_on=("workspace",))
 def task_contracts() -> TaskContractRegistry:
     """Return the shared revisioned task-contract registry."""
 
     return TaskContractRegistry(workspace())
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "task_scoped_batches",
+    depends_on=("task_contracts", "edit_batches"),
+)
 def task_scoped_batches() -> TaskScopedBatchExecutor:
     """Return the shared task-bound structural batch executor."""
 
