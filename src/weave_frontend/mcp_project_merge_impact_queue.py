@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_build import merge_impacts
@@ -10,9 +9,13 @@ from .mcp_preflight import merge_policies
 from .mcp_project_merge_queue import project_merge_queues
 from .mcp_server import _result, mcp
 from .project_merge_impact_queue import ProjectMergeImpactQueueService
+from .runtime_container import runtime_service
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "project_merge_impact_queues",
+    depends_on=("project_merge_queues", "merge_impacts", "merge_policies"),
+)
 def project_merge_impact_queues() -> ProjectMergeImpactQueueService:
     """Return the shared non-compiling project merge-impact queue service."""
 

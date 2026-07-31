@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_build import merge_previews
 from .mcp_project_agent_status import project_agent_statuses
 from .mcp_server import _result, mcp
 from .project_merge_queue import ProjectMergeQueueService
+from .runtime_container import runtime_service
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "project_merge_queues",
+    depends_on=("merge_previews", "project_agent_statuses"),
+)
 def project_merge_queues() -> ProjectMergeQueueService:
     """Return the shared stable project merge-queue service."""
 
