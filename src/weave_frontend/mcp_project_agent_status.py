@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_agent_checkpoint import agent_checkpoints
 from .mcp_server import _result, mcp
 from .project_agent_status import ProjectAgentStatusService
+from .runtime_container import runtime_service
 
 
-@lru_cache(maxsize=1)
+@runtime_service("project_agent_statuses", depends_on=("agent_checkpoints",))
 def project_agent_statuses() -> ProjectAgentStatusService:
     """Return the shared bounded project agent-status service."""
 

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .agent_checkpoint import AgentCheckpointRegistry
 from .mcp_server import _result, mcp, workspace
+from .runtime_container import runtime_service
 
 
-@lru_cache(maxsize=1)
+@runtime_service("agent_checkpoints", depends_on=("workspace",))
 def agent_checkpoints() -> AgentCheckpointRegistry:
     """Return the shared revisioned checkpoint registry."""
 

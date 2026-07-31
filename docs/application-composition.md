@@ -109,12 +109,16 @@ The runtime-owned graph now includes:
 - verified online database backups;
 - committed-revision behavioral-test definitions and bounded pages;
 - strict behavioral-test execution, explicit batches, and structural impact plans;
+- task contracts and task-scoped structural batches;
+- agent checkpoints, checkpoint timelines, and project agent-status pages;
 - compiler bridge and production runtime identity.
 
 The behavioral-test graph records exact dependencies on the workspace, build-target
 registry, test-definition registry, compiler bridge, and immutable runtime
-configuration. Clearing a root therefore invalidates every realized execution,
-batch, page, and impact service that captured it.
+configuration. The task and agent-continuity graph similarly binds task-scoped edits
+to task contracts and edit batches, and binds timelines and project status to the
+checkpoint registry. Clearing a root therefore invalidates every realized dependent
+that captured it.
 
 `mcp_server.workspace`, `mcp_build.workspace`, and
 `mcp_concurrent_nodes.workspace` are the same stable runtime-backed function from
@@ -254,16 +258,17 @@ identities matter.
 
 ## Remaining issue #106 work
 
-The typed container now owns the production roots, foundational build and merge
-graph, revision-pinned read and recovery services, and the complete
-committed-revision behavioral-test graph.
+The typed container now owns task contracts, task-scoped edits, checkpoints,
+checkpoint timelines, and project agent-status pages in addition to the production
+roots, foundational graph, and committed-revision behavioral-test graph.
 
-Task, checkpoint, artifact, project-supervision, selected-merge, virtual-candidate
-test, attestation, and retained-evidence factories still include module-local
-caches. Follow-up slices will migrate those services, pass an explicit
-runtime/application context through capability installation, isolate FastMCP
-private-registry access in one adapter, and prove that two complete applications can
-coexist in one process without cross-contamination.
+Resume snapshots, merge-policy and preflight composition, artifact services,
+project merge orchestration, selected-merge workflows, virtual-candidate tests,
+attestations, and retained-evidence factories still include module-local caches.
+Follow-up slices will migrate those services, pass an explicit runtime/application
+context through capability installation, isolate FastMCP private-registry access in
+one adapter, and prove that two complete applications can coexist in one process
+without cross-contamination.
 
 ## Contributor rules
 

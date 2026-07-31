@@ -83,10 +83,22 @@ workspace
     └── test_impact_plans
 ```
 
+The task and agent-continuity graph is runtime-owned as well:
+
+```text
+workspace
+├── task_contracts
+│   └── task_scoped_batches
+└── agent_checkpoints
+    ├── checkpoint_timelines
+    └── project_agent_statuses
+```
+
 `test_runs` additionally depends on `workspace`, `build_targets`, and
 `compiler_bridge`. `test_batches` additionally declares its direct workspace
 dependency, and `test_impact_plans` also depends on `workspace` and `build_targets`.
-`reverts` similarly declares its direct workspace dependency.
+`task_scoped_batches` additionally depends on `edit_batches`. `reverts` similarly
+declares its direct workspace dependency.
 
 Factories are created lazily under one reentrant lock. Nested factory calls record
 dependency edges automatically, while declared dependencies document edges before a
@@ -131,9 +143,10 @@ Clearing one named dependency also clears every realized dependent recorded in t
 graph. Clearing the compiler bridge therefore cannot leave runtime-owned build
 inspection, build-discovery, or behavioral-test execution services holding the
 discarded bridge. Clearing the workspace also invalidates revision reads, revert
-composition, database backups, behavioral-test definitions, executions, batches,
-impact plans, and their transitive runtime-owned dependencies. Replacing the process
-container closes the previous container before the replacement is used.
+composition, database backups, behavioral-test services, task services, checkpoint
+services, project agent-status pages, and their transitive runtime-owned
+dependencies. Replacing the process container closes the previous container before
+the replacement is used.
 
 `workspace.cache_clear()` remains the compatibility operation that closes and resets
 the entire process runtime. `compiler_bridge.cache_clear()` clears the bridge and
@@ -166,12 +179,13 @@ not claim that the remaining legacy capability factories have already migrated.
 
 ## Remaining issue #106 work
 
-The typed graph now owns committed-revision behavioral-test definitions, pages,
-execution, batches, and structural impact planning in addition to the foundational
-build, merge, read, and recovery services.
+The typed graph now owns the task-contract, task-scoped edit, checkpoint, checkpoint
+timeline, and project agent-status services in addition to the foundational and
+committed-revision behavioral-test graphs.
 
-Task, checkpoint, artifact, project-supervision, selected-merge, virtual-candidate
-test, attestation, and retained-evidence factories still contain module-local lazy
+Resume snapshots, merge-policy and preflight composition, artifact services,
+project merge orchestration, selected-merge workflows, virtual-candidate tests,
+attestations, and retained-evidence factories still contain module-local lazy
 caches. Follow-up work will move those factories onto the same registry, inject an
 explicit runtime/application context into capability installation, isolate FastMCP
 registry compatibility, and prove that two complete applications can coexist in one
