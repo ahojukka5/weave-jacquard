@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_build import build_targets, compiler_bridge
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_targets import test_targets
 from .quota_aware_test_runs import TestRunService
-from .runtime_container import runtime_config
+from .runtime_container import runtime_config, runtime_service
 from .runtime_sandbox import RuntimeBubblewrapSandbox
 from .test_runs import DEFAULT_TEST_RUN_OUTPUT_PAGE_BYTES
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "test_runs",
+    depends_on=(
+        "workspace",
+        "build_targets",
+        "test_targets",
+        "compiler_bridge",
+    ),
+)
 def test_runs() -> TestRunService:
     """Return the shared immutable sandboxed test-run service."""
 

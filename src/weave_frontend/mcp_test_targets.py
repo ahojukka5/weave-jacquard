@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from . import mcp_build as _build
@@ -12,6 +11,7 @@ from .metadata_build_targets import BuildTargetRegistry
 from .metadata_merge_impact import MergeTargetImpactService
 from .metadata_merge_preview import MergePreviewService
 from .metadata_selected_merge_train_preview import SelectedMergeTrainPreviewService
+from .runtime_container import runtime_service
 from .test_target_views import (
     DEFAULT_TEST_TARGET_PAGE_SIZE,
     TestTargetPageService,
@@ -56,14 +56,14 @@ def install_capability() -> None:
 install_capability()
 
 
-@lru_cache(maxsize=1)
+@runtime_service("test_targets", depends_on=("workspace",))
 def test_targets() -> VerifiedTestTargetRegistry:
     """Return the shared verified revisioned test-target registry."""
 
     return VerifiedTestTargetRegistry(workspace())
 
 
-@lru_cache(maxsize=1)
+@runtime_service("test_target_pages", depends_on=("test_targets",))
 def test_target_pages() -> TestTargetPageService:
     """Return the shared bounded test-target summary service."""
 

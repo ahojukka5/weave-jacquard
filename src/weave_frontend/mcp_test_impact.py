@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_build import build_targets
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_targets import test_targets
+from .runtime_container import runtime_service
 from .test_impact import (
     DEFAULT_TEST_IMPACT_EVIDENCE_LIMIT,
     DEFAULT_TEST_IMPACT_PAGE_SIZE,
@@ -15,7 +15,10 @@ from .test_impact import (
 )
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "test_impact_plans",
+    depends_on=("workspace", "build_targets", "test_targets"),
+)
 def test_impact_plans() -> TestImpactPlanService:
     """Return the shared non-executing structural test-impact service."""
 
