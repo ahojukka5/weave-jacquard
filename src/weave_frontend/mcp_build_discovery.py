@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
-
 from .mcp_build import compiler_bridge
 from .mcp_server import _result, mcp
+from .runtime_container import runtime_service
 from .verified_build_discovery import BuildDiscoveryService
 
 
-@lru_cache(maxsize=1)
+@runtime_service("build_discovery", depends_on=("compiler_bridge",))
 def build_discovery() -> BuildDiscoveryService:
     return BuildDiscoveryService(compiler_bridge())
 

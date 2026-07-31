@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .mcp_build import merge_previews
 from .mcp_server import _result, mcp, workspace
 from .revert import RevertService
+from .runtime_container import runtime_service
 
 
-@lru_cache(maxsize=1)
+@runtime_service(
+    "reverts",
+    depends_on=("workspace", "merge_previews"),
+)
 def reverts() -> RevertService:
     """Return the shared stable-ID revert service."""
 
@@ -18,7 +21,7 @@ def reverts() -> RevertService:
 
 
 def install_capability() -> None:
-    """Discard stale revert composition when public capabilities are reinstalled."""
+    """Reset runtime-owned revert composition during capability installation."""
 
     reverts.cache_clear()
 

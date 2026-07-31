@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 from .database_backup import DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS
 from .mcp_server import _result, mcp, workspace
-from .runtime_container import runtime_config
+from .runtime_container import runtime_config, runtime_service
 from .verified_database_backup import DatabaseBackupService
 
 DATABASE_BACKUP_ROOT_ENV = "WEAVE_DATABASE_BACKUP_ROOT"
 
 
-@lru_cache(maxsize=1)
+@runtime_service("database_backups", depends_on=("workspace",))
 def database_backups() -> DatabaseBackupService:
     """Return the shared immutable database-backup service."""
 
@@ -24,7 +23,7 @@ def database_backups() -> DatabaseBackupService:
 
 
 def install_capability() -> None:
-    """Discard stale backup composition while retaining immutable runtime config."""
+    """Reset runtime-owned backup composition during capability installation."""
 
     database_backups.cache_clear()
 
