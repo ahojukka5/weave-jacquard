@@ -198,7 +198,7 @@ base decorated server
 → runtime-owned lazy service declarations
 → artifact-root composition and optional quota attachment
 → final guidance installation
-→ one registered tool-registry snapshot
+→ one adapter-captured tool-registry snapshot
 → schema and required-tool validation
 → content-derived application manifest snapshot
 → stdio transport
@@ -248,14 +248,24 @@ The application object does not hide that fact. It provides the stable outer
 composition boundary needed to migrate dependent services without changing public
 names or schemas.
 
-The MCP Python SDK exposes tool metadata through the FastMCP tool-manager registry.
-Jacquard supports its mapping-backed `_tools` shape and the mapping-backed fake
-server used by tests. This remains an SDK compatibility boundary even though the
-extracted fields correspond to the protocol `tools/list` contract.
+All SDK-specific registry and registered-tool metadata access is isolated in
+`fastmcp_registry.py`. `FastMCPRegistryAdapter` captures one mapping snapshot,
+validates keys and declared names, and extracts the caller-visible contract fields.
+`application.py` receives those contracts, translates adapter failures into
+`ApplicationCompositionError`, validates canonical JSON, and computes the public
+identities. No other production application-composition module reads
+`_tool_manager._tools`, `_meta`, or `fn_metadata`.
 
-A later SDK should be adopted through a supported public tool-list API when one is
-available synchronously at startup. The migration must not introduce a second
-production server assembly path.
+The adapter supports the MCP Python SDK's mapping-backed `_tools` registry and the
+mapping-backed fake server used by tests. These are explicit compatibility shapes,
+not general reflection over arbitrary server objects. The extracted fields
+correspond to the protocol `tools/list` contract even though current synchronous
+startup still requires SDK registry access.
+
+A later SDK should be adopted inside this adapter through a supported public
+tool-list API when one is available synchronously at startup. That migration must
+not introduce a second production server assembly path or change public tool and
+application identities for an equivalent registry.
 
 ## Configuration contract
 
@@ -281,16 +291,14 @@ identities matter.
 
 ## Remaining issue #106 work
 
-The typed container now deterministically supplies every production service,
-including retained revision-evidence discovery. No production service factory uses
-independent module-local `lru_cache` ownership.
+The typed container deterministically supplies every production service, and the
+FastMCP private-registry compatibility surface is isolated in one adapter.
 
 Follow-up work must inject an explicit runtime/application context into capability
-installation, isolate all FastMCP private-registry access in one adapter, remove the
-remaining shared-server installation assumptions, and prove that two complete
-applications with different databases and artifact roots can coexist in one process
-without cross-contamination. Fixture cleanup and final documentation should then
-state the completed per-application ownership model.
+installation, remove the remaining shared-server installation assumptions, and
+prove that two complete applications with different databases and artifact roots can
+coexist in one process without cross-contamination. Fixture cleanup and final
+documentation should then state the completed per-application ownership model.
 
 ## Contributor rules
 
