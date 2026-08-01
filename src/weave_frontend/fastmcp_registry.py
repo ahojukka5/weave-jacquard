@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -31,6 +31,55 @@ class FastMCPRegistryAdapter:
             for name in sorted(registry)
         )
 
+    def replace_tools_from(self, source_server: Any) -> tuple[str, ...]:
+        """Replace this registry with exact tool objects from another server."""
+
+        source = FastMCPRegistryAdapter(source_server)
+        source_registry = source._registry()
+        source_snapshot = source._snapshot()
+        source_contracts = source.tool_contracts()
+        target_registry = self._mutable_registry()
+        names = tuple(sorted(source_snapshot))
+
+        if target_registry is source_registry:
+            return names
+
+        previous = dict(target_registry.items())
+        try:
+            target_registry.clear()
+            target_registry.update(source_snapshot)
+            installed = self._snapshot()
+            if set(installed) != set(source_snapshot):
+                raise FastMCPRegistryError(
+                    "FastMCP target registry did not preserve the complete tool set"
+                )
+            if any(installed[name] is not source_snapshot[name] for name in names):
+                raise FastMCPRegistryError(
+                    "FastMCP target registry did not preserve exact tool objects"
+                )
+            installed_contracts = tuple(
+                self._tool_contract(name, installed[name])
+                for name in names
+            )
+            if installed_contracts != source_contracts:
+                raise FastMCPRegistryError(
+                    "FastMCP target registry changed canonical tool contracts"
+                )
+        except Exception as exc:
+            try:
+                target_registry.clear()
+                target_registry.update(previous)
+            except Exception as rollback_exc:
+                raise FastMCPRegistryError(
+                    "FastMCP tool registry replacement and rollback both failed"
+                ) from rollback_exc
+            if isinstance(exc, FastMCPRegistryError):
+                raise
+            raise FastMCPRegistryError(
+                "FastMCP tool registry replacement failed"
+            ) from exc
+        return names
+
     def _registry(self) -> Mapping[Any, Any]:
         manager = getattr(self.server, "_tool_manager", None)
         registries = (
@@ -45,6 +94,15 @@ class FastMCPRegistryAdapter:
             raise FastMCPRegistryError(
                 "FastMCP tool registry is unavailable; public application "
                 "composition requires a mapping-backed tool manager"
+            )
+        return registry
+
+    def _mutable_registry(self) -> MutableMapping[Any, Any]:
+        registry = self._registry()
+        if not isinstance(registry, MutableMapping):
+            raise FastMCPRegistryError(
+                "FastMCP target tool registry must be mutable for application "
+                "registration"
             )
         return registry
 
