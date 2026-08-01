@@ -17,8 +17,9 @@ removing the remaining import-time shared-server assumptions tracked by issue #1
 ```text
 select or create RuntimeServices
 → create ApplicationContext(server, runtime)
+→ bind the selected runtime for composition
 → load capabilities in declared dependency order
-→ invoke each installer against that context
+→ invoke each production lifecycle adapter against that context
 → install final guidance on context.server
 → capture tool contracts through FastMCPRegistryAdapter
 → validate and hash the public application manifests
@@ -29,51 +30,55 @@ The resulting `JacquardApp` retains both `server` for compatibility and the comp
 application manifest, so equivalent public contracts preserve their existing tool and
 application identities.
 
-## Installer contract
+## Production installer contract
 
-Capability installers may currently use one of two signatures:
+The nine production capabilities with lifecycle work are represented by explicit
+context-only adapters in `context_capability_installers.py`. Each adapter receives the
+selected `ApplicationContext` and the loaded capability module.
 
-```python
-def install_capability(context: ApplicationContext) -> None:
-    ...
+The production table covers:
 
-def install_capability() -> None:
-    ...
-```
+- foundational runtime selection;
+- metadata-aware test and merge composition;
+- virtual-candidate build and test invalidation;
+- tested-merge attestation and revert invalidation;
+- database-backup composition;
+- artifact accounting and quota reattachment;
+- runtime-identity invalidation.
 
-The one-context form is the target architecture. Installer dispatch rejects
-ambiguous signatures, variadic signatures, and installers requiring multiple
-arguments.
+Production composition consults this table before looking at a module-local
+`install_capability` function. The historical zero-argument hooks therefore are not
+part of the public application composition path, even when their modules were already
+cached before composition.
 
-The zero-argument form is a narrow migration adapter for capability modules whose
-tools are still registered on the shared server during import. It does not grant a
-second application identity or select another server. New capability installers must
-accept `ApplicationContext`.
-
-The foundational `concurrent_nodes` installer is context-aware. When called during
-explicit composition it uses `context.runtime` and does not consult the process
-runtime singleton. Its no-argument call remains only for direct historical module
-imports while import-time registration is being removed.
+A generic compatibility dispatcher remains for non-production/custom capability
+modules. It supports the prior zero-argument form temporarily, while context-aware
+custom installers may accept exactly one `ApplicationContext`. Ambiguous and variadic
+signatures fail closed.
 
 ## Runtime ownership
 
 `ApplicationContext` rejects closed runtime containers. Passing an explicit runtime
-to `JacquardApp.compose()` therefore pins capability installation and the retained
-application object to one usable lifecycle owner.
+to `JacquardApp.compose()` therefore pins capability loading, lifecycle changes, and
+the retained application object to one usable lifecycle owner.
 
-This slice does not yet make all MCP tool functions application-local. Existing
+Production adapters also verify that the context runtime is the runtime currently
+bound for composition. Cache invalidation, configuration lookup, metadata restoration,
+and quota materialization therefore cannot silently target the process-default
+container.
+
+This boundary does not yet make MCP tool functions application-local. Existing
 decorated capability modules still import the historical shared `mcp` object and
-runtime-backed service proxies. The context boundary makes that remaining work
-explicit and testable rather than hidden inside composition.
+runtime-backed service proxies.
 
 ## Remaining issue #106 work
 
 Follow-up work must:
 
-- convert every production capability installer to the one-context signature;
 - move tool registration from import-time decorators to context-server installation;
 - make service lookup use the application runtime during request execution;
-- remove the zero-argument installer compatibility path;
+- remove historical module-local installer calls and the custom zero-argument
+  compatibility dispatcher;
 - construct two complete applications with different databases and artifact roots in
   one process and prove that tools, services, manifests, and shutdown do not
   cross-contaminate;
