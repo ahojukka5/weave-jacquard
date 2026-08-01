@@ -184,6 +184,11 @@ previously imported workspace bindings, or clears an ad hoc list of build caches
 The first capability only ensures that the immutable process runtime exists. Tool
 names and schemas are unchanged.
 
+FastMCP registry and registered-tool metadata compatibility is isolated in
+`fastmcp_registry.py`. Runtime and application composition modules consume the
+adapter's captured contracts rather than reading SDK-private registry fields
+independently.
+
 The standalone service classes and `weave-build` CLI remain explicit embedding
 boundaries. They may use constructor arguments or documented legacy fallbacks; they
 are not silently attached to the MCP process runtime.
@@ -250,18 +255,16 @@ configured values, and incidental lazy-initialization order are not included in 
 service graph.
 
 Every production service factory is now represented in the typed runtime graph. The
-remaining issue #106 work concerns the application and registration boundaries, not
-untracked service ownership.
+remaining issue #106 work concerns explicit per-application context and isolation,
+not untracked service ownership or SDK registry access.
 
 ## Remaining issue #106 work
 
-The typed container now deterministically supplies the complete production service
-graph, including retained revision-evidence discovery. Production factories no
-longer use independent module-local `lru_cache` ownership.
+The typed container deterministically supplies the complete production service
+graph, and FastMCP private-registry compatibility is isolated behind one adapter.
 
 Follow-up work must pass an explicit runtime/application context through capability
-installation, isolate FastMCP private-registry compatibility in one adapter, replace
-remaining process-global installation assumptions, and prove that two complete
-applications with different databases and artifact roots can coexist in one process
-without cross-contamination. Final fixture cleanup and documentation should then
-describe that completed application ownership model.
+installation, replace remaining process-global installation assumptions, and prove
+that two complete applications with different databases and artifact roots can
+coexist in one process without cross-contamination. Final fixture cleanup and
+documentation should then describe that completed application ownership model.
