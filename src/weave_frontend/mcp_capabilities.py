@@ -10,7 +10,10 @@ from types import ModuleType
 from typing import Any, Protocol
 
 from .application_runtime_binding import bind_application_runtime
-from .application_tool_registration import install_registered_application_tools
+from .application_tool_registration import (
+    bind_registered_application_tools,
+    install_registered_application_tools,
+)
 from .context_capability_installers import install_production_capability
 from .runtime_container import RuntimeClosedError, RuntimeServices
 
@@ -291,6 +294,7 @@ def install_public_capabilities(
 
     with bind_application_runtime(context.runtime):
         ordered = validate_capabilities(capabilities)
+        canonical = ordered == PUBLIC_CAPABILITIES
         for capability in ordered:
             module = module_loader(capability.module)
             if install_production_capability(capability.name, module, context):
@@ -299,7 +303,7 @@ def install_public_capabilities(
             if callable(installer):
                 _invoke_installer(installer, context)
 
-        if ordered == PUBLIC_CAPABILITIES:
+        if canonical:
             _install_canonical_tool_registry(context, module_loader)
 
         guidance = module_loader("weave_frontend.mcp_revert_guidance")
@@ -319,6 +323,8 @@ def install_public_capabilities(
                 "artifact storage, and runtime identity workflows."
             ),
         )
+        if canonical:
+            bind_registered_application_tools(context)
         return capability_manifest(ordered)
 
 
