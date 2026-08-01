@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import asyncio
+from dataclasses import dataclass, replace
 from pathlib import Path
 from types import MappingProxyType, ModuleType, SimpleNamespace
 from typing import Any
@@ -9,6 +10,7 @@ import pytest
 
 from weave_frontend.application import JacquardApp
 from weave_frontend.application_tool_registration import (
+    bind_registered_application_tools,
     install_registered_application_tools,
 )
 from weave_frontend.fastmcp_registry import (
@@ -22,7 +24,7 @@ from weave_frontend.mcp_capabilities import (
     install_public_capabilities,
 )
 from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import RuntimeServices
+from weave_frontend.runtime_container import RuntimeServices, runtime_services
 
 
 @dataclass
@@ -35,11 +37,16 @@ class _Tool:
     name: str
     description: str
     parameters: dict[str, Any]
+    fn: Any
+    is_async: bool = False
     output_schema: dict[str, Any] | None = None
     title: str | None = None
     annotations: Any = None
     icons: Any = None
     meta: Any = None
+
+    def model_copy(self, *, update: dict[str, Any]) -> _Tool:
+        return replace(self, **update)
 
 
 class _Server:
@@ -60,11 +67,24 @@ class _Server:
         description: str | None = None,
     ) -> None:
         tool_name = name or function.__name__
-        self.tools[tool_name] = _tool(tool_name, description=description)
+        self.tools[tool_name] = _tool(
+            tool_name,
+            description=description,
+            function=function,
+        )
         self.added.append(tool_name)
 
 
-def _tool(name: str, *, description: str | None = None) -> _Tool:
+def _tool(
+    name: str,
+    *,
+    description: str | None = None,
+    function: Any | None = None,
+) -> _Tool:
+    if function is None:
+
+        def function(name: str = name) -> str:
+            return name
     return _Tool(
         name=name,
         description=description or f"Tool {name}",
@@ -73,6 +93,8 @@ def _tool(name: str, *, description: str | None = None) -> _Tool:
             "properties": {},
             "additionalProperties": False,
         },
+        fn=function,
+        is_async=asyncio.iscoroutinefunction(function),
     )
 
 
@@ -101,6 +123,22 @@ def test_registry_transfer_preserves_exact_tool_objects() -> None:
     assert FastMCPRegistryAdapter(target).tool_contracts() == (
         FastMCPRegistryAdapter(source).tool_contracts()
     )
+
+
+def test_registry_transform_rejects_contract_changes_before_replacement() -> None:
+    source = _Server({"sample": _tool("sample")})
+    target = _Server({"stale": _tool("stale")})
+
+    def change_description(_name: str, tool: _Tool) -> _Tool:
+        return tool.model_copy(update={"description": "changed"})
+
+    with pytest.raises(FastMCPRegistryError, match="transformation changed"):
+        FastMCPRegistryAdapter(target).replace_tools_from(
+            source,
+            transform=change_description,
+        )
+
+    assert tuple(target.tools) == ("stale",)
 
 
 def test_registry_transfer_rejects_immutable_target() -> None:
@@ -135,6 +173,99 @@ def test_application_registration_replaces_stale_target_contracts(
     assert all(target.tools[name] is source.tools[name] for name in names)
 
 
+def test_application_binding_clones_tools_and_preserves_contracts(
+    tmp_path: Path,
+) -> None:
+    process_runtime = runtime_services()
+    application_runtime = _runtime(tmp_path, "bound")
+    source_tool = _tool(
+        "runtime_probe",
+        function=lambda: runtime_services(),
+    )
+    server = _Server({"runtime_probe": source_tool})
+    context = ApplicationContext(server=server, runtime=application_runtime)
+    contracts = FastMCPRegistryAdapter(server).tool_contracts()
+
+    names = bind_registered_application_tools(context)
+    clone = server.tools["runtime_probe"]
+
+    assert names == ("runtime_probe",)
+    assert clone is not source_tool
+    assert clone.is_async is True
+    assert FastMCPRegistryAdapter(server).tool_contracts() == contracts
+    assert asyncio.run(clone.fn()) is application_runtime
+    assert runtime_services() is process_runtime
+
+
+def test_overlapping_application_calls_are_runtime_isolated(
+    tmp_path: Path,
+) -> None:
+    left_runtime = _runtime(tmp_path, "left")
+    right_runtime = _runtime(tmp_path, "right")
+    first_started: asyncio.Event
+    release_first: asyncio.Event
+    events: list[tuple[str, RuntimeServices]] = []
+
+    async def left_call() -> RuntimeServices:
+        events.append(("left:start", runtime_services()))
+        first_started.set()
+        await release_first.wait()
+        events.append(("left:end", runtime_services()))
+        return runtime_services()
+
+    async def right_call() -> RuntimeServices:
+        events.append(("right:start", runtime_services()))
+        return runtime_services()
+
+    left_server = _Server({"probe": _tool("probe", function=left_call)})
+    right_server = _Server({"probe": _tool("probe", function=right_call)})
+    bind_registered_application_tools(
+        ApplicationContext(server=left_server, runtime=left_runtime)
+    )
+    bind_registered_application_tools(
+        ApplicationContext(server=right_server, runtime=right_runtime)
+    )
+
+    async def run_calls() -> tuple[RuntimeServices, RuntimeServices]:
+        nonlocal first_started, release_first
+        first_started = asyncio.Event()
+        release_first = asyncio.Event()
+        left_task = asyncio.create_task(left_server.tools["probe"].fn())
+        await first_started.wait()
+        right_task = asyncio.create_task(right_server.tools["probe"].fn())
+        await asyncio.sleep(0)
+        assert events == [("left:start", left_runtime)]
+        release_first.set()
+        results = await asyncio.gather(left_task, right_task)
+        return results[0], results[1]
+
+    assert asyncio.run(run_calls()) == (left_runtime, right_runtime)
+    assert events == [
+        ("left:start", left_runtime),
+        ("left:end", left_runtime),
+        ("right:start", right_runtime),
+    ]
+
+
+def test_nested_same_runtime_invocation_is_reentrant(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path, "nested")
+    server = _Server()
+    inner = _tool("inner", function=lambda: runtime_services())
+
+    async def outer_call() -> RuntimeServices:
+        return await server.tools["inner"].fn()
+
+    server.tools = {
+        "inner": inner,
+        "outer": _tool("outer", function=outer_call),
+    }
+    bind_registered_application_tools(
+        ApplicationContext(server=server, runtime=runtime)
+    )
+
+    assert asyncio.run(server.tools["outer"].fn()) is runtime
+
+
 def test_custom_capability_graph_does_not_replace_target_registry(
     tmp_path: Path,
 ) -> None:
@@ -162,14 +293,18 @@ def test_custom_capability_graph_does_not_replace_target_registry(
 
     assert "weave_frontend.mcp_server" not in loaded
     assert "custom" in target.tools
+    assert target.tools["custom"].is_async is False
 
 
-def test_public_capability_graph_transfers_registry_to_context_server(
+def test_public_capability_graph_binds_registry_to_context_runtime(
     tmp_path: Path,
 ) -> None:
     source_tools = {
         "weave_help": _tool("weave_help"),
-        "project_initialize": _tool("project_initialize"),
+        "project_initialize": _tool(
+            "project_initialize",
+            function=lambda: runtime_services(),
+        ),
         "program_validate": _tool("program_validate"),
         "branch_merge": _tool("branch_merge"),
     }
@@ -211,9 +346,11 @@ def test_public_capability_graph_transfers_registry_to_context_server(
     assert app.server is target
     assert app.context.runtime is runtime
     assert "stale" not in target.tools
-    assert target.tools["project_initialize"] is source_tools["project_initialize"]
-    assert target.tools["program_validate"] is source_tools["program_validate"]
-    assert target.tools["branch_merge"] is source_tools["branch_merge"]
+    assert target.tools["project_initialize"] is not source_tools["project_initialize"]
+    assert target.tools["program_validate"] is not source_tools["program_validate"]
+    assert target.tools["branch_merge"] is not source_tools["branch_merge"]
+    assert all(tool.is_async is True for tool in target.tools.values())
+    assert asyncio.run(target.tools["project_initialize"].fn()) is runtime
     assert app.tool_manifest["tool_names"] == [
         "branch_merge",
         "program_validate",

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass
 from typing import Any
+
+ToolTransform = Callable[[str, Any], Any]
 
 
 class FastMCPRegistryError(RuntimeError):
@@ -31,31 +33,52 @@ class FastMCPRegistryAdapter:
             for name in sorted(registry)
         )
 
-    def replace_tools_from(self, source_server: Any) -> tuple[str, ...]:
-        """Replace this registry with exact tool objects from another server."""
+    def replace_tools_from(
+        self,
+        source_server: Any,
+        *,
+        transform: ToolTransform | None = None,
+    ) -> tuple[str, ...]:
+        """Replace this registry with verified tools from another server."""
 
         source = FastMCPRegistryAdapter(source_server)
         source_registry = source._registry()
         source_snapshot = source._snapshot()
         source_contracts = source.tool_contracts()
-        target_registry = self._mutable_registry()
         names = tuple(sorted(source_snapshot))
+        replacement = {
+            name: (
+                transform(name, source_snapshot[name])
+                if transform is not None
+                else source_snapshot[name]
+            )
+            for name in names
+        }
+        replacement_contracts = tuple(
+            self._tool_contract(name, replacement[name])
+            for name in names
+        )
+        if replacement_contracts != source_contracts:
+            raise FastMCPRegistryError(
+                "FastMCP tool transformation changed canonical tool contracts"
+            )
 
-        if target_registry is source_registry:
+        target_registry = self._mutable_registry()
+        if target_registry is source_registry and transform is None:
             return names
 
         previous = dict(target_registry.items())
         try:
             target_registry.clear()
-            target_registry.update(source_snapshot)
+            target_registry.update(replacement)
             installed = self._snapshot()
-            if set(installed) != set(source_snapshot):
+            if set(installed) != set(replacement):
                 raise FastMCPRegistryError(
                     "FastMCP target registry did not preserve the complete tool set"
                 )
-            if any(installed[name] is not source_snapshot[name] for name in names):
+            if any(installed[name] is not replacement[name] for name in names):
                 raise FastMCPRegistryError(
-                    "FastMCP target registry did not preserve exact tool objects"
+                    "FastMCP target registry did not preserve replacement tool objects"
                 )
             installed_contracts = tuple(
                 self._tool_contract(name, installed[name])
@@ -160,4 +183,8 @@ class FastMCPRegistryAdapter:
         }
 
 
-__all__ = ["FastMCPRegistryAdapter", "FastMCPRegistryError"]
+__all__ = [
+    "FastMCPRegistryAdapter",
+    "FastMCPRegistryError",
+    "ToolTransform",
+]
