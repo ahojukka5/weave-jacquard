@@ -9,6 +9,7 @@ from inspect import Parameter, signature
 from types import ModuleType
 from typing import Any, Protocol
 
+from .application_runtime_binding import bind_application_runtime
 from .runtime_container import RuntimeClosedError, RuntimeServices
 
 
@@ -275,30 +276,32 @@ def install_public_capabilities(
     if not isinstance(context, ApplicationContext):
         raise TypeError("context must be an ApplicationContext instance")
 
-    ordered = validate_capabilities(capabilities)
-    for capability in ordered:
-        module = module_loader(capability.module)
-        installer = getattr(module, "install_capability", None)
-        if callable(installer):
-            _invoke_installer(installer, context)
+    with bind_application_runtime(context.runtime):
+        ordered = validate_capabilities(capabilities)
+        for capability in ordered:
+            module = module_loader(capability.module)
+            installer = getattr(module, "install_capability", None)
+            if callable(installer):
+                _invoke_installer(installer, context)
 
-    guidance = module_loader("weave_frontend.mcp_revert_guidance")
-    server = context.server
-    server._mcp_server.instructions = guidance.INSTRUCTIONS
-    server.remove_tool("weave_help")
-    server.add_tool(
-        guidance.weave_help,
-        name="weave_help",
-        description=(
-            "Explain structural, revision, checkpoint, project supervision, merge queues, "
-            "merge trains, test definitions, strict test runs, explicit test batches, test "
-            "impact plans, virtual candidate qualification, tested-merge attestations, "
-            "revision evidence graphs, revisioned task contracts, scoped edits, immutable "
-            "reverts, selected preflight, resume, validation, build, verified database "
-            "backup, artifact storage, and runtime identity workflows."
-        ),
-    )
-    return capability_manifest(ordered)
+        guidance = module_loader("weave_frontend.mcp_revert_guidance")
+        server = context.server
+        server._mcp_server.instructions = guidance.INSTRUCTIONS
+        server.remove_tool("weave_help")
+        server.add_tool(
+            guidance.weave_help,
+            name="weave_help",
+            description=(
+                "Explain structural, revision, checkpoint, project supervision, "
+                "merge queues, merge trains, test definitions, strict test runs, "
+                "explicit test batches, test impact plans, virtual candidate "
+                "qualification, tested-merge attestations, revision evidence graphs, "
+                "revisioned task contracts, scoped edits, immutable reverts, selected "
+                "preflight, resume, validation, build, verified database backup, "
+                "artifact storage, and runtime identity workflows."
+            ),
+        )
+        return capability_manifest(ordered)
 
 
 __all__ = [
