@@ -5,8 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from importlib import import_module
+from inspect import Parameter, signature
 from types import ModuleType
 from typing import Any, Protocol
+
+from .runtime_container import RuntimeClosedError, RuntimeServices
 
 
 @dataclass(frozen=True)
@@ -181,6 +184,20 @@ class _FastMCPServer(Protocol):
     ) -> None: ...
 
 
+@dataclass(frozen=True)
+class ApplicationContext:
+    """Exact server and runtime selected for one application composition."""
+
+    server: _FastMCPServer
+    runtime: RuntimeServices
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.runtime, RuntimeServices):
+            raise TypeError("application runtime must be a RuntimeServices instance")
+        if self.runtime.closed:
+            raise RuntimeClosedError("cannot compose an application with a closed runtime")
+
+
 ModuleLoader = Callable[[str], ModuleType]
 
 
@@ -218,22 +235,55 @@ def capability_manifest(
     )
 
 
+def _invoke_installer(
+    installer: Callable[..., Any],
+    context: ApplicationContext,
+) -> None:
+    """Call one supported legacy or context-aware capability installer."""
+
+    parameters = tuple(signature(installer).parameters.values())
+    if not parameters:
+        installer()
+        return
+    if len(parameters) != 1:
+        raise TypeError(
+            "install_capability must accept either no arguments or one "
+            "ApplicationContext"
+        )
+
+    parameter = parameters[0]
+    if parameter.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD):
+        installer(context)
+        return
+    if parameter.kind is Parameter.KEYWORD_ONLY:
+        installer(**{parameter.name: context})
+        return
+    raise TypeError(
+        "install_capability must accept either no arguments or one "
+        "ApplicationContext"
+    )
+
+
 def install_public_capabilities(
-    server: _FastMCPServer,
+    context: ApplicationContext,
     *,
     capabilities: Iterable[Capability] = PUBLIC_CAPABILITIES,
     module_loader: ModuleLoader = import_module,
 ) -> tuple[dict[str, Any], ...]:
-    """Load capabilities in order and run idempotent installers even when cached."""
+    """Load capabilities into one exact application context in dependency order."""
+
+    if not isinstance(context, ApplicationContext):
+        raise TypeError("context must be an ApplicationContext instance")
 
     ordered = validate_capabilities(capabilities)
     for capability in ordered:
         module = module_loader(capability.module)
         installer = getattr(module, "install_capability", None)
         if callable(installer):
-            installer()
+            _invoke_installer(installer, context)
 
     guidance = module_loader("weave_frontend.mcp_revert_guidance")
+    server = context.server
     server._mcp_server.instructions = guidance.INSTRUCTIONS
     server.remove_tool("weave_help")
     server.add_tool(
@@ -249,3 +299,14 @@ def install_public_capabilities(
         ),
     )
     return capability_manifest(ordered)
+
+
+__all__ = [
+    "ApplicationContext",
+    "Capability",
+    "ModuleLoader",
+    "PUBLIC_CAPABILITIES",
+    "capability_manifest",
+    "install_public_capabilities",
+    "validate_capabilities",
+]
