@@ -13,11 +13,13 @@ from typing import Any
 from .fastmcp_registry import FastMCPRegistryAdapter, FastMCPRegistryError
 from .mcp_capabilities import (
     PUBLIC_CAPABILITIES,
+    ApplicationContext,
     Capability,
     ModuleLoader,
     install_public_capabilities,
 )
 from .runtime_config import PUBLIC_CONFIGURATION_VARIABLES
+from .runtime_container import RuntimeServices, runtime_services
 
 APPLICATION_MANIFEST_FORMAT = "weave-jacquard-application-v2"
 TOOL_MANIFEST_FORMAT = "weave-jacquard-tool-manifest-v2"
@@ -52,6 +54,7 @@ class JacquardApp:
     """One validated production server plus its public composition snapshots."""
 
     server: Any
+    context: ApplicationContext
     capability_manifest: tuple[dict[str, Any], ...]
     tool_manifest: dict[str, Any]
     application_manifest: dict[str, Any]
@@ -61,16 +64,24 @@ class JacquardApp:
         cls,
         server: Any,
         *,
+        runtime: RuntimeServices | None = None,
         capabilities: Iterable[Capability] = PUBLIC_CAPABILITIES,
         module_loader: ModuleLoader | None = None,
         required_tools: Iterable[str] = _REQUIRED_PUBLIC_TOOLS,
     ) -> JacquardApp:
         """Install and validate one complete public Jacquard MCP application."""
 
+        context = ApplicationContext(
+            server=server,
+            runtime=runtime if runtime is not None else runtime_services(),
+        )
         install_arguments: dict[str, Any] = {"capabilities": capabilities}
         if module_loader is not None:
             install_arguments["module_loader"] = module_loader
-        capability_manifest = install_public_capabilities(server, **install_arguments)
+        capability_manifest = install_public_capabilities(
+            context,
+            **install_arguments,
+        )
         tool_manifest = build_tool_manifest(
             registered_tool_contracts(server),
             required_tools=required_tools,
@@ -92,6 +103,7 @@ class JacquardApp:
         }
         return cls(
             server=server,
+            context=context,
             capability_manifest=capability_manifest,
             tool_manifest=tool_manifest,
             application_manifest=application_manifest,
