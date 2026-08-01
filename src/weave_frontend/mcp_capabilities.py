@@ -10,6 +10,7 @@ from types import ModuleType
 from typing import Any, Protocol
 
 from .application_runtime_binding import bind_application_runtime
+from .context_capability_installers import install_production_capability
 from .runtime_container import RuntimeClosedError, RuntimeServices
 
 
@@ -240,7 +241,7 @@ def _invoke_installer(
     installer: Callable[..., Any],
     context: ApplicationContext,
 ) -> None:
-    """Call one supported legacy or context-aware capability installer."""
+    """Call one supported custom legacy or context-aware capability installer."""
 
     parameters = tuple(signature(installer).parameters.values())
     if not parameters:
@@ -280,6 +281,8 @@ def install_public_capabilities(
         ordered = validate_capabilities(capabilities)
         for capability in ordered:
             module = module_loader(capability.module)
+            if install_production_capability(capability.name, module, context):
+                continue
             installer = getattr(module, "install_capability", None)
             if callable(installer):
                 _invoke_installer(installer, context)
