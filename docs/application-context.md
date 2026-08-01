@@ -23,6 +23,7 @@ select or create RuntimeServices
 → invoke each production lifecycle adapter against that context
 → copy the canonical public tool registry onto context.server
 → install final guidance on context.server
+→ clone every public tool with request-time runtime binding
 → capture tool contracts through FastMCPRegistryAdapter
 → validate and hash the public application manifests
 ```
@@ -76,36 +77,60 @@ assumes that this registration server is the application server.
 - runs only for the canonical public capability graph, leaving custom graphs and their
   server contents unchanged.
 
-All SDK-private registry access remains isolated in `FastMCPRegistryAdapter`. Final
-`weave_help` guidance is installed after the transfer, exactly as before.
+After final guidance is installed, each public FastMCP `Tool` is cloned for the
+application. Only its callable and `is_async` execution flag change. The generated
+argument model, input and output schemas, descriptions, annotations, icons, metadata,
+and public manifest identity remain unchanged.
+
+All SDK-private registry and tool-cloning access remains isolated behind
+`FastMCPRegistryAdapter` and `application_tool_registration.py`.
+
+## Request-time runtime ownership
+
+Every cloned public tool contains an asynchronous wrapper around its original
+callable. The wrapper selects `context.runtime` before invoking the original function
+and retains that selection until any returned awaitable completes.
+
+The current runtime container still exposes a process-global selector. To prevent two
+overlapping requests from overwriting it, wrappers use one process-wide asynchronous
+gate. The gate:
+
+- serializes public tool execution across application runtimes;
+- permits nested calls that retain the same application runtime;
+- rejects a nested call that attempts to switch runtimes;
+- restores the previous process runtime after success, failure, or cancellation;
+- supports both synchronous and asynchronous original tool functions.
+
+This is an isolation compatibility layer, not the final concurrency architecture.
+Overlapping requests are safe but execute one at a time while the process-global
+runtime selector remains. A later runtime-container change should replace the selector
+with task-local state, after which this gate can be removed and tools from independent
+applications can execute in parallel.
 
 ## Runtime ownership
 
 `ApplicationContext` rejects closed runtime containers. Passing an explicit runtime
 to `JacquardApp.compose()` therefore pins capability loading, lifecycle changes, tool
-registration, and the retained application object to one usable lifecycle owner.
+registration, request execution, and the retained application object to one usable
+lifecycle owner.
 
 Production adapters also verify that the context runtime is the runtime currently
 bound for composition. Cache invalidation, configuration lookup, metadata restoration,
 and quota materialization therefore cannot silently target the process-default
 container.
 
-Tool objects are now owned by the selected application server, but their current
-functions still resolve runtime-backed service proxies when requests execute. Request
-execution therefore needs its own application-runtime binding before two applications
-can be used concurrently without cross-contamination.
-
 ## Remaining issue #106 work
 
 Follow-up work must:
 
-- bind each tool request to the runtime retained by its `ApplicationContext`;
+- replace the process-global runtime selector with task-local runtime state and remove
+  the serialized request gate;
 - replace import-time registration onto the historical server with direct
   context-server registration, then remove the registry-transfer adapter;
 - remove historical module-local installer calls and the custom zero-argument
   compatibility dispatcher;
 - construct two complete applications with different databases and artifact roots in
-  one process and prove that tools, services, manifests, and shutdown do not
+  one process and prove parallel tools, services, manifests, and shutdown do not
   cross-contaminate;
 - simplify fixtures once process-global cache clearing is no longer required.
 
