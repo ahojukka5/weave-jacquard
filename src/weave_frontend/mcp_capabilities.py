@@ -10,6 +10,7 @@ from types import ModuleType
 from typing import Any, Protocol
 
 from .application_runtime_binding import bind_application_runtime
+from .application_tool_registration import install_registered_application_tools
 from .context_capability_installers import install_production_capability
 from .runtime_container import RuntimeClosedError, RuntimeServices
 
@@ -266,6 +267,17 @@ def _invoke_installer(
     )
 
 
+def _install_canonical_tool_registry(
+    context: ApplicationContext,
+    module_loader: ModuleLoader,
+) -> tuple[str, ...]:
+    registration_module = module_loader("weave_frontend.mcp_server")
+    registration_server = getattr(registration_module, "mcp", None)
+    if registration_server is None:
+        raise TypeError("weave_frontend.mcp_server must expose the registration server")
+    return install_registered_application_tools(context, registration_server)
+
+
 def install_public_capabilities(
     context: ApplicationContext,
     *,
@@ -286,6 +298,9 @@ def install_public_capabilities(
             installer = getattr(module, "install_capability", None)
             if callable(installer):
                 _invoke_installer(installer, context)
+
+        if ordered == PUBLIC_CAPABILITIES:
+            _install_canonical_tool_registry(context, module_loader)
 
         guidance = module_loader("weave_frontend.mcp_revert_guidance")
         server = context.server
