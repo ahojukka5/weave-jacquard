@@ -12,7 +12,6 @@ from weave_frontend.compiler_artifacts import (
 )
 from weave_frontend.errors import ValidationError
 
-
 BUILD_ID = "a" * 32
 
 

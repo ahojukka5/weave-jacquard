@@ -291,10 +291,8 @@ def _run_bounded_command(
                 _kill_process_group(process)
                 break
             if not selector.get_map():
-                try:
+                with suppress(subprocess.TimeoutExpired):
                     process.wait(timeout=min(remaining, 0.1))
-                except subprocess.TimeoutExpired:
-                    pass
                 continue
             events = selector.select(timeout=min(remaining, 0.1))
             if not events and process.poll() is not None:

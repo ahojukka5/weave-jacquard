@@ -110,8 +110,7 @@ def test_quota_mixin_rejects_before_parent_publication_lock(tmp_path: Path) -> N
     service = _QuotaPublication()
     service.artifact_quota = _quota(root, max_bytes=3)
 
-    with pytest.raises(ArtifactQuotaExceededError):
-        with service._publication_lock(final):
-            raise AssertionError("overflowing publication unexpectedly entered")
+    with pytest.raises(ArtifactQuotaExceededError), service._publication_lock(final):
+        raise AssertionError("overflowing publication unexpectedly entered")
 
     assert service.events == []

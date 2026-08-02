@@ -17,6 +17,8 @@ from .errors import ArtifactIntegrityError, ValidationError
 from .merge_candidate_build import (
     MERGE_CANDIDATE_BUILD_FORMAT,
     MERGE_CANDIDATE_BUILD_KEY_FORMAT,
+)
+from .merge_candidate_build import (
     MergeCandidateBuildService as _BaseMergeCandidateBuildService,
 )
 from .test_target_validation import validate_test_target_references

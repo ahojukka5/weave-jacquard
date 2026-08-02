@@ -7,11 +7,10 @@ import selectors
 import signal
 import subprocess
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
 _READ_CHUNK = 65_536
 
@@ -117,10 +116,8 @@ def _collect(
                 break
 
             if not selector.get_map():
-                try:
+                with suppress(subprocess.TimeoutExpired):
                     process.wait(timeout=min(remaining, 0.1))
-                except subprocess.TimeoutExpired:
-                    pass
                 continue
 
             events = selector.select(timeout=min(remaining, 0.1))

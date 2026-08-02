@@ -8,7 +8,6 @@ import pytest
 from weave_frontend.database import Database
 from weave_frontend.database_integrity import inspect_database
 
-
 _GUARDS = (
     "revisions_validate_parent_projects_insert",
     "revisions_validate_parent_projects_update",

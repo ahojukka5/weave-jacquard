@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import pytest
 
@@ -12,7 +12,6 @@ from weave_frontend.test_batches import (
     TestBatchService,
 )
 from weave_frontend.test_runs import MAX_TEST_RUN_MANIFEST_BYTES, TestRunService
-
 
 Reader = Callable[[Path], dict[str, object]]
 

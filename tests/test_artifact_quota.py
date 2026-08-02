@@ -131,13 +131,12 @@ def test_exact_stage_rejects_limit_plus_one_with_stable_error(tmp_path: Path) ->
     final = root / ("2" * 32)
     quota = _quota(root, max_bytes=6)
 
-    with pytest.raises(ArtifactQuotaExceededError) as captured:
-        with quota.admit(
-            family="committed_builds",
-            temporary=temporary,
-            final=final,
-        ):
-            raise AssertionError("overflowing publication unexpectedly admitted")
+    with pytest.raises(ArtifactQuotaExceededError) as captured, quota.admit(
+        family="committed_builds",
+        temporary=temporary,
+        final=final,
+    ):
+        raise AssertionError("overflowing publication unexpectedly admitted")
 
     assert captured.value.as_dict() == {
         "code": "ARTIFACT_STORAGE_QUOTA_EXCEEDED",
@@ -206,12 +205,11 @@ def test_prefix_admission_ignores_other_staging_then_prevents_oversubscription(
         assert evidence["staged_bytes"] == 6
         os.replace(first_stage, first_final)
 
-    with pytest.raises(ArtifactQuotaExceededError) as captured:
-        with quota.admit_staged_prefix(
-            family="committed_builds",
-            final=second_final,
-        ):
-            raise AssertionError("second publication unexpectedly admitted")
+    with pytest.raises(ArtifactQuotaExceededError) as captured, quota.admit_staged_prefix(
+        family="committed_builds",
+        final=second_final,
+    ):
+        raise AssertionError("second publication unexpectedly admitted")
 
     assert captured.value.current_bytes == 6
     assert captured.value.staged_bytes == 6
@@ -244,12 +242,11 @@ def test_prefix_admission_rejects_missing_stage(tmp_path: Path) -> None:
     root.mkdir()
     quota = _quota(root, max_bytes=10)
 
-    with pytest.raises(ValidationError) as captured:
-        with quota.admit_staged_prefix(
-            family="committed_builds",
-            final=root / ("a" * 32),
-        ):
-            raise AssertionError("missing stage unexpectedly admitted")
+    with pytest.raises(ValidationError) as captured, quota.admit_staged_prefix(
+        family="committed_builds",
+        final=root / ("a" * 32),
+    ):
+        raise AssertionError("missing stage unexpectedly admitted")
 
     assert captured.value.code == "ARTIFACT_STORAGE_STAGE_NOT_FOUND"
 
@@ -286,11 +283,10 @@ def test_staged_candidate_count_is_bounded(
         stage.mkdir()
     quota = _quota(root, max_bytes=10)
 
-    with pytest.raises(ValidationError) as captured:
-        with quota.admit_staged_prefix(
-            family="committed_builds",
-            final=final,
-        ):
-            raise AssertionError("excess stages unexpectedly admitted")
+    with pytest.raises(ValidationError) as captured, quota.admit_staged_prefix(
+        family="committed_builds",
+        final=final,
+    ):
+        raise AssertionError("excess stages unexpectedly admitted")
 
     assert captured.value.code == "ARTIFACT_STORAGE_STAGE_LIMIT_EXCEEDED"

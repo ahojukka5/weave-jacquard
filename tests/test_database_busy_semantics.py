@@ -47,9 +47,8 @@ def test_busy_writer_returns_retryable_domain_error_and_recovers(tmp_path: Path)
                 "INSERT INTO projects(id, name) VALUES (?, ?)",
                 ("owner-project", "owner-project"),
             )
-            with pytest.raises(DatabaseBusyError) as captured:
-                with contender.transaction():
-                    raise AssertionError("busy transaction unexpectedly started")
+            with pytest.raises(DatabaseBusyError) as captured, contender.transaction():
+                raise AssertionError("busy transaction unexpectedly started")
 
         error = captured.value
         assert error.code == "DATABASE_BUSY"
@@ -87,9 +86,11 @@ def test_database_busy_error_uses_stable_mcp_envelope() -> None:
 
 def test_non_busy_operational_error_remains_operational_error(tmp_path: Path) -> None:
     with Database(tmp_path / "jacquard.db") as database:
-        with pytest.raises(sqlite3.OperationalError, match="no such table"):
-            with database.transaction() as connection:
-                connection.execute("INSERT INTO table_that_does_not_exist VALUES (1)")
+        with (
+            pytest.raises(sqlite3.OperationalError, match="no such table"),
+            database.transaction() as connection,
+        ):
+            connection.execute("INSERT INTO table_that_does_not_exist VALUES (1)")
 
         assert database.connection.in_transaction is False
 
@@ -125,9 +126,8 @@ connection.close()
                 time.sleep(0.01)
             assert process.poll() is None
 
-            with pytest.raises(DatabaseBusyError) as captured:
-                with contender.transaction():
-                    raise AssertionError("busy transaction unexpectedly started")
+            with pytest.raises(DatabaseBusyError) as captured, contender.transaction():
+                raise AssertionError("busy transaction unexpectedly started")
 
             assert captured.value.busy_timeout_ms == 50
             assert contender.connection.in_transaction is False
