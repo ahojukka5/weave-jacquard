@@ -95,11 +95,10 @@ unverified: whoever merges it must run the full validation suite from
 "Development setup" locally, against the actual commit being merged, before
 merging.
 
-When checking `ruff check .` or `pytest` output, compare it against the same
-commands run on `main`, not against an absolute zero-error bar — this
-repository carries pre-existing `ruff` findings that are not introduced by any
-one pull request. Fix only newly introduced findings, and fold that fix into
-the commit that introduced them rather than adding a separate cleanup commit.
+Treat `ruff check .` as an absolute zero-warning gate on both `main` and the
+pull request head. Fix every reported finding before review, and fold
+corrections into the commit that introduced them rather than adding a separate
+cleanup commit.
 
 `tests/test_validator_process_failures.py::test_validator_timeout_preserves_partial_output`
 is a known flaky test: it races a subprocess timeout against captured stdout
