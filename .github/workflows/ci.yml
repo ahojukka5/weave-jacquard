@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -29,7 +33,7 @@ jobs:
           exit 1
 
   qualification:
-    name: Python qualification
+    name: Portable Python qualification
     needs: guard-self-hosted
     runs-on: self-hosted
     timeout-minutes: 20
@@ -42,36 +46,69 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
-      # The `runner` context (runner.temp, runner.os, ...) is only valid
-      # inside a step -- referencing it in job-level `env:` is a parse
-      # error GitHub rejects before creating any job at all (confirmed
-      # directly via the workflow_dispatch API: "Unrecognized named-value:
-      # 'runner'"), which is why every run of this workflow, on every
-      # commit, has shown zero jobs regardless of what else changed.
       - name: Compute qualification directory
         run: echo "QUALIFICATION_DIR=${{ runner.temp }}/jacquard-python-qualification" >> "$GITHUB_ENV"
-
-      # This runner is unprivileged (no sudo, no root) and doesn't allow
-      # relaxing user-namespace restrictions -- bubblewrap-based sandboxing
-      # simply isn't available here. scripts/qualify.sh already reports
-      # bubblewrap's availability as part of its own capability detection
-      # (see its "bubblewrap" capability field) rather than requiring it,
-      # so this only means that capability reports as unavailable/limited,
-      # not that qualification itself fails.
 
       - name: Install Jacquard qualification environment
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e '.[dev]'
 
-      - name: Run unified Python qualification
-        run: bash scripts/qualify.sh python "$QUALIFICATION_DIR"
+      - name: Record runner and sandbox capabilities
+        run: |
+          mkdir -p "$QUALIFICATION_DIR"
+          python --version | tee "$QUALIFICATION_DIR/python-version.txt"
+          python -m pip freeze > "$QUALIFICATION_DIR/python-packages.txt"
+          uname -a | tee "$QUALIFICATION_DIR/platform.txt"
+          python - "$QUALIFICATION_DIR/sandbox-capabilities.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          from weave_frontend.sandbox import BubblewrapSandbox
+
+          path = Path(sys.argv[1])
+          capabilities = BubblewrapSandbox().capabilities()
+          path.write_text(
+              json.dumps(capabilities, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(capabilities, indent=2, sort_keys=True))
+          PY
+
+      - name: Compile Python sources
+        run: |
+          set -o pipefail
+          python -m compileall -q src tests scripts/qualification.py 2>&1 \
+            | tee "$QUALIFICATION_DIR/compileall.log"
+
+      - name: Run Ruff
+        run: |
+          set -o pipefail
+          python -m ruff check . 2>&1 | tee "$QUALIFICATION_DIR/ruff.log"
+
+      - name: Run pytest
+        run: |
+          set -o pipefail
+          python -m pytest \
+            -q \
+            --tb=short \
+            --strict-markers \
+            -p no:cacheprovider \
+            -m "not real_e2e" \
+            --cov=weave_frontend \
+            --cov-report=term-missing \
+            --cov-report=xml:"$QUALIFICATION_DIR/coverage.xml" \
+            --junitxml="$QUALIFICATION_DIR/pytest-junit.xml" \
+            2>&1 | tee "$QUALIFICATION_DIR/pytest.log"
 
       - name: Upload qualification evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: jacquard-python-qualification
           path: ${{ env.QUALIFICATION_DIR }}
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
