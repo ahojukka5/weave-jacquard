@@ -76,6 +76,16 @@ def test_sandbox_limits_reject_boolean_values() -> None:
     assert raised.value.code == "INVALID_SANDBOX_LIMIT"
 
 
+def test_process_probe_recognizes_expected_fork_denial() -> None:
+    assert BubblewrapSandbox._is_fork_denial(2, b"/app/program: 1: Cannot fork\n")
+    assert BubblewrapSandbox._is_fork_denial(
+        254,
+        b"fork: Resource temporarily unavailable\n",
+    )
+    assert not BubblewrapSandbox._is_fork_denial(0, b"Cannot fork")
+    assert not BubblewrapSandbox._is_fork_denial(2, b"syntax error")
+
+
 def test_collector_allows_exact_limit_and_stops_excess_output() -> None:
     exact = subprocess.Popen(
         [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'x' * 16)"],
@@ -206,24 +216,15 @@ def test_bubblewrap_denies_process_creation() -> None:
     if not capabilities["available"]:
         pytest.skip(str(capabilities["probe_error"]))
 
-    bash = shutil.which("bash")
-    assert bash is not None
-    script = r'''
-if [[ "$(ulimit -u)" != "1" ]]; then
-    exit 82
-fi
-if ( : ) 2>/dev/null; then
-    exit 83
-fi
-printf 'single-process\n'
-'''
+    shell = shutil.which("sh")
+    assert shell is not None
     result = sandbox.run(
-        Path(bash),
-        ["-c", script],
+        Path(shell),
+        ["-c", "( : ); exit 83"],
         b"",
         _limits(),
     )
 
-    assert result.returncode == 0
-    assert result.stdout == b"single-process\n"
-    assert result.stderr == b""
+    output = (result.stdout + result.stderr).lower()
+    assert result.returncode not in {None, 0, 83}
+    assert b"cannot fork" in output or b"resource temporarily unavailable" in output

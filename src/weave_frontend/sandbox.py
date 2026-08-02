@@ -26,6 +26,10 @@ SANDBOX_RESULT_FORMAT = "weave-sandbox-result-v1"
 MAX_SANDBOX_VERSION_BYTES = 4096
 _READ_CHUNK = 65_536
 _SINGLE_PROCESS_LIMIT = 1
+_FORK_DENIAL_MARKERS = (
+    b"cannot fork",
+    b"resource temporarily unavailable",
+)
 
 
 @dataclass(frozen=True)
@@ -170,10 +174,7 @@ class BubblewrapSandbox:
                         process_probe = subprocess.run(
                             self._command(
                                 Path("/bin/sh").resolve(),
-                                [
-                                    "-c",
-                                    "if ( : ) 2>/dev/null; then exit 91; fi; exit 0",
-                                ],
+                                ["-c", "( : ); exit 91"],
                             ),
                             stdin=subprocess.DEVNULL,
                             stdout=subprocess.PIPE,
@@ -181,12 +182,20 @@ class BubblewrapSandbox:
                             check=False,
                             timeout=5,
                         )
-                        if process_probe.returncode == 0:
+                        process_output = process_probe.stdout[
+                            :MAX_SANDBOX_VERSION_BYTES
+                        ]
+                        if process_probe.returncode == 91:
+                            error = "single-process policy allowed child process creation"
+                        elif self._is_fork_denial(
+                            process_probe.returncode,
+                            process_output,
+                        ):
                             available = True
                         else:
-                            message = process_probe.stdout[
-                                :MAX_SANDBOX_VERSION_BYTES
-                            ].decode("utf-8", errors="replace").strip()
+                            message = process_output.decode(
+                                "utf-8", errors="replace"
+                            ).strip()
                             error = (
                                 "single-process policy probe exited "
                                 f"{process_probe.returncode}"
@@ -351,6 +360,13 @@ class BubblewrapSandbox:
             ]
         )
         return command
+
+    @staticmethod
+    def _is_fork_denial(returncode: int, output: bytes) -> bool:
+        if returncode == 0:
+            return False
+        normalized = output.lower()
+        return any(marker in normalized for marker in _FORK_DENIAL_MARKERS)
 
     @staticmethod
     def _runtime_paths() -> list[str]:

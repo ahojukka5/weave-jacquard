@@ -33,6 +33,13 @@ Finding the executables is not sufficient evidence. `capabilities()` performs:
 3. a process-policy probe whose shell attempts to create a subshell under
    `RLIMIT_NPROC=1`.
 
+A shell cannot reliably continue after the kernel refuses that fork. In
+particular, `/bin/sh` may terminate with exit code `2` and `Cannot fork` instead
+of returning control to an `if` statement. The admission probe therefore treats
+only a recognized fork-denial diagnostic as success. If the subshell runs, the
+probe exits with a dedicated failure code. Any unrelated nonzero exit still
+fails closed.
+
 The backend reports `available=true` only when the isolated command succeeds and
 the process-creation attempt is denied. Privilege contexts that bypass
 `RLIMIT_NPROC`, including an unsuitable root execution context, therefore fail
