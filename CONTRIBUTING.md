@@ -100,11 +100,6 @@ pull request head. Fix every reported finding before review, and fold
 corrections into the commit that introduced them rather than adding a separate
 cleanup commit.
 
-`tests/test_validator_process_failures.py::test_validator_timeout_preserves_partial_output`
-is a known flaky test: it races a subprocess timeout against captured stdout
-and fails intermittently under load, independent of any particular change. If
-it fails, rerun it in isolation before treating it as a regression.
-
 Pull requests are merged by rebase, preserving individual commits in `main`'s
 history rather than squashing at merge time. Rewrite commit history —
 including squashing over-split commits per "Commit scope" above — before
