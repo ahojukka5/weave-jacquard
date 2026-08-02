@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Any
+from unittest.mock import patch
 
 import pytest
 
+from tests.e2e import test_real_mcp_program_matrix as program_matrix
 from tests.e2e.test_real_mcp_program_matrix import (
     NodeSpec,
     ProgramCase,
@@ -16,9 +19,9 @@ from tests.e2e.test_real_mcp_program_matrix import (
     increment,
     local,
     param,
-    run_case,
     sym,
 )
+from weave_frontend.revision_limits import MAX_BRANCH_HISTORY_PAGE_SIZE
 
 
 def ptr_at(base: NodeSpec, index: NodeSpec) -> NodeSpec:
@@ -250,11 +253,50 @@ def binary_search_batch16() -> ProgramCase:
 CASE = binary_search_batch16()
 
 
+async def run_case_with_bounded_history(
+    tmp_path: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    history_page: dict[str, Any] | None = None
+    original_call = program_matrix.call
+
+    async def bounded_call(
+        session: Any,
+        trace: list[dict[str, Any]],
+        name: str,
+        arguments: dict[str, Any],
+    ) -> Any:
+        nonlocal history_page
+        bounded_arguments = arguments
+        if name == "branch_history":
+            assert arguments["limit"] > MAX_BRANCH_HISTORY_PAGE_SIZE
+            bounded_arguments = {
+                **arguments,
+                "limit": MAX_BRANCH_HISTORY_PAGE_SIZE,
+            }
+        result = await original_call(session, trace, name, bounded_arguments)
+        if name == "branch_history":
+            history_page = result
+        return result
+
+    with patch.object(program_matrix, "call", bounded_call):
+        summary = await program_matrix.run_case(
+            CASE,
+            tmp_path,
+            configured_compiler(),
+        )
+
+    assert history_page is not None
+    return summary, history_page
+
+
 @pytest.mark.real_mcp
 @pytest.mark.real_e2e
 def test_real_mcp_binary_search_batch16(tmp_path: Path) -> None:
-    summary = asyncio.run(run_case(CASE, tmp_path, configured_compiler()))
+    summary, history = asyncio.run(run_case_with_bounded_history(tmp_path))
     assert summary["actual_exit"] == 26
     assert summary["node_count"] > 250
     assert summary["tool_calls"] == summary["node_count"] + 7
-    assert summary["reachable_revisions"] == summary["node_count"] + 2
+    assert summary["reachable_revisions"] == MAX_BRANCH_HISTORY_PAGE_SIZE
+    assert history["returned_count"] == MAX_BRANCH_HISTORY_PAGE_SIZE
+    assert history["truncated"] is True
+    assert history["next_revision_id"] is not None
