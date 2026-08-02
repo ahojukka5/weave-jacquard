@@ -42,27 +42,43 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
+      - name: Initialize qualification evidence
+        run: |
+          qualification_dir="$GITHUB_WORKSPACE/.qualification-evidence"
+          mkdir -p "$qualification_dir"
+          echo "QUALIFICATION_DIR=$qualification_dir" >> "$GITHUB_ENV"
 
-      - name: Compute qualification directory
-        run: echo "QUALIFICATION_DIR=${{ runner.temp }}/jacquard-python-qualification" >> "$GITHUB_ENV"
+      - name: Select supported runner Python
+        run: |
+          set -euo pipefail
+          for candidate in python3.13 python3.12 python3.11 python3 python; do
+            if ! command -v "$candidate" >/dev/null 2>&1; then
+              continue
+            fi
+            if "$candidate" - <<'PY'
+          import sys
+          raise SystemExit(0 if sys.version_info >= (3, 11) else 1)
+          PY
+            then
+              python_path="$(command -v "$candidate")"
+              echo "PYTHON_BIN=$python_path" >> "$GITHUB_ENV"
+              "$python_path" --version | tee "$QUALIFICATION_DIR/python-version.txt"
+              exit 0
+            fi
+          done
+          echo "::error::Python 3.11 or newer is required on the self-hosted runner."
+          exit 1
 
       - name: Install Jacquard qualification environment
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e '.[dev]'
+          "$PYTHON_BIN" -m pip install --upgrade pip
+          "$PYTHON_BIN" -m pip install -e '.[dev]'
 
       - name: Record runner and sandbox capabilities
         run: |
-          mkdir -p "$QUALIFICATION_DIR"
-          python --version | tee "$QUALIFICATION_DIR/python-version.txt"
-          python -m pip freeze > "$QUALIFICATION_DIR/python-packages.txt"
+          "$PYTHON_BIN" -m pip freeze > "$QUALIFICATION_DIR/python-packages.txt"
           uname -a | tee "$QUALIFICATION_DIR/platform.txt"
-          python - "$QUALIFICATION_DIR/sandbox-capabilities.json" <<'PY'
+          "$PYTHON_BIN" - "$QUALIFICATION_DIR/sandbox-capabilities.json" <<'PY'
           import json
           import sys
           from pathlib import Path
@@ -81,18 +97,18 @@ jobs:
       - name: Compile Python sources
         run: |
           set -o pipefail
-          python -m compileall -q src tests scripts/qualification.py 2>&1 \
+          "$PYTHON_BIN" -m compileall -q src tests scripts/qualification.py 2>&1 \
             | tee "$QUALIFICATION_DIR/compileall.log"
 
       - name: Run Ruff
         run: |
           set -o pipefail
-          python -m ruff check . 2>&1 | tee "$QUALIFICATION_DIR/ruff.log"
+          "$PYTHON_BIN" -m ruff check . 2>&1 | tee "$QUALIFICATION_DIR/ruff.log"
 
       - name: Run pytest
         run: |
           set -o pipefail
-          python -m pytest \
+          "$PYTHON_BIN" -m pytest \
             -q \
             --tb=short \
             --strict-markers \
@@ -109,6 +125,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: jacquard-python-qualification
-          path: ${{ env.QUALIFICATION_DIR }}
+          path: ${{ github.workspace }}/.qualification-evidence
           if-no-files-found: warn
           retention-days: 7
