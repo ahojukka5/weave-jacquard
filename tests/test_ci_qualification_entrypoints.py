@@ -9,15 +9,20 @@ def _workflow(name: str) -> str:
     return (ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
 
 
-def test_python_ci_delegates_to_unified_qualification() -> None:
+def test_python_ci_runs_portable_qualification() -> None:
     workflow = _workflow("ci.yml")
 
-    assert 'bash scripts/qualify.sh python "$QUALIFICATION_DIR"' in workflow
-    assert "python -m compileall" not in workflow
-    assert "ruff check" not in workflow
-    assert "pytest -q" not in workflow
-    assert "qualification-traces.json" not in workflow
-    assert "if-no-files-found: error" in workflow
+    assert "runs-on: self-hosted" in workflow
+    assert 'QUALIFICATION_DIR=${{ runner.temp }}/jacquard-python-qualification' in workflow
+    assert "BubblewrapSandbox" in workflow
+    assert "python -m compileall -q src tests scripts/qualification.py" in workflow
+    assert "python -m ruff check ." in workflow
+    assert "python -m pytest" in workflow
+    assert '-m "not real_e2e"' in workflow
+    assert "--cov=weave_frontend" in workflow
+    assert 'bash scripts/qualify.sh python "$QUALIFICATION_DIR"' not in workflow
+    assert "if: always()" in workflow
+    assert "if-no-files-found: warn" in workflow
 
 
 def test_native_ci_delegates_to_unified_qualification() -> None:
