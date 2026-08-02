@@ -33,8 +33,6 @@ jobs:
     needs: guard-self-hosted
     runs-on: self-hosted
     timeout-minutes: 20
-    env:
-      QUALIFICATION_DIR: ${{ runner.temp }}/jacquard-python-qualification
 
     steps:
       - name: Check out repository
@@ -45,16 +43,22 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install sandbox runtime
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bubblewrap
-          if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
-            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          fi
-          if [[ -e /proc/sys/kernel/unprivileged_userns_clone ]]; then
-            sudo sysctl -w kernel.unprivileged_userns_clone=1
-          fi
+      # The `runner` context (runner.temp, runner.os, ...) is only valid
+      # inside a step -- referencing it in job-level `env:` is a parse
+      # error GitHub rejects before creating any job at all (confirmed
+      # directly via the workflow_dispatch API: "Unrecognized named-value:
+      # 'runner'"), which is why every run of this workflow, on every
+      # commit, has shown zero jobs regardless of what else changed.
+      - name: Compute qualification directory
+        run: echo "QUALIFICATION_DIR=${{ runner.temp }}/jacquard-python-qualification" >> "$GITHUB_ENV"
+
+      # This runner is unprivileged (no sudo, no root) and doesn't allow
+      # relaxing user-namespace restrictions -- bubblewrap-based sandboxing
+      # simply isn't available here. scripts/qualify.sh already reports
+      # bubblewrap's availability as part of its own capability detection
+      # (see its "bubblewrap" capability field) rather than requiring it,
+      # so this only means that capability reports as unavailable/limited,
+      # not that qualification itself fails.
 
       - name: Install Jacquard qualification environment
         run: |
