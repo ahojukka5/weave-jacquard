@@ -21,13 +21,17 @@ jobs:
     name: Packaged compiler qualification
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    env:
-      QUALIFICATION_DIR: ${{ runner.temp }}/jacquard-native-qualification
-      COMPILER_STAGE: ${{ runner.temp }}/jacquard-weavec-release
 
     steps:
       - name: Check out Jacquard
         uses: actions/checkout@v4
+
+      - name: Set up job-local scratch directories
+        # Job-level env: can't reference the runner context, so these are
+        # set here instead of in the job's env: block above.
+        run: |
+          echo "QUALIFICATION_DIR=${{ runner.temp }}/jacquard-native-qualification" >> "$GITHUB_ENV"
+          echo "COMPILER_STAGE=${{ runner.temp }}/jacquard-weavec-release" >> "$GITHUB_ENV"
 
       - name: Set up Python
         uses: actions/setup-python@v5
