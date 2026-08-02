@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -79,6 +80,81 @@ def test_runtime_binding_restores_after_installer_error(tmp_path: Path) -> None:
         assert runtime_services() is bound
         raise RuntimeError("installer failed")
 
+    assert runtime_services() is process_runtime
+
+
+def test_concurrent_runtime_bindings_overlap_without_cross_contamination(
+    tmp_path: Path,
+) -> None:
+    process_runtime = runtime_services()
+    left = _runtime(tmp_path, "concurrent-left")
+    right = _runtime(tmp_path, "concurrent-right")
+    observations: list[tuple[str, RuntimeServices]] = []
+
+    async def run() -> None:
+        left_started = asyncio.Event()
+        right_started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def observe(
+            name: str,
+            selected: RuntimeServices,
+            started: asyncio.Event,
+            peer_started: asyncio.Event,
+        ) -> None:
+            with bind_application_runtime(selected):
+                observations.append((f"{name}:before", runtime_services()))
+                started.set()
+                await peer_started.wait()
+                await release.wait()
+                observations.append((f"{name}:after", runtime_services()))
+
+        left_task = asyncio.create_task(
+            observe("left", left, left_started, right_started)
+        )
+        right_task = asyncio.create_task(
+            observe("right", right, right_started, left_started)
+        )
+        await left_started.wait()
+        await right_started.wait()
+        release.set()
+        await asyncio.gather(left_task, right_task)
+
+    asyncio.run(run())
+
+    assert observations[:2] == [
+        ("left:before", left),
+        ("right:before", right),
+    ]
+    assert dict(observations[2:]) == {
+        "left:after": left,
+        "right:after": right,
+    }
+    assert runtime_services() is process_runtime
+
+
+def test_child_task_inherits_bound_runtime_at_creation(tmp_path: Path) -> None:
+    process_runtime = runtime_services()
+    bound = _runtime(tmp_path, "child")
+
+    async def run() -> RuntimeServices:
+        child_ready = asyncio.Event()
+        release_child = asyncio.Event()
+
+        async def child() -> RuntimeServices:
+            child_ready.set()
+            await release_child.wait()
+            return runtime_services()
+
+        with bind_application_runtime(bound):
+            task = asyncio.create_task(child())
+            await child_ready.wait()
+
+        assert runtime_services() is process_runtime
+        release_child.set()
+        return await task
+
+    assert asyncio.run(run()) is bound
     assert runtime_services() is process_runtime
 
 
@@ -172,3 +248,12 @@ def test_closed_runtime_cannot_be_bound(tmp_path: Path) -> None:
         bind_application_runtime(runtime),
     ):
         raise AssertionError("closed binding must not start")
+
+
+def test_closed_inherited_runtime_fails_closed(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path, "closed-inherited")
+
+    with bind_application_runtime(runtime):
+        runtime.close()
+        with pytest.raises(RuntimeClosedError, match="bound Jacquard runtime"):
+            runtime_services()

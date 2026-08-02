@@ -200,51 +200,63 @@ def test_application_binding_clones_tools_and_preserves_contracts(
 def test_overlapping_application_calls_are_runtime_isolated(
     tmp_path: Path,
 ) -> None:
+    process_runtime = runtime_services()
     left_runtime = _runtime(tmp_path, "left")
     right_runtime = _runtime(tmp_path, "right")
-    first_started: asyncio.Event
-    release_first: asyncio.Event
     events: list[tuple[str, RuntimeServices]] = []
 
-    async def left_call() -> RuntimeServices:
-        events.append(("left:start", runtime_services()))
-        first_started.set()
-        await release_first.wait()
-        events.append(("left:end", runtime_services()))
-        return runtime_services()
-
-    async def right_call() -> RuntimeServices:
-        events.append(("right:start", runtime_services()))
-        return runtime_services()
-
-    left_server = _Server({"probe": _tool("probe", function=left_call)})
-    right_server = _Server({"probe": _tool("probe", function=right_call)})
-    bind_registered_application_tools(
-        ApplicationContext(server=left_server, runtime=left_runtime)
-    )
-    bind_registered_application_tools(
-        ApplicationContext(server=right_server, runtime=right_runtime)
-    )
-
     async def run_calls() -> tuple[RuntimeServices, RuntimeServices]:
-        nonlocal first_started, release_first
-        first_started = asyncio.Event()
-        release_first = asyncio.Event()
+        left_started = asyncio.Event()
+        right_started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def left_call() -> RuntimeServices:
+            events.append(("left:start", runtime_services()))
+            left_started.set()
+            await right_started.wait()
+            await release.wait()
+            events.append(("left:end", runtime_services()))
+            return runtime_services()
+
+        async def right_call() -> RuntimeServices:
+            events.append(("right:start", runtime_services()))
+            right_started.set()
+            await left_started.wait()
+            await release.wait()
+            events.append(("right:end", runtime_services()))
+            return runtime_services()
+
+        left_server = _Server({"probe": _tool("probe", function=left_call)})
+        right_server = _Server({"probe": _tool("probe", function=right_call)})
+        bind_registered_application_tools(
+            ApplicationContext(server=left_server, runtime=left_runtime)
+        )
+        bind_registered_application_tools(
+            ApplicationContext(server=right_server, runtime=right_runtime)
+        )
+
         left_task = asyncio.create_task(left_server.tools["probe"].fn())
-        await first_started.wait()
+        await left_started.wait()
         right_task = asyncio.create_task(right_server.tools["probe"].fn())
-        await asyncio.sleep(0)
-        assert events == [("left:start", left_runtime)]
-        release_first.set()
+        await right_started.wait()
+        assert events == [
+            ("left:start", left_runtime),
+            ("right:start", right_runtime),
+        ]
+        release.set()
         results = await asyncio.gather(left_task, right_task)
         return results[0], results[1]
 
     assert asyncio.run(run_calls()) == (left_runtime, right_runtime)
-    assert events == [
+    assert events[:2] == [
         ("left:start", left_runtime),
-        ("left:end", left_runtime),
         ("right:start", right_runtime),
     ]
+    assert dict(events[2:]) == {
+        "left:end": left_runtime,
+        "right:end": right_runtime,
+    }
+    assert runtime_services() is process_runtime
 
 
 def test_nested_same_runtime_invocation_is_reentrant(tmp_path: Path) -> None:
