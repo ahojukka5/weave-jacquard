@@ -8,6 +8,7 @@ import json
 import os
 from collections import namedtuple
 from collections.abc import Callable, Iterable
+from contextvars import ContextVar, Token
 from functools import wraps
 from threading import RLock
 from typing import Any, TypeVar, cast
@@ -424,10 +425,41 @@ class RuntimeServices:
 _runtime_lock = RLock()
 _runtime_config: RuntimeConfig | None = None
 _runtime_services: RuntimeServices | None = None
+_bound_runtime_services: ContextVar[RuntimeServices | None] = ContextVar(
+    "weave_bound_runtime_services",
+    default=None,
+)
+
+
+def _bound_runtime() -> RuntimeServices | None:
+    services = _bound_runtime_services.get()
+    if services is not None and services.closed:
+        raise RuntimeClosedError("bound Jacquard runtime services are closed")
+    return services
+
+
+def _bind_runtime_services(
+    services: RuntimeServices,
+) -> Token[RuntimeServices | None]:
+    if not isinstance(services, RuntimeServices):
+        raise TypeError("services must be a RuntimeServices instance")
+    if services.closed:
+        raise RuntimeClosedError("cannot bind a closed runtime container")
+    return _bound_runtime_services.set(services)
+
+
+def _reset_bound_runtime_services(
+    token: Token[RuntimeServices | None],
+) -> None:
+    _bound_runtime_services.reset(token)
 
 
 def runtime_config() -> RuntimeConfig:
     """Return the immutable configuration snapshot for the current runtime."""
+
+    bound = _bound_runtime()
+    if bound is not None:
+        return bound.config
 
     global _runtime_config
     with _runtime_lock:
@@ -437,7 +469,11 @@ def runtime_config() -> RuntimeConfig:
 
 
 def runtime_services() -> RuntimeServices:
-    """Return the process-wide typed service container."""
+    """Return the task-local runtime or the process-wide default container."""
+
+    bound = _bound_runtime()
+    if bound is not None:
+        return bound
 
     global _runtime_services
     with _runtime_lock:
@@ -463,7 +499,7 @@ def install_runtime_services(services: RuntimeServices) -> None:
 
 
 def reset_runtime_services(config: RuntimeConfig | None = None) -> None:
-    """Close and forget the current runtime, optionally pinning replacement config."""
+    """Close and forget the process runtime, optionally pinning replacement config."""
 
     global _runtime_config, _runtime_services
     with _runtime_lock:
@@ -475,13 +511,18 @@ def reset_runtime_services(config: RuntimeConfig | None = None) -> None:
 
 
 def close_runtime_services() -> None:
-    """Close the current runtime and clear its immutable configuration snapshot."""
+    """Close the process runtime and clear its immutable configuration snapshot."""
 
     reset_runtime_services()
 
 
 def clear_runtime_service(name: str) -> None:
-    """Discard one named service only when a process runtime already exists."""
+    """Discard one named service from the selected runtime when it exists."""
+
+    bound = _bound_runtime()
+    if bound is not None:
+        bound.clear_service(name)
+        return
 
     with _runtime_lock:
         services = _runtime_services
@@ -490,13 +531,17 @@ def clear_runtime_service(name: str) -> None:
 
 
 def clear_runtime_compiler_bridge() -> None:
-    """Discard the compiler bridge when a runtime already exists."""
+    """Discard the compiler bridge from the selected runtime when it exists."""
 
     clear_runtime_service("compiler_bridge")
 
 
 def runtime_service_cache_info(name: str) -> CacheInfo:
     """Return cache evidence without constructing a process runtime."""
+
+    bound = _bound_runtime()
+    if bound is not None:
+        return bound.cache_info(name)
 
     with _runtime_lock:
         services = _runtime_services
@@ -510,7 +555,7 @@ def runtime_service(
     *,
     depends_on: Iterable[str] = (),
 ) -> Callable[[Callable[[], ServiceValue]], Callable[[], ServiceValue]]:
-    """Decorate a no-argument factory as one process-runtime-owned lazy service."""
+    """Decorate a no-argument factory as one selected-runtime lazy service."""
 
     service_name = _validate_service_name(name)
     dependency_names = tuple(

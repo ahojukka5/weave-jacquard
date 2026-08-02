@@ -2,34 +2,18 @@
 
 from __future__ import annotations
 
-import asyncio
 import inspect
-from contextvars import ContextVar
 from functools import wraps
-from threading import Lock
 from typing import TYPE_CHECKING, Any
 
 from .application_runtime_binding import bind_application_runtime
 from .fastmcp_registry import FastMCPRegistryAdapter, FastMCPRegistryError
-from .runtime_container import RuntimeServices, runtime_services
+from .runtime_container import RuntimeServices
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from .mcp_capabilities import ApplicationContext
-
-_active_runtime: ContextVar[
-    tuple[RuntimeServices, asyncio.Task[Any] | None] | None
-] = ContextVar(
-    "weave_active_application_runtime",
-    default=None,
-)
-_runtime_gate = Lock()
-
-
-async def _acquire_runtime_gate() -> None:
-    while not _runtime_gate.acquire(blocking=False):
-        await asyncio.sleep(0)
 
 
 async def _call_with_runtime(
@@ -38,29 +22,9 @@ async def _call_with_runtime(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
 ) -> Any:
-    active = _active_runtime.get()
-    current_task = asyncio.current_task()
-    if (
-        active is not None
-        and active[1] is current_task
-        and runtime_services() is active[0]
-    ):
-        if active[0] is not runtime:
-            raise RuntimeError(
-                "nested tool invocation cannot switch application runtimes"
-            )
+    with bind_application_runtime(runtime):
         result = function(*args, **kwargs)
         return await result if inspect.isawaitable(result) else result
-
-    await _acquire_runtime_gate()
-    token = _active_runtime.set((runtime, current_task))
-    try:
-        with bind_application_runtime(runtime):
-            result = function(*args, **kwargs)
-            return await result if inspect.isawaitable(result) else result
-    finally:
-        _active_runtime.reset(token)
-        _runtime_gate.release()
 
 
 def _bind_tool_to_runtime(
