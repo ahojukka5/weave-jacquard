@@ -13,11 +13,13 @@ def test_python_ci_runs_portable_qualification() -> None:
     workflow = _workflow("ci.yml")
 
     assert "runs-on: self-hosted" in workflow
-    assert 'QUALIFICATION_DIR=${{ runner.temp }}/jacquard-python-qualification' in workflow
+    assert 'qualification_dir="$GITHUB_WORKSPACE/qualification-evidence"' in workflow
+    assert 'virtualenv_dir="$GITHUB_WORKSPACE/.venv-ci"' in workflow
+    assert '"$SYSTEM_PYTHON_BIN" -m venv "$VIRTUALENV_DIR"' in workflow
     assert "BubblewrapSandbox" in workflow
-    assert "python -m compileall -q src tests scripts/qualification.py" in workflow
-    assert "python -m ruff check ." in workflow
-    assert "python -m pytest" in workflow
+    assert '"$PYTHON_BIN" -m compileall -q src tests scripts/qualification.py' in workflow
+    assert '"$PYTHON_BIN" -m ruff check .' in workflow
+    assert '"$PYTHON_BIN" -m pytest' in workflow
     assert '-m "not real_e2e"' in workflow
     assert "--cov=weave_frontend" in workflow
     assert 'bash scripts/qualify.sh python "$QUALIFICATION_DIR"' not in workflow
