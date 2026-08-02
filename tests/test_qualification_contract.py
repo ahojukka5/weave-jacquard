@@ -57,6 +57,15 @@ def test_runner_never_deletes_requested_evidence_directory() -> None:
     assert 'mv -T -n -- "$staging_dir" "$final_out"' in source
 
 
+def test_release_version_fallback_is_explicit_and_audited() -> None:
+    source = (ROOT / "scripts" / "qualify.sh").read_text(encoding="utf-8")
+
+    assert "WEAVEC_RELEASE" in source
+    assert "release-tag-fallback" in source
+    assert "compiler-version-probe.txt" in source
+    assert "weavec_version_source" in source
+
+
 def test_resolve_output_requires_a_new_safe_directory(tmp_path: Path) -> None:
     root = tmp_path / "repository"
     root.mkdir()
