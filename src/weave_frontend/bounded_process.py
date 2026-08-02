@@ -45,6 +45,12 @@ def run_bounded_process(
 
     ``OSError`` from process launch is intentionally propagated so callers can retain
     their existing availability and launch-failure semantics.
+
+    On timeout, the complete process group is killed before remaining pipe data is
+    drained up to the shared output limit. ``timed_out`` and ``output_limited``
+    identify the termination reason independently; output-limit termination is never
+    reported as timeout. The direct child is reaped before return and the process
+    group is signaled again to catch descendants whose leader exited first.
     """
 
     if (
