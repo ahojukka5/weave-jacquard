@@ -1,0 +1,76 @@
+name: Bounded process stress
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/bounded-process-stress.yml
+      - scripts/stress_bounded_process.py
+      - src/weave_frontend/bounded_process.py
+      - tests/test_bounded_compiler_io.py
+      - tests/test_bounded_process_group_cleanup.py
+  pull_request:
+    paths:
+      - .github/workflows/bounded-process-stress.yml
+      - scripts/stress_bounded_process.py
+      - src/weave_frontend/bounded_process.py
+      - tests/test_bounded_compiler_io.py
+      - tests/test_bounded_process_group_cleanup.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: bounded-process-stress-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard-self-hosted:
+    name: Verify trusted source for self-hosted jobs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject pull requests from forks
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Self-hosted runner jobs do not run for pull requests from forks."
+          exit 1
+
+  stress:
+    name: Run 1000-iteration termination matrix
+    needs: guard-self-hosted
+    runs-on: self-hosted
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select supported runner Python
+        run: |
+          set -euo pipefail
+          for candidate in python3.13 python3.12 python3.11 python3 python; do
+            if ! command -v "$candidate" >/dev/null 2>&1; then
+              continue
+            fi
+            if "$candidate" - <<'PY'
+          import sys
+          raise SystemExit(0 if sys.version_info >= (3, 11) else 1)
+          PY
+            then
+              echo "PYTHON_BIN=$(command -v "$candidate")" >> "$GITHUB_ENV"
+              exit 0
+            fi
+          done
+          echo "::error::Python 3.11 or newer is required on the self-hosted runner."
+          exit 1
+
+      - name: Run bounded process stress matrix
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          "$PYTHON_BIN" scripts/stress_bounded_process.py --iterations 1000
