@@ -42,11 +42,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Initialize qualification evidence
+      - name: Initialize qualification directories
         run: |
-          qualification_dir="$GITHUB_WORKSPACE/.qualification-evidence"
+          qualification_dir="$GITHUB_WORKSPACE/qualification-evidence"
+          virtualenv_dir="$GITHUB_WORKSPACE/.venv-ci"
           mkdir -p "$qualification_dir"
           echo "QUALIFICATION_DIR=$qualification_dir" >> "$GITHUB_ENV"
+          echo "VIRTUALENV_DIR=$virtualenv_dir" >> "$GITHUB_ENV"
 
       - name: Select supported runner Python
         run: |
@@ -61,7 +63,7 @@ jobs:
           PY
             then
               python_path="$(command -v "$candidate")"
-              echo "PYTHON_BIN=$python_path" >> "$GITHUB_ENV"
+              echo "SYSTEM_PYTHON_BIN=$python_path" >> "$GITHUB_ENV"
               "$python_path" --version | tee "$QUALIFICATION_DIR/python-version.txt"
               exit 0
             fi
@@ -69,10 +71,15 @@ jobs:
           echo "::error::Python 3.11 or newer is required on the self-hosted runner."
           exit 1
 
+      - name: Create qualification virtual environment
+        run: |
+          "$SYSTEM_PYTHON_BIN" -m venv "$VIRTUALENV_DIR"
+          echo "PYTHON_BIN=$VIRTUALENV_DIR/bin/python" >> "$GITHUB_ENV"
+
       - name: Install Jacquard qualification environment
         run: |
-          "$PYTHON_BIN" -m pip install --upgrade pip
-          "$PYTHON_BIN" -m pip install -e '.[dev]'
+          "$VIRTUALENV_DIR/bin/python" -m pip install --upgrade pip
+          "$VIRTUALENV_DIR/bin/python" -m pip install -e '.[dev]'
 
       - name: Record runner and sandbox capabilities
         run: |
@@ -125,6 +132,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: jacquard-python-qualification
-          path: ${{ github.workspace }}/.qualification-evidence
+          path: ${{ github.workspace }}/qualification-evidence
           if-no-files-found: warn
           retention-days: 7
