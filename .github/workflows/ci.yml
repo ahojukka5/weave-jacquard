@@ -16,7 +16,7 @@ concurrency:
 jobs:
   qualification:
     name: Python qualification
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, lumi, lumi-cpu, lumi-small]
     timeout-minutes: 20
     env:
       QUALIFICATION_DIR: ${{ runner.temp }}/jacquard-python-qualification
