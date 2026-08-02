@@ -29,18 +29,20 @@ def test_validator_timeout_preserves_partial_output(tmp_path: Path) -> None:
         "#!/bin/sh\n"
         "printf 'partial stdout'\n"
         "printf 'partial stderr' >&2\n"
-        "sleep 5\n",
+        "while :; do :; done\n",
         encoding="utf-8",
     )
     compiler.chmod(0o755)
+    validator = WeavecValidator(compiler, timeout_seconds=0.05)
 
-    result = WeavecValidator(compiler, timeout_seconds=0.05).validate(PROGRAM)
+    for _ in range(25):
+        result = validator.validate(PROGRAM)
 
-    assert result["available"] is True
-    assert result["valid"] is False
-    assert result["returncode"] is None
-    assert result["timed_out"] is True
-    assert result["documents"] == ["program.weave"]
-    assert "timed out" in result["diagnostic"]
-    assert "partial stdout" in result["stdout"]
-    assert "partial stderr" in result["stderr"]
+        assert result["available"] is True
+        assert result["valid"] is False
+        assert result["returncode"] is None
+        assert result["timed_out"] is True
+        assert result["documents"] == ["program.weave"]
+        assert "timed out" in result["diagnostic"]
+        assert result["stdout"] == "partial stdout"
+        assert result["stderr"] == "partial stderr"

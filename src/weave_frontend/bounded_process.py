@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _READ_CHUNK = 65_536
+_TERMINATION_DRAIN_SECONDS = 1.0
 
 
 @dataclass(frozen=True)
@@ -113,6 +114,12 @@ def _collect(
             if remaining <= 0:
                 timed_out = True
                 _terminate_process_group(process)
+                total = _drain_terminated_streams(
+                    selector,
+                    streams,
+                    max_output_bytes=max_output_bytes,
+                    total=total,
+                )
                 break
 
             if not selector.get_map():
@@ -128,9 +135,8 @@ def _collect(
                 ]
             for key, _ in events:
                 stream = key.fileobj
-                try:
-                    chunk = os.read(stream.fileno(), _READ_CHUNK)
-                except BlockingIOError:
+                chunk = _read_stream(stream)
+                if chunk is None:
                     continue
                 if not chunk:
                     selector.unregister(stream)
@@ -160,6 +166,46 @@ def _collect(
         timed_out,
         output_limited,
     )
+
+
+def _drain_terminated_streams(
+    selector: selectors.BaseSelector,
+    streams: dict[object, bytearray],
+    *,
+    max_output_bytes: int,
+    total: int,
+) -> int:
+    """Drain bytes written before termination until both pipes reach EOF."""
+
+    deadline = time.monotonic() + _TERMINATION_DRAIN_SECONDS
+    while selector.get_map() and time.monotonic() < deadline:
+        events = selector.select(timeout=0.05)
+        if not events:
+            continue
+        for key, _ in events:
+            stream = key.fileobj
+            chunk = _read_stream(stream)
+            if chunk is None:
+                continue
+            if not chunk:
+                selector.unregister(stream)
+                continue
+            capacity = max_output_bytes - total
+            if capacity <= 0:
+                return total
+            accepted = chunk[:capacity]
+            streams[stream].extend(accepted)
+            total += len(accepted)
+            if len(accepted) < len(chunk):
+                return total
+    return total
+
+
+def _read_stream(stream: object) -> bytes | None:
+    try:
+        return os.read(stream.fileno(), _READ_CHUNK)
+    except BlockingIOError:
+        return None
 
 
 def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:
