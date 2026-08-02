@@ -106,6 +106,7 @@ export COVERAGE_FILE="$base_temp/.coverage"
 compiler_path=""
 compiler_sha256=""
 compiler_version=""
+compiler_version_source=""
 if [[ "$mode" == "native" || "$mode" == "full" ]]; then
   configured_compiler="${WEAVEC_BIN:-}"
   if [[ -z "$configured_compiler" ]]; then
@@ -141,7 +142,22 @@ with Path(sys.argv[1]).open("rb") as stream:
 print(digest.hexdigest())
 PY
   )"
-  compiler_version="$(python scripts/qualification.py command-version "$compiler_path")"
+  version_error="$base_temp/compiler-version-error.txt"
+  if compiler_version="$(
+    python scripts/qualification.py command-version "$compiler_path" 2>"$version_error"
+  )"; then
+    compiler_version_source="executable"
+    rm -f -- "$version_error"
+  elif [[ "${WEAVEC_RELEASE:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+    compiler_version="$WEAVEC_RELEASE"
+    compiler_version_source="release-tag-fallback"
+    cp -- "$version_error" "$out_dir/compiler-version-probe.txt"
+    printf 'compiler version probe failed; using release identity %s\n' \
+      "$compiler_version" >&2
+  else
+    cat "$version_error" >&2
+    exit 2
+  fi
 fi
 
 if [[ -n "${WEAVE_QUALIFICATION_UV_ISOLATED:-}" ]]; then
@@ -177,6 +193,7 @@ ruff_version="$("${ruff_cmd[@]}" --version 2>&1)"
   printf 'weavec_bin=%s\n' "$compiler_path"
   printf 'weavec_sha256=%s\n' "$compiler_sha256"
   printf 'weavec_version=%s\n' "$compiler_version"
+  printf 'weavec_version_source=%s\n' "$compiler_version_source"
 } | tee "$out_dir/environment.txt"
 
 python scripts/qualification.py packages > "$out_dir/python-packages.txt"
