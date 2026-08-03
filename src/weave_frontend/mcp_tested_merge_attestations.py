@@ -24,15 +24,6 @@ def tested_merge_attestations() -> TestedMergeAttestationService:
     )
 
 
-def install_capability() -> None:
-    """Discard stale attestation composition when capabilities are reinstalled."""
-
-    tested_merge_attestations.cache_clear()
-
-
-install_capability()
-
-
 @mcp.tool()
 def tested_merge_attest(
     qualification_id: str,
