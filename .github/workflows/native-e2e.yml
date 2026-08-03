@@ -125,7 +125,7 @@ jobs:
           printf 'WEAVEC_BIN=%s\n' "$compiler_path" >> "$GITHUB_ENV"
 
       - name: Run unified native qualification
-        run: bash scripts/qualify.sh native "$QUALIFICATION_DIR"
+        run: bash scripts/qualify-release.sh native "$QUALIFICATION_DIR"
 
       - name: Upload qualification evidence
         uses: actions/upload-artifact@v4
