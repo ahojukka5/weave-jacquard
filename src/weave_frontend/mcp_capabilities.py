@@ -245,16 +245,12 @@ def _invoke_installer(
     installer: Callable[..., Any],
     context: ApplicationContext,
 ) -> None:
-    """Call one supported custom legacy or context-aware capability installer."""
+    """Call one context-aware custom capability installer."""
 
     parameters = tuple(signature(installer).parameters.values())
-    if not parameters:
-        installer()
-        return
     if len(parameters) != 1:
         raise TypeError(
-            "install_capability must accept either no arguments or one "
-            "ApplicationContext"
+            "install_capability must accept exactly one ApplicationContext"
         )
 
     parameter = parameters[0]
@@ -265,8 +261,7 @@ def _invoke_installer(
         installer(**{parameter.name: context})
         return
     raise TypeError(
-        "install_capability must accept either no arguments or one "
-        "ApplicationContext"
+        "install_capability must accept exactly one ApplicationContext"
     )
 
 
