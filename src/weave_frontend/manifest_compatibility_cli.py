@@ -1,4 +1,4 @@
-"""Command-line semantic compatibility diffing for Jacquard manifests."""
+"""Command-line semantic compatibility diffing for Jacquard evidence."""
 
 from __future__ import annotations
 
@@ -15,6 +15,12 @@ from .manifest_compatibility import (
     ManifestCompatibilityError,
     compare_manifests,
 )
+from .runtime_evidence_compatibility import (
+    RUNTIME_IDENTITY_FORMAT,
+    SERVICE_GRAPH_FORMAT,
+    RuntimeEvidenceCompatibilityError,
+    compare_runtime_evidence,
+)
 
 MAX_MANIFEST_BYTES = MAX_COMPILER_PROTOCOL_BYTES
 
@@ -22,7 +28,12 @@ MAX_MANIFEST_BYTES = MAX_COMPILER_PROTOCOL_BYTES
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="weave-manifest-diff")
     parser.add_argument("old_manifest", type=Path)
-    parser.add_argument("new_manifest", type=Path)
+    parser.add_argument("new_manifest", nargs="?", type=Path)
+    parser.add_argument(
+        "--installed",
+        choices=("tool", "application"),
+        help="compare the old manifest with the currently installed public contract",
+    )
     return parser
 
 
@@ -52,13 +63,58 @@ def _read_manifest(path: Path) -> Mapping[str, Any]:
     return document
 
 
-def compare_manifest_files(old_path: Path, new_path: Path) -> dict[str, Any]:
-    """Compare two bounded manifest files without opening runtime state."""
-
-    return compare_manifests(
-        _read_manifest(old_path),
-        _read_manifest(new_path),
+def _installed_manifest(kind: str) -> Mapping[str, Any]:
+    from weave_jacquard.mcp_build import (
+        PUBLIC_APPLICATION_MANIFEST,
+        PUBLIC_TOOL_MANIFEST,
     )
+
+    if kind == "tool":
+        return PUBLIC_TOOL_MANIFEST
+    if kind == "application":
+        return PUBLIC_APPLICATION_MANIFEST
+    raise ManifestCompatibilityError(f"unsupported installed manifest {kind!r}")
+
+
+def _compare_documents(
+    old_document: Mapping[str, Any],
+    new_document: Mapping[str, Any],
+) -> dict[str, Any]:
+    runtime_formats = {SERVICE_GRAPH_FORMAT, RUNTIME_IDENTITY_FORMAT}
+    if (
+        old_document.get("format") in runtime_formats
+        or new_document.get("format") in runtime_formats
+    ):
+        try:
+            return compare_runtime_evidence(old_document, new_document)
+        except RuntimeEvidenceCompatibilityError as exc:
+            raise ManifestCompatibilityError(str(exc)) from exc
+    return compare_manifests(old_document, new_document)
+
+
+def compare_manifest_files(
+    old_path: Path,
+    new_path: Path | None = None,
+    *,
+    installed: str | None = None,
+) -> dict[str, Any]:
+    """Compare bounded files or one file against the installed public contract."""
+
+    if new_path is None and installed is None:
+        raise ManifestCompatibilityError(
+            "new_manifest or --installed is required"
+        )
+    if new_path is not None and installed is not None:
+        raise ManifestCompatibilityError(
+            "new_manifest cannot be used with --installed"
+        )
+    old_document = _read_manifest(old_path)
+    new_document = (
+        _read_manifest(new_path)
+        if new_path is not None
+        else _installed_manifest(str(installed))
+    )
+    return _compare_documents(old_document, new_document)
 
 
 def _error_payload(exc: ManifestCompatibilityError) -> dict[str, object]:
@@ -74,7 +130,11 @@ def _error_payload(exc: ManifestCompatibilityError) -> dict[str, object]:
 def main() -> None:
     args = build_parser().parse_args()
     try:
-        report = compare_manifest_files(args.old_manifest, args.new_manifest)
+        report = compare_manifest_files(
+            args.old_manifest,
+            args.new_manifest,
+            installed=args.installed,
+        )
     except ManifestCompatibilityError as exc:
         print(json.dumps(_error_payload(exc), indent=2, sort_keys=True), file=sys.stderr)
         raise SystemExit(2) from None
