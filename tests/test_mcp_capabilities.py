@@ -202,6 +202,35 @@ def test_public_install_uses_exact_context_and_replaces_help_once() -> None:
     assert manifest == capability_manifest(capabilities)
 
 
+def test_public_install_rejects_zero_argument_installer() -> None:
+    server = _FakeFastMCP()
+    context = ApplicationContext(server=server, runtime=_runtime())
+
+    def loader(name: str) -> ModuleType:
+        if name == "weave_frontend.mcp_revert_guidance":
+            return SimpleNamespace(  # type: ignore[return-value]
+                INSTRUCTIONS="unused",
+                weave_help=lambda: None,
+            )
+        module = ModuleType(name)
+
+        def install_capability() -> None:
+            raise AssertionError("zero-argument installer must not run")
+
+        module.install_capability = install_capability  # type: ignore[attr-defined]
+        return module
+
+    with pytest.raises(TypeError, match="exactly one ApplicationContext"):
+        install_public_capabilities(
+            context,
+            capabilities=(Capability("invalid", "example.invalid"),),
+            module_loader=loader,
+        )
+
+    assert server.removed == []
+    assert server.added == []
+
+
 def test_public_install_rejects_ambiguous_installer_signature() -> None:
     server = _FakeFastMCP()
     context = ApplicationContext(server=server, runtime=_runtime())
@@ -220,7 +249,7 @@ def test_public_install_rejects_ambiguous_installer_signature() -> None:
         module.install_capability = install_capability  # type: ignore[attr-defined]
         return module
 
-    with pytest.raises(TypeError, match="one ApplicationContext"):
+    with pytest.raises(TypeError, match="exactly one ApplicationContext"):
         install_public_capabilities(
             context,
             capabilities=(Capability("invalid", "example.invalid"),),
