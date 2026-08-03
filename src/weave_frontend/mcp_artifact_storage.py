@@ -182,3 +182,10 @@ def artifact_storage_report() -> dict[str, Any]:
     """Report bounded logical usage and aggregate publication quota state."""
 
     return _result(artifact_quota().report)
+
+
+@mcp.tool()
+def artifact_reconciliation_report() -> dict[str, Any]:
+    """Report deterministic database-to-artifact reachability evidence."""
+
+    return _result(artifact_reconciliation().report)
