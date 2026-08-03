@@ -168,7 +168,7 @@ def test_public_install_uses_exact_context_and_replaces_help_once() -> None:
             )
         if name == "example.feature":
             module.install_capability = (  # type: ignore[attr-defined]
-                lambda: installed.append(("feature", None))
+                lambda context: installed.append(("feature", context))
             )
         return module
 
@@ -191,7 +191,7 @@ def test_public_install_uses_exact_context_and_replaces_help_once() -> None:
         "example.feature",
         "weave_frontend.mcp_revert_guidance",
     ]
-    assert installed == [("base", context), ("feature", None)]
+    assert installed == [("base", context), ("feature", context)]
     assert context.server is server
     assert context.runtime is runtime
     assert server._mcp_server.instructions == "final instructions"
