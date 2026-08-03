@@ -43,19 +43,6 @@ def install_metadata_aware_merge_services() -> None:
         service.cache_clear()
 
 
-def install_capability() -> None:
-    """Restore final service composition when this cached capability is installed."""
-
-    install_metadata_aware_merge_services()
-
-
-# All later build, preview, impact, validation, policy, preflight, and train
-# services must share the metadata-aware implementations. This helper is
-# intentionally idempotent because capability modules can already be cached
-# when a later installer needs to restore the final composition.
-install_capability()
-
-
 @runtime_service("test_targets", depends_on=("workspace",))
 def test_targets() -> VerifiedTestTargetRegistry:
     """Return the shared verified revisioned test-target registry."""
