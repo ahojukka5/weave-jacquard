@@ -6,23 +6,9 @@ from typing import Any
 
 from . import mcp_build as _build
 from . import mcp_server as _server
-from .mcp_capabilities import ApplicationContext
-from .runtime_container import RuntimeClosedError, runtime_services
 
 workspace = _server.workspace
 compiler_bridge = _build.compiler_bridge
-
-
-def install_capability(context: ApplicationContext | None = None) -> None:
-    """Select the exact runtime for foundational capability installation."""
-
-    services = runtime_services() if context is None else context.runtime
-    if services.closed:
-        raise RuntimeClosedError("cannot install a capability with a closed runtime")
-
-
-install_capability()
-
 mcp = _server.mcp
 _result = _server._result
 
