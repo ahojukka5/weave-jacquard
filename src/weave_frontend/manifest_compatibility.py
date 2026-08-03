@@ -27,6 +27,7 @@ _CLASSIFICATION_ORDER = {
     "behavior-review-required": 3,
     "breaking": 4,
 }
+_MISSING = object()
 
 
 class ManifestCompatibilityError(ValueError):
@@ -51,6 +52,10 @@ def _fragment(value: Any) -> Any:
         "sha256": hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
         "truncated": True,
     }
+
+
+def _pointer_token(value: str) -> str:
+    return value.replace("~", "~0").replace("/", "~1")
 
 
 def _require_string_list(
@@ -136,7 +141,8 @@ def _require_application_manifest(manifest: Mapping[str, Any], label: str) -> st
         )
     capabilities = manifest.get("capabilities")
     if not isinstance(capabilities, Sequence) or isinstance(
-        capabilities, (str, bytes, bytearray)
+        capabilities,
+        (str, bytes, bytearray),
     ):
         raise ManifestCompatibilityError(f"{label} manifest capabilities must be a list")
     seen: set[str] = set()
@@ -205,6 +211,170 @@ def _change(
     }
 
 
+def _enum_map(value: Any, *, label: str) -> dict[str, Any]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        raise ManifestCompatibilityError(f"{label} must be a list")
+    if not value:
+        raise ManifestCompatibilityError(f"{label} must not be empty")
+    result: dict[str, Any] = {}
+    for item in value:
+        try:
+            identity = _canonical_json(item)
+        except (TypeError, ValueError) as exc:
+            raise ManifestCompatibilityError(
+                f"{label} contains a non-canonical value"
+            ) from exc
+        if identity in result:
+            raise ManifestCompatibilityError(f"{label} must not contain duplicates")
+        result[identity] = item
+    return result
+
+
+def _canonical_enum(values: Mapping[str, Any]) -> list[Any]:
+    return [values[key] for key in sorted(values)]
+
+
+def _default_change(
+    pointer: str,
+    old: Any,
+    new: Any,
+) -> dict[str, Any] | None:
+    old_value = old.get("default", _MISSING)
+    new_value = new.get("default", _MISSING)
+    if old_value is _MISSING and new_value is _MISSING:
+        return None
+    if old_value is not _MISSING and new_value is not _MISSING:
+        if old_value == new_value:
+            return None
+        kind = "parameter-default-changed"
+    elif old_value is _MISSING:
+        kind = "parameter-default-added"
+    else:
+        kind = "parameter-default-removed"
+    return _change(
+        f"{pointer}/default",
+        "behavior-review-required",
+        kind,
+        None if old_value is _MISSING else old_value,
+        None if new_value is _MISSING else new_value,
+    )
+
+
+def _enum_change(
+    pointer: str,
+    old: Mapping[str, Any],
+    new: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    old_raw = old.get("enum", _MISSING)
+    new_raw = new.get("enum", _MISSING)
+    if old_raw is _MISSING and new_raw is _MISSING:
+        return None
+    old_values = (
+        None
+        if old_raw is _MISSING
+        else _enum_map(old_raw, label=f"{pointer} old enum")
+    )
+    new_values = (
+        None
+        if new_raw is _MISSING
+        else _enum_map(new_raw, label=f"{pointer} new enum")
+    )
+    if old_values is None:
+        return _change(
+            f"{pointer}/enum",
+            "breaking",
+            "parameter-enum-constrained",
+            None,
+            _canonical_enum(new_values or {}),
+        )
+    if new_values is None:
+        return _change(
+            f"{pointer}/enum",
+            "additive-compatible",
+            "parameter-enum-unconstrained",
+            _canonical_enum(old_values),
+            None,
+        )
+
+    old_keys = set(old_values)
+    new_keys = set(new_values)
+    if old_keys == new_keys:
+        return None
+    if old_keys < new_keys:
+        classification = "additive-compatible"
+        kind = "parameter-enum-expanded"
+    elif new_keys < old_keys:
+        classification = "breaking"
+        kind = "parameter-enum-narrowed"
+    else:
+        classification = "breaking"
+        kind = "parameter-enum-changed"
+    return _change(
+        f"{pointer}/enum",
+        classification,
+        kind,
+        _canonical_enum(old_values),
+        _canonical_enum(new_values),
+    )
+
+
+def _schema_value_changes(
+    pointer: str,
+    old: Any,
+    new: Any,
+) -> list[dict[str, Any]]:
+    if not isinstance(old, Mapping) or not isinstance(new, Mapping):
+        if old == new:
+            return []
+        return [
+            _change(
+                pointer,
+                "behavior-review-required",
+                "parameter-schema-changed",
+                old,
+                new,
+            )
+        ]
+
+    changes: list[dict[str, Any]] = []
+    default_change = _default_change(pointer, old, new)
+    if default_change is not None:
+        changes.append(default_change)
+    enum_change = _enum_change(pointer, old, new)
+    if enum_change is not None:
+        changes.append(enum_change)
+
+    old_fields = set(old) - {"default", "enum"}
+    new_fields = set(new) - {"default", "enum"}
+    for field in sorted(old_fields | new_fields):
+        child_pointer = f"{pointer}/{_pointer_token(str(field))}"
+        if field not in old:
+            changes.append(
+                _change(
+                    child_pointer,
+                    "behavior-review-required",
+                    "parameter-schema-changed",
+                    None,
+                    new[field],
+                )
+            )
+        elif field not in new:
+            changes.append(
+                _change(
+                    child_pointer,
+                    "behavior-review-required",
+                    "parameter-schema-changed",
+                    old[field],
+                    None,
+                )
+            )
+        else:
+            changes.extend(
+                _schema_value_changes(child_pointer, old[field], new[field])
+            )
+    return changes
+
+
 def _schema_changes(
     tool_name: str,
     schema_field: str,
@@ -212,7 +382,7 @@ def _schema_changes(
     new_schema: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     changes: list[dict[str, Any]] = []
-    base = f"/tools/{tool_name}/{schema_field}"
+    base = f"/tools/{_pointer_token(tool_name)}/{schema_field}"
     old_required = set(
         _require_string_list(
             old_schema.get("required", []),
@@ -228,7 +398,7 @@ def _schema_changes(
     for name in sorted(old_required - new_required):
         changes.append(
             _change(
-                f"{base}/required/{name}",
+                f"{base}/required/{_pointer_token(name)}",
                 "additive-compatible",
                 "required-parameter-relaxed",
                 True,
@@ -238,7 +408,7 @@ def _schema_changes(
     for name in sorted(new_required - old_required):
         changes.append(
             _change(
-                f"{base}/required/{name}",
+                f"{base}/required/{_pointer_token(name)}",
                 "breaking",
                 "required-parameter-added",
                 False,
@@ -249,7 +419,8 @@ def _schema_changes(
     old_properties = old_schema.get("properties", {})
     new_properties = new_schema.get("properties", {})
     if not isinstance(old_properties, Mapping) or not isinstance(
-        new_properties, Mapping
+        new_properties,
+        Mapping,
     ):
         if old_schema != new_schema:
             changes.append(
@@ -266,7 +437,7 @@ def _schema_changes(
     for name in sorted(old_properties.keys() - new_properties.keys()):
         changes.append(
             _change(
-                f"{base}/properties/{name}",
+                f"{base}/properties/{_pointer_token(str(name))}",
                 "breaking",
                 "parameter-removed",
                 old_properties[name],
@@ -277,7 +448,7 @@ def _schema_changes(
         classification = "breaking" if name in new_required else "additive-compatible"
         changes.append(
             _change(
-                f"{base}/properties/{name}",
+                f"{base}/properties/{_pointer_token(str(name))}",
                 classification,
                 "parameter-added",
                 None,
@@ -285,16 +456,25 @@ def _schema_changes(
             )
         )
     for name in sorted(old_properties.keys() & new_properties.keys()):
-        if old_properties[name] != new_properties[name]:
-            changes.append(
-                _change(
-                    f"{base}/properties/{name}",
-                    "behavior-review-required",
-                    "parameter-schema-changed",
-                    old_properties[name],
-                    new_properties[name],
-                )
+        changes.extend(
+            _schema_value_changes(
+                f"{base}/properties/{_pointer_token(str(name))}",
+                old_properties[name],
+                new_properties[name],
             )
+        )
+
+    old_remainder = {
+        key: value
+        for key, value in old_schema.items()
+        if key not in {"required", "properties"}
+    }
+    new_remainder = {
+        key: value
+        for key, value in new_schema.items()
+        if key not in {"required", "properties"}
+    }
+    changes.extend(_schema_value_changes(base, old_remainder, new_remainder))
     return changes
 
 
@@ -346,7 +526,7 @@ def compare_tool_manifests(
     for name in sorted(old_tools.keys() - new_tools.keys()):
         changes.append(
             _change(
-                f"/tools/{name}",
+                f"/tools/{_pointer_token(name)}",
                 "breaking",
                 "tool-removed",
                 old_tools[name],
@@ -356,7 +536,7 @@ def compare_tool_manifests(
     for name in sorted(new_tools.keys() - old_tools.keys()):
         changes.append(
             _change(
-                f"/tools/{name}",
+                f"/tools/{_pointer_token(name)}",
                 "additive-compatible",
                 "tool-added",
                 None,
@@ -378,7 +558,7 @@ def compare_tool_manifests(
             if old_tool.get(field) != new_tool.get(field):
                 changes.append(
                     _change(
-                        f"/tools/{name}/{field}",
+                        f"/tools/{_pointer_token(name)}/{field}",
                         "behavior-review-required",
                         f"{field.replace('_', '-')}-changed",
                         old_tool.get(field),
@@ -389,7 +569,7 @@ def compare_tool_manifests(
             if old_tool.get(field) != new_tool.get(field):
                 changes.append(
                     _change(
-                        f"/tools/{name}/{field}",
+                        f"/tools/{_pointer_token(name)}/{field}",
                         "documentation-only",
                         f"{field}-changed",
                         old_tool.get(field),
@@ -424,7 +604,7 @@ def compare_application_manifests(
     for name in sorted(old_capabilities.keys() - new_capabilities.keys()):
         changes.append(
             _change(
-                f"/capabilities/{name}",
+                f"/capabilities/{_pointer_token(name)}",
                 "breaking",
                 "capability-removed",
                 old_capabilities[name],
@@ -434,7 +614,7 @@ def compare_application_manifests(
     for name in sorted(new_capabilities.keys() - old_capabilities.keys()):
         changes.append(
             _change(
-                f"/capabilities/{name}",
+                f"/capabilities/{_pointer_token(name)}",
                 "additive-compatible",
                 "capability-added",
                 None,
@@ -445,7 +625,7 @@ def compare_application_manifests(
         if old_capabilities[name] != new_capabilities[name]:
             changes.append(
                 _change(
-                    f"/capabilities/{name}",
+                    f"/capabilities/{_pointer_token(name)}",
                     "behavior-review-required",
                     "capability-contract-changed",
                     old_capabilities[name],
@@ -471,7 +651,7 @@ def compare_application_manifests(
     for name in sorted(old_variables - new_variables):
         changes.append(
             _change(
-                f"/configuration_variables/{name}",
+                f"/configuration_variables/{_pointer_token(name)}",
                 "breaking",
                 "configuration-variable-removed",
                 True,
@@ -481,7 +661,7 @@ def compare_application_manifests(
     for name in sorted(new_variables - old_variables):
         changes.append(
             _change(
-                f"/configuration_variables/{name}",
+                f"/configuration_variables/{_pointer_token(name)}",
                 "additive-compatible",
                 "configuration-variable-added",
                 False,
