@@ -7,7 +7,7 @@ from typing import Any
 from .build_inspection import BuildInspectionService
 from .mcp_build import build_targets, compiler_bridge, merge_previews
 from .mcp_server import _result, mcp
-from .mcp_test_targets import install_metadata_aware_merge_services, test_targets
+from .mcp_test_targets import test_targets
 from .merge_candidate_test_runs import DEFAULT_OUTPUT_PAGE_BYTES
 from .runtime_container import runtime_config, runtime_service
 from .runtime_sandbox import RuntimeBubblewrapSandbox
@@ -59,18 +59,6 @@ def merge_candidate_test_batches() -> MergeCandidateTestBatchService:
         RuntimeBubblewrapSandbox.from_config(config),
         run_root=config.merge_test_run_root,
     )
-
-
-def install_capability() -> None:
-    """Restore metadata-aware services and discard stale cached compositions."""
-
-    install_metadata_aware_merge_services()
-    merge_candidate_test_batches.cache_clear()
-    merge_candidate_build_inspection.cache_clear()
-    merge_candidate_builds.cache_clear()
-
-
-install_capability()
 
 
 def _public_build(result: dict[str, Any]) -> dict[str, Any]:
