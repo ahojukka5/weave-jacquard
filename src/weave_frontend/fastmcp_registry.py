@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, MutableMapping
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
@@ -20,10 +20,10 @@ class FastMCPRegistryAdapter:
 
     server: Any
 
-    def tool_names(self) -> tuple[str, ...]:
+    def tool_names(self, *, allow_empty: bool = False) -> tuple[str, ...]:
         """Return deterministic tool names from one captured registry snapshot."""
 
-        return tuple(sorted(self._snapshot()))
+        return tuple(sorted(self._snapshot(allow_empty=allow_empty)))
 
     def tool_contracts(self) -> tuple[dict[str, Any], ...]:
         """Return caller-visible contracts from one captured registry snapshot."""
@@ -38,6 +38,128 @@ class FastMCPRegistryAdapter:
         """Return an immutable exact-object snapshot of the registered tools."""
 
         return MappingProxyType(self._snapshot())
+
+    def install_tools_from(
+        self,
+        source_server: Any,
+        names: Iterable[str],
+        *,
+        transform: ToolTransform | None = None,
+    ) -> tuple[str, ...]:
+        """Install selected verified tools without disturbing unrelated entries."""
+
+        selected = self._selected_names(names)
+        if not selected:
+            return ()
+
+        source = FastMCPRegistryAdapter(source_server)
+        source_snapshot = source._snapshot()
+        missing = tuple(name for name in selected if name not in source_snapshot)
+        if missing:
+            raise FastMCPRegistryError(
+                f"FastMCP source registry is missing selected tools {missing!r}"
+            )
+        source_contracts = tuple(
+            self._tool_contract(name, source_snapshot[name])
+            for name in selected
+        )
+        replacement = {
+            name: (
+                transform(name, source_snapshot[name])
+                if transform is not None
+                else source_snapshot[name]
+            )
+            for name in selected
+        }
+        replacement_contracts = tuple(
+            self._tool_contract(name, replacement[name])
+            for name in selected
+        )
+        if replacement_contracts != source_contracts:
+            raise FastMCPRegistryError(
+                "FastMCP tool transformation changed selected tool contracts"
+            )
+
+        target_registry = self._mutable_registry()
+        previous = self._snapshot(allow_empty=True)
+        try:
+            target_registry.update(replacement)
+            installed = self._snapshot()
+            expected_names = set(previous) | set(replacement)
+            if set(installed) != expected_names:
+                raise FastMCPRegistryError(
+                    "FastMCP target registry did not preserve the staged tool set"
+                )
+            if any(installed[name] is not replacement[name] for name in selected):
+                raise FastMCPRegistryError(
+                    "FastMCP target registry did not preserve selected tool objects"
+                )
+            for name, tool in previous.items():
+                if name not in replacement and installed[name] is not tool:
+                    raise FastMCPRegistryError(
+                        "FastMCP staged installation changed an unrelated tool object"
+                    )
+            installed_contracts = tuple(
+                self._tool_contract(name, installed[name])
+                for name in selected
+            )
+            if installed_contracts != source_contracts:
+                raise FastMCPRegistryError(
+                    "FastMCP target registry changed selected tool contracts"
+                )
+        except Exception as exc:
+            self._rollback(target_registry, previous, exc)
+        return selected
+
+    def synchronize_tools_from(self, source_server: Any) -> tuple[str, ...]:
+        """Match a source registry while retaining compatible target objects."""
+
+        source = FastMCPRegistryAdapter(source_server)
+        source_registry = source._registry()
+        source_snapshot = source._snapshot()
+        names = tuple(sorted(source_snapshot))
+        source_contracts = {
+            name: self._tool_contract(name, source_snapshot[name])
+            for name in names
+        }
+
+        target_registry = self._mutable_registry()
+        if target_registry is source_registry:
+            return names
+        previous = self._snapshot(allow_empty=True)
+        replacement: dict[str, Any] = {}
+        for name in names:
+            existing = previous.get(name)
+            if existing is not None:
+                existing_contract = self._tool_contract(name, existing)
+                if existing_contract == source_contracts[name]:
+                    replacement[name] = existing
+                    continue
+            replacement[name] = source_snapshot[name]
+
+        try:
+            target_registry.clear()
+            target_registry.update(replacement)
+            installed = self._snapshot()
+            if set(installed) != set(source_snapshot):
+                raise FastMCPRegistryError(
+                    "FastMCP synchronized registry did not preserve the complete tool set"
+                )
+            if any(installed[name] is not replacement[name] for name in names):
+                raise FastMCPRegistryError(
+                    "FastMCP synchronized registry changed selected tool objects"
+                )
+            installed_contracts = {
+                name: self._tool_contract(name, installed[name])
+                for name in names
+            }
+            if installed_contracts != source_contracts:
+                raise FastMCPRegistryError(
+                    "FastMCP synchronized registry changed canonical tool contracts"
+                )
+        except Exception as exc:
+            self._rollback(target_registry, previous, exc)
+        return names
 
     def replace_tools_from(
         self,
@@ -73,7 +195,7 @@ class FastMCPRegistryAdapter:
         if target_registry is source_registry and transform is None:
             return names
 
-        previous = dict(target_registry.items())
+        previous = self._snapshot(allow_empty=True)
         try:
             target_registry.clear()
             target_registry.update(replacement)
@@ -95,18 +217,7 @@ class FastMCPRegistryAdapter:
                     "FastMCP target registry changed canonical tool contracts"
                 )
         except Exception as exc:
-            try:
-                target_registry.clear()
-                target_registry.update(previous)
-            except Exception as rollback_exc:
-                raise FastMCPRegistryError(
-                    "FastMCP tool registry replacement and rollback both failed"
-                ) from rollback_exc
-            if isinstance(exc, FastMCPRegistryError):
-                raise
-            raise FastMCPRegistryError(
-                "FastMCP tool registry replacement failed"
-            ) from exc
+            self._rollback(target_registry, previous, exc)
         return names
 
     def _registry(self) -> Mapping[Any, Any]:
@@ -135,9 +246,9 @@ class FastMCPRegistryAdapter:
             )
         return registry
 
-    def _snapshot(self) -> dict[str, Any]:
+    def _snapshot(self, *, allow_empty: bool = False) -> dict[str, Any]:
         items = tuple(self._registry().items())
-        if not items:
+        if not items and not allow_empty:
             raise FastMCPRegistryError("public MCP application registered no tools")
 
         snapshot: dict[str, Any] = {}
@@ -150,6 +261,34 @@ class FastMCPRegistryAdapter:
                 raise FastMCPRegistryError("public MCP tool names must be unique")
             snapshot[name] = tool
         return snapshot
+
+    @staticmethod
+    def _selected_names(names: Iterable[str]) -> tuple[str, ...]:
+        selected = tuple(names)
+        if any(not isinstance(name, str) or not name for name in selected):
+            raise FastMCPRegistryError(
+                "selected FastMCP tool names must be non-empty strings"
+            )
+        if len(set(selected)) != len(selected):
+            raise FastMCPRegistryError("selected FastMCP tool names must be unique")
+        return tuple(sorted(selected))
+
+    @staticmethod
+    def _rollback(
+        target_registry: MutableMapping[Any, Any],
+        previous: Mapping[str, Any],
+        exc: Exception,
+    ) -> None:
+        try:
+            target_registry.clear()
+            target_registry.update(previous)
+        except Exception as rollback_exc:
+            raise FastMCPRegistryError(
+                "FastMCP tool registry update and rollback both failed"
+            ) from rollback_exc
+        if isinstance(exc, FastMCPRegistryError):
+            raise exc
+        raise FastMCPRegistryError("FastMCP tool registry update failed") from exc
 
     @staticmethod
     def _tool_contract(registry_name: str, tool: Any) -> dict[str, Any]:
