@@ -31,6 +31,7 @@ def test_distribution_and_entry_points_use_jacquard_name() -> None:
         "weave-mcp": "weave_jacquard.mcp_build:main",
         "weave-build": "weave_jacquard.build_cli:main",
         "weave-manifest-diff": "weave_jacquard.manifest_compatibility_cli:main",
+        "weave-release-compatibility": "weave_frontend.release_compatibility:main",
     }
 
 
