@@ -23,49 +23,49 @@ def _runtime(tmp_path: Path) -> RuntimeServices:
     )
 
 
-def test_context_core_localization_preserves_contracts_and_callables(
+def test_context_core_staging_preserves_contracts_and_callables(
     tmp_path: Path,
 ) -> None:
+    source = FastMCPRegistryAdapter(mcp_server.mcp)
+    source_objects = dict(source.tool_objects())
+    source_contracts = {
+        contract["name"]: contract for contract in source.tool_contracts()
+    }
+    expected_names = tuple(
+        sorted(name for name in CORE_TOOL_NAMES if name in source_objects)
+    )
+    expected_contracts = tuple(source_contracts[name] for name in expected_names)
+
     target = FastMCP("context-core-tools")
     adapter = FastMCPRegistryAdapter(target)
-    adapter.replace_tools_from(mcp_server.mcp)
-    before_contracts = adapter.tool_contracts()
-    contracts_by_name = {
-        contract["name"]: contract for contract in before_contracts
-    }
-    transferred_objects = dict(adapter.tool_objects())
-    expected_names = tuple(
-        name for name in CORE_TOOL_NAMES if name in transferred_objects
-    )
     runtime = _runtime(tmp_path)
     context = ApplicationContext(server=target, runtime=runtime)
 
+    assert adapter.tool_names(allow_empty=True) == ()
     assert "expected_revision_id" in (
-        contracts_by_name["program_create"]["input_schema"]["properties"]
+        source_contracts["program_create"]["input_schema"]["properties"]
     )
     assert "expected_revision_id" in (
-        contracts_by_name["context_add"]["input_schema"]["properties"]
+        source_contracts["context_add"]["input_schema"]["properties"]
     )
 
     try:
-        installed = install_context_core_tools(context)
+        installed = install_context_core_tools(context, mcp_server.mcp)
         first_objects = dict(adapter.tool_objects())
 
         assert installed == expected_names
-        assert adapter.tool_contracts() == before_contracts
+        assert adapter.tool_contracts() == expected_contracts
         for name in installed:
-            assert first_objects[name] is not transferred_objects[name]
-            assert first_objects[name].fn is transferred_objects[name].fn
-        assert first_objects["weave_help"] is transferred_objects["weave_help"]
+            assert first_objects[name] is not source_objects[name]
+            assert first_objects[name].fn is source_objects[name].fn
 
-        repeated = install_context_core_tools(context)
+        repeated = install_context_core_tools(context, mcp_server.mcp)
         second_objects = dict(adapter.tool_objects())
 
         assert repeated == installed
-        assert adapter.tool_contracts() == before_contracts
+        assert adapter.tool_contracts() == expected_contracts
         for name in installed:
             assert second_objects[name] is not first_objects[name]
-            assert second_objects[name].fn is first_objects[name].fn
-        assert second_objects["weave_help"] is first_objects["weave_help"]
+            assert second_objects[name].fn is source_objects[name].fn
     finally:
         runtime.close()
