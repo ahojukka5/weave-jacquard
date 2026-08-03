@@ -9,6 +9,7 @@ _CONTEXT_OWNED_CAPABILITY_MODULES = (
     "mcp_merge_test_impact.py",
     "mcp_merge_candidate_test_runs.py",
     "mcp_tested_merge_attestations.py",
+    "mcp_revert.py",
 )
 
 
