@@ -93,14 +93,6 @@ def artifact_quota() -> ArtifactQuotaService:
     return quota
 
 
-def install_capability() -> None:
-    """Recompose root accounting and attach one quota guard to every publisher."""
-
-    artifact_quota.cache_clear()
-    artifact_storage.cache_clear()
-    artifact_quota()
-
-
 @mcp.tool()
 def artifact_storage_report() -> dict[str, Any]:
     """Report bounded logical usage and aggregate publication quota state."""

@@ -11,6 +11,7 @@ _CONTEXT_OWNED_CAPABILITY_MODULES = (
     "mcp_tested_merge_attestations.py",
     "mcp_revert.py",
     "mcp_database_backup.py",
+    "mcp_artifact_storage.py",
 )
 
 
