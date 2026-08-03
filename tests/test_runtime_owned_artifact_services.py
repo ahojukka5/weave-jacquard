@@ -55,18 +55,42 @@ def test_artifact_services_are_runtime_owned(
         "tested_merge_attestations": tmp_path / "attestations",
         "database_backups": tmp_path / "database-backups",
     }
+
+    def verifier(family: str):
+        return lambda artifact_id: {
+            "family": family,
+            "artifact_id": artifact_id,
+        }
+
     workspace = SimpleNamespace(db=SimpleNamespace(path=tmp_path / "runtime.db"))
-    compiler = SimpleNamespace(build_root=roots["committed_builds"])
-    candidate_builds = SimpleNamespace(build_root=roots["candidate_builds"])
-    runs = SimpleNamespace(run_root=roots["test_runs"])
-    batches = SimpleNamespace(batch_root=roots["test_batches"])
+    compiler = SimpleNamespace(
+        build_root=roots["committed_builds"],
+        get=verifier("committed_builds"),
+    )
+    candidate_builds = SimpleNamespace(
+        build_root=roots["candidate_builds"],
+        get=verifier("candidate_builds"),
+    )
+    runs = SimpleNamespace(
+        run_root=roots["test_runs"],
+        get=verifier("test_runs"),
+    )
+    batches = SimpleNamespace(
+        batch_root=roots["test_batches"],
+        get=verifier("test_batches"),
+    )
     candidate_tests = SimpleNamespace(
-        run_root=roots["candidate_test_qualifications"]
+        run_root=roots["candidate_test_qualifications"],
+        get=verifier("candidate_test_qualifications"),
     )
     attestations = SimpleNamespace(
-        attestation_root=roots["tested_merge_attestations"]
+        attestation_root=roots["tested_merge_attestations"],
+        get=verifier("tested_merge_attestations"),
     )
-    backups = SimpleNamespace(backup_root=roots["database_backups"])
+    backups = SimpleNamespace(
+        backup_root=roots["database_backups"],
+        get=verifier("database_backups"),
+    )
     publishers = (
         compiler,
         candidate_builds,
@@ -113,11 +137,16 @@ def test_artifact_services_are_runtime_owned(
         install_runtime_services(runtime)
 
         storage = artifact_module.artifact_storage()
+        inventory = artifact_module.artifact_inventory()
         quota = artifact_module.artifact_quota()
 
-        assert storage.roots == {
+        expected_roots = {
             name: path.resolve() for name, path in roots.items()
         }
+        assert storage.roots == expected_roots
+        assert {
+            family.name: family.root for family in inventory.families
+        } == expected_roots
         assert quota.accounting is storage
         assert quota.lock_path == (
             tmp_path / ".weave-artifact-quota.lock"
@@ -130,7 +159,7 @@ def test_artifact_services_are_runtime_owned(
             item["name"]: item
             for item in runtime.service_manifest()["services"]
         }
-        assert entries["artifact_storage"]["depends_on"] == [
+        expected_dependencies = [
             "compiler_bridge",
             "database_backups",
             "merge_candidate_builds",
@@ -139,6 +168,8 @@ def test_artifact_services_are_runtime_owned(
             "test_runs",
             "tested_merge_attestations",
         ]
+        assert entries["artifact_storage"]["depends_on"] == expected_dependencies
+        assert entries["artifact_inventory"]["depends_on"] == expected_dependencies
         assert entries["artifact_quota"]["depends_on"] == [
             "artifact_storage",
             "compiler_bridge",
@@ -154,4 +185,5 @@ def test_artifact_services_are_runtime_owned(
         runtime.clear_service("database_backups")
 
         assert artifact_module.artifact_storage.cache_info().currsize == 0
+        assert artifact_module.artifact_inventory.cache_info().currsize == 0
         assert artifact_module.artifact_quota.cache_info().currsize == 0
