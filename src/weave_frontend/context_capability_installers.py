@@ -28,6 +28,12 @@ def _clear_services(context: ApplicationContext, *names: str) -> None:
         context.runtime.clear_service(name)
 
 
+def _install_metadata_aware_merge_services() -> None:
+    from . import mcp_test_targets
+
+    mcp_test_targets.install_metadata_aware_merge_services()
+
+
 def _install_concurrent_nodes(
     context: ApplicationContext,
     module: ModuleType,
@@ -41,16 +47,18 @@ def _install_test_targets(
     context: ApplicationContext,
     module: ModuleType,
 ) -> None:
+    del module
     _require_bound_runtime(context)
-    module.install_metadata_aware_merge_services()
+    _install_metadata_aware_merge_services()
 
 
 def _install_merge_test_impact(
     context: ApplicationContext,
     module: ModuleType,
 ) -> None:
+    del module
     _require_bound_runtime(context)
-    module.install_metadata_aware_merge_services()
+    _install_metadata_aware_merge_services()
     context.runtime.clear_service("merge_test_impact_plans")
 
 
@@ -58,8 +66,9 @@ def _install_merge_candidate_test_execution(
     context: ApplicationContext,
     module: ModuleType,
 ) -> None:
+    del module
     _require_bound_runtime(context)
-    module.install_metadata_aware_merge_services()
+    _install_metadata_aware_merge_services()
     for name in (
         "merge_candidate_test_batches",
         "merge_candidate_build_inspection",
