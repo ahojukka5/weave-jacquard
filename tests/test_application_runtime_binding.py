@@ -195,7 +195,7 @@ def test_capability_loading_and_installation_use_context_runtime(
         module = ModuleType(name)
         if name == "example.legacy":
 
-            def install_capability() -> None:
+            def install_capability(selected: ApplicationContext) -> None:
                 services = runtime_services()
                 services.service(
                     "legacy_probe",
@@ -203,6 +203,7 @@ def test_capability_loading_and_installation_use_context_runtime(
                     origin="tests.legacy_probe",
                 )
                 observed.append(("install:legacy", services, runtime_config()))
+                assert selected is context
 
             module.install_capability = install_capability  # type: ignore[attr-defined]
         else:
