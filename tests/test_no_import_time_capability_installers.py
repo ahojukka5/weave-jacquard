@@ -3,17 +3,18 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-_METADATA_CAPABILITY_MODULES = (
+_CONTEXT_OWNED_CAPABILITY_MODULES = (
+    "mcp_concurrent_nodes.py",
     "mcp_test_targets.py",
     "mcp_merge_test_impact.py",
     "mcp_merge_candidate_test_runs.py",
 )
 
 
-def test_metadata_capabilities_have_no_module_local_installers() -> None:
+def test_context_owned_capabilities_have_no_module_local_installers() -> None:
     source_root = Path(__file__).parents[1] / "src" / "weave_frontend"
 
-    for filename in _METADATA_CAPABILITY_MODULES:
+    for filename in _CONTEXT_OWNED_CAPABILITY_MODULES:
         tree = ast.parse(
             (source_root / filename).read_text(encoding="utf-8"),
             filename=filename,

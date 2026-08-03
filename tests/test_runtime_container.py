@@ -232,9 +232,7 @@ def test_process_runtime_freezes_environment_until_reset(
         assert runtime_config().database_path == tmp_path / "second.db"
 
 
-def test_first_capability_installs_runtime_backed_production_factories() -> None:
-    concurrent_nodes.install_capability()
-
+def test_foundational_capability_exports_runtime_backed_production_factories() -> None:
     assert server_module.workspace is concurrent_nodes.workspace
     assert build_module.workspace is concurrent_nodes.workspace
     assert build_module.compiler_bridge is concurrent_nodes.compiler_bridge
@@ -255,7 +253,6 @@ def test_production_runtime_owns_race_safe_workspace_and_quota_bridge(
         monkeypatch.setenv("WEAVE_DB_PATH", str(tmp_path / "production.db"))
         monkeypatch.setenv("WEAVE_BUILD_ROOT", str(tmp_path / "builds"))
         monkeypatch.setenv("WEAVEC_BIN", str(compiler))
-        concurrent_nodes.install_capability()
         workspace = concurrent_nodes.workspace()
         bridge = concurrent_nodes.compiler_bridge()
 
