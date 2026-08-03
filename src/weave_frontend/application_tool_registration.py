@@ -11,7 +11,7 @@ from .fastmcp_registry import FastMCPRegistryAdapter, FastMCPRegistryError
 from .runtime_container import RuntimeServices
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
 
     from .mcp_capabilities import ApplicationContext
 
@@ -90,15 +90,57 @@ def install_registered_application_tools(
     )
 
 
-def synchronize_registered_application_tools(
+def finalize_registered_application_tools(
     context: ApplicationContext,
     registration_server: Any,
+    *,
+    local_contract_names: Iterable[str] = (),
 ) -> tuple[str, ...]:
-    """Complete one registry while retaining compatible application-local tools."""
+    """Retain canonical names and verify one explicitly assembled registry."""
 
-    return FastMCPRegistryAdapter(context.server).synchronize_tools_from(
-        registration_server
+    source = FastMCPRegistryAdapter(registration_server)
+    target = FastMCPRegistryAdapter(context.server)
+    source_names = source.tool_names()
+    expected_names = set(source_names)
+    local_names = set(local_contract_names)
+    if any(not isinstance(name, str) or not name for name in local_names):
+        raise FastMCPRegistryError(
+            "application-local contract names must be non-empty strings"
+        )
+    unknown_local = tuple(sorted(local_names - expected_names))
+    if unknown_local:
+        raise FastMCPRegistryError(
+            f"application-local contracts are not canonical tools {unknown_local!r}"
+        )
+
+    target_names = set(target.tool_names(allow_empty=True))
+    missing = tuple(sorted(expected_names - target_names))
+    if missing:
+        extra = tuple(sorted(target_names - expected_names))
+        raise FastMCPRegistryError(
+            "explicit application tool assembly is incomplete: "
+            f"missing={missing!r}, extra={extra!r}"
+        )
+    installed_names = target.retain_tools(source_names)
+
+    source_contracts = {
+        contract["name"]: contract for contract in source.tool_contracts()
+    }
+    target_contracts = {
+        contract["name"]: contract for contract in target.tool_contracts()
+    }
+    mismatched = tuple(
+        name
+        for name in source_names
+        if name not in local_names
+        and target_contracts[name] != source_contracts[name]
     )
+    if mismatched:
+        raise FastMCPRegistryError(
+            "explicit application tool assembly changed canonical contracts "
+            f"{mismatched!r}"
+        )
+    return installed_names
 
 
 def bind_registered_application_tools(
@@ -118,6 +160,6 @@ def bind_registered_application_tools(
 
 __all__ = [
     "bind_registered_application_tools",
+    "finalize_registered_application_tools",
     "install_registered_application_tools",
-    "synchronize_registered_application_tools",
 ]
