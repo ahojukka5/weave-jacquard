@@ -35,6 +35,32 @@ def _write_manifest(path: Path, *tools: dict[str, object]) -> None:
     )
 
 
+def _write_application_manifest(
+    path: Path,
+    *,
+    variables: list[str],
+) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "format": "weave-jacquard-application-v2",
+                "capabilities": [
+                    {
+                        "name": "base",
+                        "module": "example.base",
+                        "depends_on": [],
+                    }
+                ],
+                "tool_manifest_id": "tool-id",
+                "tool_count": 1,
+                "configuration_variables": variables,
+                "application_id": "application-id",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_public_manifest_diff_cli_compares_two_files(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -54,6 +80,26 @@ def test_public_manifest_diff_cli_compares_two_files(
     assert report["classification"] == "additive-compatible"
     assert report["change_count"] == 1
     assert report["changes"][0]["kind"] == "tool-added"
+
+
+def test_manifest_diff_cli_dispatches_application_manifests(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    old = tmp_path / "old-application.json"
+    new = tmp_path / "new-application.json"
+    _write_application_manifest(old, variables=["WEAVE_DB"])
+    _write_application_manifest(new, variables=["WEAVE_DB", "WEAVE_ROOT"])
+    monkeypatch.setattr(sys, "argv", ["weave-manifest-diff", str(old), str(new)])
+
+    public_main()
+
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    report = json.loads(captured.out)
+    assert report["classification"] == "additive-compatible"
+    assert report["changes"][0]["kind"] == "configuration-variable-added"
 
 
 def test_manifest_diff_cli_rejects_unknown_format(

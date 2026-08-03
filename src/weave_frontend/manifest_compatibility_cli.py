@@ -13,7 +13,7 @@ from .compiler_io import CompilerFileTooLarge, read_bounded_json
 from .compiler_limits import MAX_COMPILER_PROTOCOL_BYTES
 from .manifest_compatibility import (
     ManifestCompatibilityError,
-    compare_tool_manifests,
+    compare_manifests,
 )
 
 MAX_MANIFEST_BYTES = MAX_COMPILER_PROTOCOL_BYTES
@@ -55,7 +55,7 @@ def _read_manifest(path: Path) -> Mapping[str, Any]:
 def compare_manifest_files(old_path: Path, new_path: Path) -> dict[str, Any]:
     """Compare two bounded manifest files without opening runtime state."""
 
-    return compare_tool_manifests(
+    return compare_manifests(
         _read_manifest(old_path),
         _read_manifest(new_path),
     )
