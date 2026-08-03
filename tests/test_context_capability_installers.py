@@ -5,6 +5,7 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
+from weave_frontend import mcp_test_targets
 from weave_frontend.application_runtime_binding import bind_application_runtime
 from weave_frontend.context_capability_installers import (
     install_production_capability,
@@ -89,31 +90,54 @@ def test_simple_production_installer_clears_only_context_runtime(
     assert other.service_initialized("reverts")
 
 
-def test_merge_candidate_installer_restores_metadata_and_clears_services(
+@pytest.mark.parametrize(
+    ("capability", "module_name", "service_names"),
+    [
+        ("test_targets", "weave_frontend.mcp_test_targets", ()),
+        (
+            "merge_test_impact",
+            "weave_frontend.mcp_merge_test_impact",
+            ("merge_test_impact_plans",),
+        ),
+        (
+            "merge_candidate_test_execution",
+            "weave_frontend.mcp_merge_candidate_test_runs",
+            (
+                "merge_candidate_test_batches",
+                "merge_candidate_build_inspection",
+                "merge_candidate_builds",
+            ),
+        ),
+    ],
+)
+def test_metadata_installers_route_through_test_target_owner(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capability: str,
+    module_name: str,
+    service_names: tuple[str, ...],
 ) -> None:
-    context = _context(tmp_path, "merge-candidate")
-    names = (
-        "merge_candidate_test_batches",
-        "merge_candidate_build_inspection",
-        "merge_candidate_builds",
-    )
-    _materialize(context.runtime, *names)
+    context = _context(tmp_path, capability)
+    _materialize(context.runtime, *service_names)
     observed: list[RuntimeServices] = []
-    module = ModuleType("weave_frontend.mcp_merge_candidate_test_runs")
-    module.install_metadata_aware_merge_services = (  # type: ignore[attr-defined]
-        lambda: observed.append(runtime_services())
+    monkeypatch.setattr(
+        mcp_test_targets,
+        "install_metadata_aware_merge_services",
+        lambda: observed.append(runtime_services()),
     )
 
     with bind_application_runtime(context.runtime):
         assert install_production_capability(
-            "merge_candidate_test_execution",
-            module,
+            capability,
+            ModuleType(module_name),
             context,
         )
 
     assert observed == [context.runtime]
-    assert all(not context.runtime.service_initialized(name) for name in names)
+    assert all(
+        not context.runtime.service_initialized(name)
+        for name in service_names
+    )
 
 
 def test_artifact_installer_rebuilds_quota_on_context_runtime(
