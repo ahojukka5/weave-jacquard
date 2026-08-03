@@ -22,12 +22,6 @@ def database_backups() -> DatabaseBackupService:
     )
 
 
-def install_capability() -> None:
-    """Reset runtime-owned backup composition during capability installation."""
-
-    database_backups.cache_clear()
-
-
 @mcp.tool()
 def database_backup_create(
     timeout_seconds: int = DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS,
