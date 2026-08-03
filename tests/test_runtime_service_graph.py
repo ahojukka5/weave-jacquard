@@ -11,14 +11,13 @@ import weave_frontend.mcp_build as build_module
 import weave_frontend.mcp_concurrent_nodes as concurrent_nodes
 import weave_frontend.mcp_server as server_module
 import weave_frontend.runtime_container as runtime_module
+from weave_frontend.application_runtime_binding import bind_application_runtime
 from weave_frontend.mcp_runtime_identity import RuntimeIdentityWithServices
 from weave_frontend.runtime_config import RuntimeConfig
 from weave_frontend.runtime_container import (
     RUNTIME_SERVICE_GRAPH_FORMAT,
     RuntimeServiceCycleError,
     RuntimeServices,
-    close_runtime_services,
-    install_runtime_services,
     runtime_service,
 )
 
@@ -36,22 +35,6 @@ def _config(tmp_path: Path) -> RuntimeConfig:
     return RuntimeConfig.from_environ(
         {"WEAVE_DB_PATH": str(tmp_path / "runtime.db")}
     )
-
-
-@contextmanager
-def _isolated_process_runtime() -> Iterator[None]:
-    with runtime_module._runtime_lock:
-        previous_config = runtime_module._runtime_config
-        previous_services = runtime_module._runtime_services
-        runtime_module._runtime_config = None
-        runtime_module._runtime_services = None
-    try:
-        yield
-    finally:
-        close_runtime_services()
-        with runtime_module._runtime_lock:
-            runtime_module._runtime_config = previous_config
-            runtime_module._runtime_services = previous_services
 
 
 @contextmanager
@@ -177,7 +160,7 @@ def test_runtime_service_cycle_fails_without_partial_instance(tmp_path: Path) ->
     services.close()
 
 
-def test_runtime_service_decorator_uses_installed_container_and_cache_adapter(
+def test_runtime_service_decorator_uses_bound_container_and_cache_adapter(
     tmp_path: Path,
 ) -> None:
     calls = 0
@@ -191,20 +174,22 @@ def test_runtime_service_decorator_uses_installed_container_and_cache_adapter(
             calls += 1
             return object()
 
-        with _isolated_process_runtime():
-            services = RuntimeServices(_config(tmp_path))
-            install_runtime_services(services)
-            graph_before = services.service_manifest(include_state=False)
-            first = decorated()
-            assert decorated() is first
-            assert calls == 1
-            assert decorated.cache_info().currsize == 1
-            assert services.service_manifest(include_state=False) == graph_before
+        services = RuntimeServices(_config(tmp_path))
+        try:
+            with bind_application_runtime(services):
+                graph_before = services.service_manifest(include_state=False)
+                first = decorated()
+                assert decorated() is first
+                assert calls == 1
+                assert decorated.cache_info().currsize == 1
+                assert services.service_manifest(include_state=False) == graph_before
 
-            decorated.cache_clear()
-            assert decorated.cache_info().currsize == 0
-            assert decorated() is not first
-            assert calls == 2
+                decorated.cache_clear()
+                assert decorated.cache_info().currsize == 0
+                assert decorated() is not first
+                assert calls == 2
+        finally:
+            services.close()
 
 
 def test_two_containers_supply_isolated_named_services(tmp_path: Path) -> None:
@@ -246,27 +231,29 @@ def test_foundational_build_services_are_runtime_owned(tmp_path: Path) -> None:
         workspace_factory=lambda _config: workspace,
     )
 
-    with _isolated_process_runtime():
-        install_runtime_services(services)
-        assert build_module.edit_batches().workspace is workspace
-        assert build_module.branch_activity().workspace is workspace
-        assert build_module.revision_inspection().workspace is workspace
-        assert build_module.revision_diffs().workspace is workspace
-        assert build_module.merge_previews().workspace is workspace
-        assert build_module.build_targets().workspace is workspace
+    try:
+        with bind_application_runtime(services):
+            assert build_module.edit_batches().workspace is workspace
+            assert build_module.branch_activity().workspace is workspace
+            assert build_module.revision_inspection().workspace is workspace
+            assert build_module.revision_diffs().workspace is workspace
+            assert build_module.merge_previews().workspace is workspace
+            assert build_module.build_targets().workspace is workspace
 
-        names = {
-            item["name"] for item in services.service_manifest()["services"]
-        }
-        assert {
-            "workspace",
-            "edit_batches",
-            "branch_activity",
-            "revision_inspection",
-            "revision_diffs",
-            "merge_previews",
-            "build_targets",
-        }.issubset(names)
+            names = {
+                item["name"] for item in services.service_manifest()["services"]
+            }
+            assert {
+                "workspace",
+                "edit_batches",
+                "branch_activity",
+                "revision_inspection",
+                "revision_diffs",
+                "merge_previews",
+                "build_targets",
+            }.issubset(names)
+    finally:
+        services.close()
 
 
 def test_runtime_identity_binds_state_free_service_graph(tmp_path: Path) -> None:
@@ -275,14 +262,16 @@ def test_runtime_identity_binds_state_free_service_graph(tmp_path: Path) -> None
         def report() -> dict[str, str]:
             return {"format": "test-runtime", "runtime_id": "old"}
 
-    with _isolated_process_runtime():
-        services = RuntimeServices(_config(tmp_path))
-        install_runtime_services(services)
-        expected = services.service_manifest(include_state=False)
+    services = RuntimeServices(_config(tmp_path))
+    try:
+        with bind_application_runtime(services):
+            expected = services.service_manifest(include_state=False)
 
-        result = RuntimeIdentityWithServices(_Identity()).report()  # type: ignore[arg-type]
+            result = RuntimeIdentityWithServices(_Identity()).report()  # type: ignore[arg-type]
 
-        assert result["service_graph"] == expected
-        assert "initialized_services" not in result["service_graph"]
-        assert result["runtime_id"] != "old"
-        assert len(result["runtime_id"]) == 64
+            assert result["service_graph"] == expected
+            assert "initialized_services" not in result["service_graph"]
+            assert result["runtime_id"] != "old"
+            assert len(result["runtime_id"]) == 64
+    finally:
+        services.close()
