@@ -110,6 +110,7 @@ def _install_artifact_storage(
         "artifact_quota",
         "artifact_storage",
         "artifact_inventory",
+        "artifact_reconciliation",
     )
     module.artifact_quota()
 

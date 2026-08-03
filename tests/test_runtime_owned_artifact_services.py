@@ -138,6 +138,7 @@ def test_artifact_services_are_runtime_owned(
 
         storage = artifact_module.artifact_storage()
         inventory = artifact_module.artifact_inventory()
+        reconciliation = artifact_module.artifact_reconciliation()
         quota = artifact_module.artifact_quota()
 
         expected_roots = {
@@ -147,6 +148,8 @@ def test_artifact_services_are_runtime_owned(
         assert {
             family.name: family.root for family in inventory.families
         } == expected_roots
+        assert reconciliation.database is workspace.db
+        assert reconciliation.inventory is inventory
         assert quota.accounting is storage
         assert quota.lock_path == (
             tmp_path / ".weave-artifact-quota.lock"
@@ -170,6 +173,10 @@ def test_artifact_services_are_runtime_owned(
         ]
         assert entries["artifact_storage"]["depends_on"] == expected_dependencies
         assert entries["artifact_inventory"]["depends_on"] == expected_dependencies
+        assert entries["artifact_reconciliation"]["depends_on"] == [
+            "artifact_inventory",
+            "workspace",
+        ]
         assert entries["artifact_quota"]["depends_on"] == [
             "artifact_storage",
             "compiler_bridge",
@@ -186,4 +193,5 @@ def test_artifact_services_are_runtime_owned(
 
         assert artifact_module.artifact_storage.cache_info().currsize == 0
         assert artifact_module.artifact_inventory.cache_info().currsize == 0
+        assert artifact_module.artifact_reconciliation.cache_info().currsize == 0
         assert artifact_module.artifact_quota.cache_info().currsize == 0
