@@ -90,6 +90,17 @@ def install_registered_application_tools(
     )
 
 
+def synchronize_registered_application_tools(
+    context: ApplicationContext,
+    registration_server: Any,
+) -> tuple[str, ...]:
+    """Complete one registry while retaining compatible application-local tools."""
+
+    return FastMCPRegistryAdapter(context.server).synchronize_tools_from(
+        registration_server
+    )
+
+
 def bind_registered_application_tools(
     context: ApplicationContext,
 ) -> tuple[str, ...]:
@@ -108,4 +119,5 @@ def bind_registered_application_tools(
 __all__ = [
     "bind_registered_application_tools",
     "install_registered_application_tools",
+    "synchronize_registered_application_tools",
 ]
