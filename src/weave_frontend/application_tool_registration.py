@@ -15,6 +15,10 @@ if TYPE_CHECKING:
 
     from .mcp_capabilities import ApplicationContext
 
+_CANONICAL_FUNCTION_ATTRIBUTE = (
+    "__weave_jacquard_canonical_tool_function__"
+)
+
 
 async def _call_with_runtime(
     runtime: RuntimeServices,
@@ -25,6 +29,15 @@ async def _call_with_runtime(
     with bind_application_runtime(runtime):
         result = function(*args, **kwargs)
         return await result if inspect.isawaitable(result) else result
+
+
+def _canonical_function(name: str, function: Any) -> Callable[..., Any]:
+    canonical = getattr(function, _CANONICAL_FUNCTION_ATTRIBUTE, function)
+    if not callable(canonical):
+        raise FastMCPRegistryError(
+            f"registered tool {name!r} retained an invalid canonical callable"
+        )
+    return canonical
 
 
 def _bind_tool_to_runtime(
@@ -38,11 +51,13 @@ def _bind_tool_to_runtime(
         raise FastMCPRegistryError(
             f"registered tool {name!r} cannot be cloned for runtime binding"
         )
+    canonical = _canonical_function(name, function)
 
-    @wraps(function)
+    @wraps(canonical)
     async def bound(*args: Any, **kwargs: Any) -> Any:
-        return await _call_with_runtime(runtime, function, args, kwargs)
+        return await _call_with_runtime(runtime, canonical, args, kwargs)
 
+    setattr(bound, _CANONICAL_FUNCTION_ATTRIBUTE, canonical)
     try:
         clone = model_copy(update={"fn": bound, "is_async": True})
     except Exception as exc:
