@@ -12,9 +12,12 @@ from typing import Any, Protocol
 from .application_runtime_binding import bind_application_runtime
 from .application_tool_registration import (
     bind_registered_application_tools,
-    install_registered_application_tools,
+    synchronize_registered_application_tools,
 )
 from .context_capability_installers import install_production_capability
+from .context_capability_tool_registration import (
+    install_context_capability_tools,
+)
 from .context_tool_registration import install_context_core_tools
 from .runtime_container import RuntimeClosedError, RuntimeServices
 
@@ -266,15 +269,22 @@ def _invoke_installer(
     )
 
 
-def _install_canonical_tool_registry(
-    context: ApplicationContext,
-    module_loader: ModuleLoader,
-) -> tuple[str, ...]:
+def _canonical_registration_server(module_loader: ModuleLoader) -> Any:
     registration_module = module_loader("weave_frontend.mcp_server")
     registration_server = getattr(registration_module, "mcp", None)
     if registration_server is None:
         raise TypeError("weave_frontend.mcp_server must expose the registration server")
-    installed = install_registered_application_tools(context, registration_server)
+    return registration_server
+
+
+def _install_canonical_tool_registry(
+    context: ApplicationContext,
+    registration_server: Any,
+) -> tuple[str, ...]:
+    installed = synchronize_registered_application_tools(
+        context,
+        registration_server,
+    )
     install_context_core_tools(context)
     return installed
 
@@ -293,16 +303,29 @@ def install_public_capabilities(
     with bind_application_runtime(context.runtime):
         ordered = validate_capabilities(capabilities)
         canonical = ordered == PUBLIC_CAPABILITIES
+        registration_server = (
+            _canonical_registration_server(module_loader) if canonical else None
+        )
         for capability in ordered:
             module = module_loader(capability.module)
-            if install_production_capability(capability.name, module, context):
-                continue
-            installer = getattr(module, "install_capability", None)
-            if callable(installer):
-                _invoke_installer(installer, context)
+            handled = install_production_capability(
+                capability.name,
+                module,
+                context,
+            )
+            if not handled:
+                installer = getattr(module, "install_capability", None)
+                if callable(installer):
+                    _invoke_installer(installer, context)
+            if canonical:
+                install_context_capability_tools(
+                    context,
+                    registration_server,
+                    module,
+                )
 
         if canonical:
-            _install_canonical_tool_registry(context, module_loader)
+            _install_canonical_tool_registry(context, registration_server)
 
         guidance = module_loader("weave_frontend.mcp_revert_guidance")
         server = context.server
