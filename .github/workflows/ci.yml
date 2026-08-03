@@ -76,6 +76,14 @@ jobs:
           "$SYSTEM_PYTHON_BIN" -m venv "$VIRTUALENV_DIR"
           echo "PYTHON_BIN=$VIRTUALENV_DIR/bin/python" >> "$GITHUB_ENV"
 
+      - name: Cache pip downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install Jacquard qualification environment
         run: |
           "$VIRTUALENV_DIR/bin/python" -m pip install --upgrade pip
