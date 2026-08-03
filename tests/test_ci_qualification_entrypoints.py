@@ -27,10 +27,16 @@ def test_python_ci_runs_portable_qualification() -> None:
     assert "if-no-files-found: warn" in workflow
 
 
-def test_native_ci_delegates_to_unified_qualification() -> None:
+def test_native_ci_delegates_to_release_qualification() -> None:
     workflow = _workflow("native-e2e.yml")
+    wrapper = (ROOT / "scripts" / "qualify-release.sh").read_text(
+        encoding="utf-8"
+    )
 
-    assert 'bash scripts/qualify.sh native "$QUALIFICATION_DIR"' in workflow
+    assert 'bash scripts/qualify-release.sh native "$QUALIFICATION_DIR"' in workflow
+    assert 'scripts/qualify.sh" "$mode" "$requested_out"' in wrapper
+    assert 'scripts/retain-public-manifests.py" "$final_out"' in wrapper
+    assert 'scripts/qualification.py" checksums "$final_out"' in wrapper
     assert "python -m pytest" not in workflow
     assert "qualification-summary.json" not in workflow
     assert "bubblewrap clang file llvm" in workflow
