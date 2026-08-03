@@ -8,6 +8,7 @@ import pytest
 
 import weave_frontend.artifact_storage as storage_module
 import weave_frontend.mcp_artifact_storage as mcp_storage_module
+from weave_frontend.artifact_reconciliation import RETAINED_ARTIFACT_FAMILIES
 from weave_frontend.artifact_storage import (
     ARTIFACT_STORAGE_REPORT_FORMAT,
     ArtifactStorageService,
@@ -138,7 +139,7 @@ def test_storage_report_rejects_depth_overflow(
     assert captured.value.code == "ARTIFACT_STORAGE_DEPTH_EXCEEDED"
 
 
-def test_production_root_composition_includes_every_artifact_family(
+def test_production_composition_binds_every_artifact_family_verifier(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -151,40 +152,78 @@ def test_production_root_composition_includes_every_artifact_family(
         "tested_merge_attestations": tmp_path / "attestations",
         "database_backups": tmp_path / "database-backups",
     }
+
+    def service(family: str, root_attribute: str) -> SimpleNamespace:
+        value = SimpleNamespace()
+        setattr(value, root_attribute, roots[family])
+        value.get = lambda artifact_id: {
+            "family": family,
+            "artifact_id": artifact_id,
+        }
+        return value
+
+    services = {
+        "committed_builds": service("committed_builds", "build_root"),
+        "candidate_builds": service("candidate_builds", "build_root"),
+        "test_runs": service("test_runs", "run_root"),
+        "test_batches": service("test_batches", "batch_root"),
+        "candidate_test_qualifications": service(
+            "candidate_test_qualifications",
+            "run_root",
+        ),
+        "tested_merge_attestations": service(
+            "tested_merge_attestations",
+            "attestation_root",
+        ),
+        "database_backups": service("database_backups", "backup_root"),
+    }
     monkeypatch.setattr(
         mcp_storage_module,
         "compiler_bridge",
-        lambda: SimpleNamespace(build_root=roots["committed_builds"]),
+        lambda: services["committed_builds"],
     )
     monkeypatch.setattr(
         mcp_storage_module,
         "merge_candidate_builds",
-        lambda: SimpleNamespace(build_root=roots["candidate_builds"]),
+        lambda: services["candidate_builds"],
     )
     monkeypatch.setattr(
         mcp_storage_module,
         "test_runs",
-        lambda: SimpleNamespace(run_root=roots["test_runs"]),
+        lambda: services["test_runs"],
     )
     monkeypatch.setattr(
         mcp_storage_module,
         "test_batches",
-        lambda: SimpleNamespace(batch_root=roots["test_batches"]),
+        lambda: services["test_batches"],
     )
     monkeypatch.setattr(
         mcp_storage_module,
         "merge_candidate_test_batches",
-        lambda: SimpleNamespace(run_root=roots["candidate_test_qualifications"]),
+        lambda: services["candidate_test_qualifications"],
     )
     monkeypatch.setattr(
         mcp_storage_module,
         "tested_merge_attestations",
-        lambda: SimpleNamespace(attestation_root=roots["tested_merge_attestations"]),
+        lambda: services["tested_merge_attestations"],
     )
     monkeypatch.setattr(
         mcp_storage_module,
         "database_backups",
-        lambda: SimpleNamespace(backup_root=roots["database_backups"]),
+        lambda: services["database_backups"],
     )
 
     assert mcp_storage_module._artifact_roots() == roots
+    families = {
+        family.name: family for family in mcp_storage_module._artifact_families()
+    }
+    assert tuple(sorted(families)) == RETAINED_ARTIFACT_FAMILIES
+    for name, family in families.items():
+        expected_length = 64 if name == "database_backups" else 32
+        artifact_id = "a" * expected_length
+        assert family.root == roots[name].absolute()
+        assert family.artifact_id_pattern.fullmatch(artifact_id)
+        assert family.verifier(artifact_id) == {
+            "family": name,
+            "artifact_id": artifact_id,
+        }

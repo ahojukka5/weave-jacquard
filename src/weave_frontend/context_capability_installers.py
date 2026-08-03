@@ -105,7 +105,12 @@ def _install_artifact_storage(
     context: ApplicationContext,
     module: ModuleType,
 ) -> None:
-    _clear_services(context, "artifact_quota", "artifact_storage")
+    _clear_services(
+        context,
+        "artifact_quota",
+        "artifact_storage",
+        "artifact_inventory",
+    )
     module.artifact_quota()
 
 
