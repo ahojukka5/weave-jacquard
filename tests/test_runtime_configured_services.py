@@ -99,7 +99,6 @@ def test_production_service_roots_and_sandbox_use_one_startup_snapshot(
         monkeypatch.setenv("WEAVE_DB_PATH", str(tmp_path / "runtime.db"))
         for name, path in roots.items():
             monkeypatch.setenv(name, str(path))
-        concurrent_nodes.install_capability()
         startup = runtime_config()
 
         for name in roots:

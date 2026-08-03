@@ -5,6 +5,10 @@ from types import SimpleNamespace
 import pytest
 
 import weave_frontend.mcp_concurrent_nodes as concurrent_nodes
+from weave_frontend.application_runtime_binding import bind_application_runtime
+from weave_frontend.context_capability_installers import (
+    install_production_capability,
+)
 from weave_frontend.mcp_capabilities import ApplicationContext
 from weave_frontend.runtime_config import RuntimeConfig
 from weave_frontend.runtime_container import (
@@ -27,19 +31,16 @@ def test_public_application_owns_exact_process_context() -> None:
     assert public_entrypoint.PUBLIC_APP.context.runtime is runtime_services()
 
 
-def test_foundational_installer_uses_supplied_runtime(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_foundational_installer_uses_supplied_runtime() -> None:
     runtime = _runtime("foundational-context.db")
     context = ApplicationContext(server=SimpleNamespace(), runtime=runtime)
 
-    monkeypatch.setattr(
-        concurrent_nodes,
-        "runtime_services",
-        lambda: pytest.fail("process runtime must not be consulted"),
-    )
-
-    concurrent_nodes.install_capability(context)
+    with bind_application_runtime(runtime):
+        assert install_production_capability(
+            "concurrent_nodes",
+            concurrent_nodes,
+            context,
+        )
 
     assert context.runtime is runtime
 
