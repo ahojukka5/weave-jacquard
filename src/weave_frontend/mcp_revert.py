@@ -20,15 +20,6 @@ def reverts() -> RevertService:
     return RevertService(workspace(), merge_previews())
 
 
-def install_capability() -> None:
-    """Reset runtime-owned revert composition during capability installation."""
-
-    reverts.cache_clear()
-
-
-install_capability()
-
-
 @mcp.tool()
 def branch_revert_preview(
     project: str,

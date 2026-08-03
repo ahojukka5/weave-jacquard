@@ -20,7 +20,7 @@ def test_revert_service_factory_composes_shared_services(monkeypatch) -> None:
     assert first.workspace is workspace
     assert first.previews is previews
 
-    mcp_revert.install_capability()
+    mcp_revert.reverts.cache_clear()
     replacement = mcp_revert.reverts()
     assert replacement is not first
     assert replacement.workspace is workspace
