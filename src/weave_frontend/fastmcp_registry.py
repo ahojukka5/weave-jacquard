@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
 
 ToolTransform = Callable[[str, Any], Any]
@@ -32,6 +33,11 @@ class FastMCPRegistryAdapter:
             self._tool_contract(name, registry[name])
             for name in sorted(registry)
         )
+
+    def tool_objects(self) -> Mapping[str, Any]:
+        """Return an immutable exact-object snapshot of the registered tools."""
+
+        return MappingProxyType(self._snapshot())
 
     def replace_tools_from(
         self,
