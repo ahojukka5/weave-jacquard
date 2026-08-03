@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .artifact_quota import ArtifactQuotaService
+from .artifact_reachability import ArtifactReconciliationService
 from .artifact_reconciliation import (
     RetainedArtifactFamily,
     RetainedArtifactInventoryService,
@@ -128,6 +129,16 @@ def artifact_inventory() -> RetainedArtifactInventoryService:
     """Return bounded verified membership for all retained-artifact families."""
 
     return RetainedArtifactInventoryService(_artifact_families())
+
+
+@runtime_service(
+    "artifact_reconciliation",
+    depends_on=("workspace", "artifact_inventory"),
+)
+def artifact_reconciliation() -> ArtifactReconciliationService:
+    """Return immutable database-to-artifact reachability reconciliation."""
+
+    return ArtifactReconciliationService(workspace().db, artifact_inventory())
 
 
 @runtime_service(
