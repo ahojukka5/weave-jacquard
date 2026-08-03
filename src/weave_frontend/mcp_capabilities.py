@@ -12,12 +12,13 @@ from typing import Any, Protocol
 from .application_runtime_binding import bind_application_runtime
 from .application_tool_registration import (
     bind_registered_application_tools,
-    synchronize_registered_application_tools,
+    finalize_registered_application_tools,
 )
 from .context_capability_installers import install_production_capability
 from .context_capability_tool_registration import (
     install_context_capability_tools,
 )
+from .context_guidance import install_context_guidance
 from .context_tool_registration import install_context_core_tools
 from .runtime_container import RuntimeClosedError, RuntimeServices
 
@@ -277,16 +278,18 @@ def _canonical_registration_server(module_loader: ModuleLoader) -> Any:
     return registration_server
 
 
-def _install_canonical_tool_registry(
+def _install_foundational_and_build_tools(
     context: ApplicationContext,
     registration_server: Any,
-) -> tuple[str, ...]:
-    installed = synchronize_registered_application_tools(
+    module_loader: ModuleLoader,
+) -> None:
+    install_context_core_tools(context, registration_server)
+    build_module = module_loader("weave_frontend.mcp_build")
+    install_context_capability_tools(
         context,
         registration_server,
+        build_module,
     )
-    install_context_core_tools(context)
-    return installed
 
 
 def install_public_capabilities(
@@ -306,6 +309,13 @@ def install_public_capabilities(
         registration_server = (
             _canonical_registration_server(module_loader) if canonical else None
         )
+        if canonical:
+            _install_foundational_and_build_tools(
+                context,
+                registration_server,
+                module_loader,
+            )
+
         for capability in ordered:
             module = module_loader(capability.module)
             handled = install_production_capability(
@@ -324,27 +334,14 @@ def install_public_capabilities(
                     module,
                 )
 
-        if canonical:
-            _install_canonical_tool_registry(context, registration_server)
-
         guidance = module_loader("weave_frontend.mcp_revert_guidance")
-        server = context.server
-        server._mcp_server.instructions = guidance.INSTRUCTIONS
-        server.remove_tool("weave_help")
-        server.add_tool(
-            guidance.weave_help,
-            name="weave_help",
-            description=(
-                "Explain structural, revision, checkpoint, project supervision, "
-                "merge queues, merge trains, test definitions, strict test runs, "
-                "explicit test batches, test impact plans, virtual candidate "
-                "qualification, tested-merge attestations, revision evidence graphs, "
-                "revisioned task contracts, scoped edits, immutable reverts, selected "
-                "preflight, resume, validation, build, verified database backup, "
-                "artifact storage, and runtime identity workflows."
-            ),
-        )
+        install_context_guidance(context, guidance)
         if canonical:
+            finalize_registered_application_tools(
+                context,
+                registration_server,
+                local_contract_names=("weave_help",),
+            )
             bind_registered_application_tools(context)
         return capability_manifest(ordered)
 
