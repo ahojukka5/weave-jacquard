@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 
 CORE_TOOL_NAMES: tuple[str, ...] = (
+    "weave_help",
     "grammar_help",
     "project_initialize",
     "branch_create",
@@ -49,7 +50,7 @@ def _clone_tool_model(name: str, tool: Any) -> Any:
         ) from exc
     if clone is tool:
         raise FastMCPRegistryError(
-            f"foundational MCP tool {name!r} reused its transferred object"
+            f"foundational MCP tool {name!r} reused its shared object"
         )
     if getattr(clone, "fn", None) is not getattr(tool, "fn", None):
         raise FastMCPRegistryError(
@@ -60,27 +61,27 @@ def _clone_tool_model(name: str, tool: Any) -> Any:
 
 def install_context_core_tools(
     context: ApplicationContext,
+    registration_server: Any,
 ) -> tuple[str, ...]:
-    """Replace transferred foundational tools with application-local models."""
+    """Install foundational tools as application-local models."""
 
-    adapter = FastMCPRegistryAdapter(context.server)
-    source_objects = dict(adapter.tool_objects())
+    source = FastMCPRegistryAdapter(registration_server)
+    source_objects = source.tool_objects()
     selected = tuple(name for name in CORE_TOOL_NAMES if name in source_objects)
     if not selected:
         raise FastMCPRegistryError(
             "canonical application registry contains no foundational MCP tools"
         )
-    selected_names = set(selected)
 
-    adapter.replace_tools_from(
-        context.server,
-        transform=lambda name, tool: (
-            _clone_tool_model(name, tool) if name in selected_names else tool
-        ),
+    target = FastMCPRegistryAdapter(context.server)
+    installed = target.install_tools_from(
+        registration_server,
+        selected,
+        transform=_clone_tool_model,
     )
+    installed_objects = target.tool_objects()
 
-    installed_objects = adapter.tool_objects()
-    for name in selected:
+    for name in installed:
         if installed_objects[name] is source_objects[name]:
             raise FastMCPRegistryError(
                 f"foundational MCP tool {name!r} was not made application-local"
@@ -93,12 +94,7 @@ def install_context_core_tools(
             raise FastMCPRegistryError(
                 f"foundational MCP tool {name!r} lost its canonical callable"
             )
-    for name in source_objects.keys() - selected_names:
-        if installed_objects[name] is not source_objects[name]:
-            raise FastMCPRegistryError(
-                f"extension MCP tool {name!r} changed during core localization"
-            )
-    return selected
+    return installed
 
 
 __all__ = [
