@@ -1,9 +1,14 @@
 # Typed runtime configuration and service ownership
 
-Jacquard's production MCP application captures supported process configuration once
-and owns shared services through an explicit runtime container. Startup
-configuration, service identity, dependency ownership, and shutdown behavior remain
-stable for the life of one server process.
+Jacquard composes each MCP application from one immutable `RuntimeConfig`, one
+`RuntimeServices` container, and one application-local FastMCP server. The
+`ApplicationContext` retained by `JacquardApp` is the ownership boundary: it selects
+the exact runtime used during capability installation and public tool execution.
+
+Production capability modules declare tools and runtime-backed service factories.
+They do not select a process runtime, scan `sys.modules`, or mutate previously
+imported modules. Context-owned installers perform the small amount of ordered
+composition work that must occur for an exact application.
 
 ## Immutable configuration snapshot
 
@@ -29,242 +34,163 @@ validated during snapshot creation. Paths and executable selections are stored a
 typed values, while an immutable mapping of explicitly configured string values is
 retained for redacted runtime identity.
 
-Changing `os.environ` after the snapshot exists does not reconfigure a running
-server. Operators restart the process to apply configuration changes. This prevents
-lazily created services from observing different generations of environment state.
+Changing `os.environ` after the snapshot exists does not reconfigure that runtime.
+Operators create a new application runtime or restart the process to apply supported
+configuration changes. Lazily created services therefore cannot observe different
+generations of startup state.
 
-The application manifest binds variable names only. `runtime_identity` reads the
-same startup snapshot and publishes domain-separated opaque value IDs without
-revealing paths or values.
+Standalone constructors and command-line embedding boundaries may still accept
+explicit arguments or their documented local fallbacks. They are not production MCP
+service composition and are not silently attached to an application runtime.
 
-## Runtime-owned service registry
+## Application-owned runtime container
 
-`RuntimeServices` owns the roots of the production graph:
+`RuntimeServices` owns or deterministically supplies every production service. Its
+roots are:
 
 - the race-safe `SExpressionWorkspace` and SQLite connection;
-- the quota-capable committed-build `CompilerBridge`.
+- the quota-capable committed-build `CompilerBridge`;
+- the immutable `RuntimeConfig` used by every configured dependent.
 
-It also supplies a named lazy-service registry. The `runtime_service()` decorator
-moves a no-argument production factory into that registry while retaining the
-historical callable, `cache_clear()`, and `cache_info()` surface expected by existing
-qualification code.
+The `runtime_service()` decorator exposes stable no-argument proxy functions while
+placing object identity, dependency tracking, invalidation, and shutdown in the
+selected `RuntimeServices` container. The historical `cache_clear()` and
+`cache_info()` attributes remain narrow compatibility adapters; they are not the
+application lifecycle API.
 
-The foundational build, merge, read, and recovery graph includes:
+The complete graph includes:
 
-```text
-workspace
-├── edit_batches
-├── branch_activity
-├── revision_inspection
-├── revision_diffs
-├── revision_reads
-├── database_backups
-├── merge_previews
-│   └── reverts
-└── build_targets
-    ├── build_target_validator
-    ├── merge_impacts
-    └── merge_validations
-        └── merge_validation_sets
-
-compiler_bridge
-├── build_inspection
-└── build_discovery
-```
-
-The committed-revision behavioral-test graph is runtime-owned:
-
-```text
-workspace
-└── test_targets
-    ├── test_target_pages
-    ├── test_runs
-    │   └── test_batches
-    └── test_impact_plans
-```
-
-The task and agent-continuity graph is runtime-owned as well:
-
-```text
-workspace
-├── task_contracts
-│   └── task_scoped_batches
-└── agent_checkpoints
-    ├── checkpoint_timelines
-    └── project_agent_statuses
-```
-
-Merge review and restart orientation belong to the same graph:
-
-```text
-workspace
-└── merge_policies
-    ├── merge_preflights
-    └── resume_snapshots
-```
-
-Virtual-candidate qualification and attestation are runtime-owned too:
-
-```text
-merge_previews
-├── merge_candidate_builds
-│   ├── merge_candidate_build_inspection
-│   └── merge_candidate_test_batches
-└── merge_test_impact_plans
-
-merge_candidate_test_batches
-└── tested_merge_attestations
-```
-
-Aggregate retained-artifact accounting and quota attachment are runtime-owned:
-
-```text
-artifact_storage
-└── artifact_quota
-```
-
-`artifact_storage` depends on the committed and virtual-candidate build roots,
-committed test runs and batches, candidate test qualifications, tested-merge
-attestations, and database backups. `artifact_quota` depends on that accounting
-service, the workspace, and every retained publisher because it attaches one shared
-quota guard to each publisher.
-
-Project merge orchestration and explicit selected-source workflows are runtime-owned:
-
-```text
-project_merge_queues
-├── project_merge_impact_queues
-├── selected_merge_train_previews
-└── selected_merge_preflight_batches
-```
-
-`project_merge_queues` depends on `merge_previews` and
-`project_agent_statuses`. `project_merge_impact_queues` additionally depends on
-`merge_impacts` and `merge_policies`. `selected_merge_preflight_batches`
-additionally depends on `merge_preflights`.
-
-Retained revision-evidence discovery is runtime-owned:
-
-```text
-workspace
-└── revision_evidence
-```
-
-`revision_evidence` additionally depends on the compiler bridge, committed test runs
-and batches, virtual-candidate test qualifications, and tested-merge attestations.
-It captures publisher roots and verifier callables without scanning artifacts during
-composition.
-
-`merge_candidate_builds` additionally depends on `build_targets` and
-`compiler_bridge`. `merge_candidate_test_batches` also depends on `test_targets`,
-and `merge_test_impact_plans` depends on `build_targets` and `test_targets`.
-`tested_merge_attestations` additionally declares its direct workspace dependency.
-`merge_preflights` additionally depends on `merge_impacts` and
-`merge_validation_sets`. `resume_snapshots` additionally depends on
-`build_targets`, `agent_checkpoints`, `test_targets`, and `task_contracts`.
-`test_runs` additionally depends on `workspace`, `build_targets`, and
-`compiler_bridge`. `test_batches` additionally declares its direct workspace
-dependency, and `test_impact_plans` also depends on `workspace` and `build_targets`.
-`task_scoped_batches` additionally depends on `edit_batches`. `reverts` similarly
-declares its direct workspace dependency.
+- edit batches, branch activity, revision inspection, diffs, and pinned reads;
+- stable-ID revert composition and verified database backups;
+- build targets, validation, inspection, and verified discovery;
+- merge preview, impact, validation, policy, preflight, and resume snapshots;
+- committed-revision test definitions, execution, batches, and impact planning;
+- task contracts, task-scoped batches, checkpoints, timelines, and project status;
+- virtual-candidate builds, diagnostics, tests, and tested-merge attestations;
+- artifact accounting, quota attachment, and retained revision evidence;
+- project merge queues, impact queues, merge-train previews, and preflight batches;
+- production runtime identity.
 
 Factories are created lazily under one reentrant lock. Nested factory calls record
-dependency edges automatically, while declared dependencies document edges before a
-service is materialized. Repeated calls return the same object identity.
+edges automatically, and declared dependencies describe the graph before first use.
+Repeated calls in one runtime return the same object identity. Two runtimes may
+materialize the same service names independently with different databases and
+artifact roots.
 
-## Stable production proxies
+## Explicit capability installation
 
-`mcp_server.workspace` is now a stable runtime-backed function from its first import.
-`mcp_build.workspace` and `mcp_concurrent_nodes.workspace` reference that same
-function object. The committed compiler factory is similarly a stable proxy to the
-container-owned compiler bridge.
+`install_public_capabilities()` validates the ordered `PUBLIC_CAPABILITIES` graph and
+runs inside `bind_application_runtime(context.runtime)`. For each capability it:
 
-Production capability installation no longer scans or mutates `sys.modules`, swaps
-previously imported workspace bindings, or clears an ad hoc list of build caches.
-The first capability only ensures that the immutable process runtime exists. Tool
-names and schemas are unchanged.
+1. imports the declaration module;
+2. invokes the exact context-owned production installer when one is registered;
+3. otherwise invokes a custom installer only when it accepts exactly one
+   `ApplicationContext`;
+4. clones that capability's declared tool models onto `context.server`;
+5. installs final application-local guidance;
+6. finalizes and binds the exact application tool set.
 
-FastMCP registry and registered-tool metadata compatibility is isolated in
-`fastmcp_registry.py`. Runtime and application composition modules consume the
-adapter's captured contracts rather than reading SDK-private registry fields
-independently.
+The production installer table is immutable and keyed by both capability name and
+module name. Installers verify that the selected runtime is the runtime retained by
+the context. Their cache invalidation and quota attachment affect only that runtime.
+Repeated composition is deterministic and preserves public tool names and schemas.
 
-The standalone service classes and `weave-build` CLI remain explicit embedding
-boundaries. They may use constructor arguments or documented legacy fallbacks; they
-are not silently attached to the MCP process runtime.
+The canonical decorated server remains a source catalog for tool declarations. It is
+not the running application's ownership boundary. Production tools are installed
+onto the selected `context.server`, and incomplete explicit assembly fails closed.
 
-## Dependency-aware lifecycle
+## Scoped runtime selection
 
-The process runtime follows this lifecycle:
+`bind_application_runtime()` selects one `RuntimeServices` instance for the current
+execution context and inherited child tasks, then restores the previous selection.
+Application-local tool wrappers perform that binding for complete synchronous or
+asynchronous invocations.
+
+This allows two complete applications in one process to execute against different
+SQLite databases and retained-artifact roots without changing the process-default
+runtime or contaminating each other's lazy-service caches. Nested calls in the same
+runtime remain reentrant.
+
+A process-default runtime remains available for the exported public application and
+legacy embedding adapters. Tests and additional applications should pass and bind an
+explicit `RuntimeServices` instance instead of rewriting private process globals or
+clearing unrelated module caches.
+
+## Dependency-aware invalidation and shutdown
+
+One application runtime follows this lifecycle:
 
 ```text
 capture RuntimeConfig
 → create RuntimeServices
-→ lazily create named services
-→ record service dependencies
-→ serve MCP requests
+→ compose ApplicationContext
+→ install capabilities and application-local tools
+→ lazily materialize named services
+→ bind the runtime for each tool invocation
 → close realized services in reverse dependency order
 ```
 
-The container derives close order from service dependencies, not only from creation
-order. Dependents therefore close before the resources they use even when a declared
-dependency was materialized later. Duplicate object identities are closed only once.
-Closing is idempotent, clears owned references, and rejects later access through the
-closed container.
+The container derives close order from service dependencies, not merely creation
+order. Dependents close before resources they use, duplicate object identities close
+once, and repeated `close()` calls are harmless. A closed runtime rejects later
+service access.
 
-Clearing one named dependency also clears every realized dependent recorded in the
-graph. Clearing any retained publisher invalidates aggregate accounting, quota
-attachment, and revision-evidence discovery where applicable. A rebuilt publisher
-therefore cannot remain attached to a stale guard or verifier graph. Clearing project
-merge queues invalidates impact queues, selected merge-train previews, and selected
-preflight batches. Clearing the compiler bridge cannot leave runtime-owned build,
-virtual-candidate build, inspection, test-execution, accounting, quota, or revision-
-evidence services holding the discarded bridge. Clearing the workspace also
-invalidates revision reads, revert composition, database backups, behavioral-test
-services, task services, checkpoint services, merge policies, preflight composition,
-resume snapshots, virtual-candidate qualification, tested-merge attestations,
-artifact accounting, quota attachment, project merge orchestration, selected-source
-workflows, retained revision evidence, project agent-status pages, and their
-transitive runtime-owned dependencies. Replacing the process container closes the
-previous container before the replacement is used.
+Clearing one named service also clears every realized dependent. Publisher
+replacement therefore invalidates artifact accounting, quota attachment, and
+revision-evidence services that captured it. Clearing the compiler bridge invalidates
+all bridge-dependent build and test services. Clearing the workspace invalidates its
+entire transitive application graph.
 
-`workspace.cache_clear()` remains the compatibility operation that closes and resets
-the entire process runtime. `compiler_bridge.cache_clear()` clears the bridge and
-its runtime-owned dependents while preserving the workspace.
+Application owners close `context.runtime`; they do not enumerate module caches.
+Closing one application runtime does not close or reset another runtime in the same
+process.
+
+## Stable production proxies
+
+`mcp_server.workspace`, `mcp_build.workspace`, and
+`mcp_concurrent_nodes.workspace` reference the same stable runtime-backed proxy.
+The committed compiler bridge and all migrated service factories follow the same
+model.
+
+Production capability installation does not:
+
+- scan or mutate `sys.modules`;
+- replace imported service bindings;
+- reread supported startup variables;
+- clear a hand-maintained cross-module cache list;
+- transfer a shared registry into the running server.
+
+All FastMCP private-registry compatibility is isolated in `fastmcp_registry.py` and
+the focused application tool-registration adapters. Other production composition
+modules consume validated adapter operations instead of reading SDK-private fields.
 
 ## Service-graph identity
 
 `RuntimeServices.service_manifest()` returns
 `weave-jacquard-runtime-service-graph-v1` evidence containing:
 
-- each known service name;
+- every known service name;
 - its factory origin;
 - deterministic dependency names;
 - the complete service count;
 - a content-derived `service_graph_id`.
 
-Decorator declarations are registered when their modules are composed. The graph ID
-therefore describes service composition and does not change merely because another
-lazy service is used for the first time. Optional state evidence reports the current
-`initialized_services` and `initialized_service_count` separately and is excluded
-from the graph hash.
+Lazy initialization state is optional diagnostic evidence and is excluded from the
+graph hash. The public `runtime_identity` report includes the state-free service
+graph and recomputes `runtime_id` from the exact application, tool, configuration,
+compiler, database, sandbox, and service-composition evidence.
 
-The production `runtime_identity` report includes the state-free graph manifest and
-recomputes its `runtime_id` over that stable composition evidence. Filesystem paths,
-configured values, and incidental lazy-initialization order are not included in the
-service graph.
+Filesystem paths, configured values, and incidental first-use order are not exposed
+in the service graph. Configured values appear only as domain-separated opaque IDs.
 
-Every production service factory is now represented in the typed runtime graph. The
-remaining issue #106 work concerns explicit per-application context and isolation,
-not untracked service ownership or SDK registry access.
+## Contributor invariants
 
-## Remaining issue #106 work
-
-The typed container deterministically supplies the complete production service
-graph, and FastMCP private-registry compatibility is isolated behind one adapter.
-
-Follow-up work must pass an explicit runtime/application context through capability
-installation, replace remaining process-global installation assumptions, and prove
-that two complete applications with different databases and artifact roots can
-coexist in one process without cross-contamination. Final fixture cleanup and
-documentation should then describe that completed application ownership model.
+- Add production services through `RuntimeServices` and declare dependencies.
+- Read supported MCP configuration only through `RuntimeConfig`.
+- Install production capabilities through an exact `ApplicationContext`.
+- Register running tools on `context.server`, never by mutating a shared live server.
+- Bind the retained runtime for every application-local tool invocation.
+- Close only runtimes and resources owned by the current application or test.
+- Keep standalone constructors explicit and separate from MCP composition.
+- Treat service-graph, tool-contract, and application identity changes as reviewed
+  compatibility changes.
