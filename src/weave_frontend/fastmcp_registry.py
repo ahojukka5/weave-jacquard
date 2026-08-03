@@ -111,55 +111,34 @@ class FastMCPRegistryAdapter:
             self._rollback(target_registry, previous, exc)
         return selected
 
-    def synchronize_tools_from(self, source_server: Any) -> tuple[str, ...]:
-        """Match a source registry while retaining compatible target objects."""
+    def retain_tools(self, names: Iterable[str]) -> tuple[str, ...]:
+        """Remove every registry entry outside one verified retained name set."""
 
-        source = FastMCPRegistryAdapter(source_server)
-        source_registry = source._registry()
-        source_snapshot = source._snapshot()
-        names = tuple(sorted(source_snapshot))
-        source_contracts = {
-            name: self._tool_contract(name, source_snapshot[name])
-            for name in names
-        }
-
+        selected = self._selected_names(names)
         target_registry = self._mutable_registry()
-        if target_registry is source_registry:
-            return names
         previous = self._snapshot(allow_empty=True)
-        replacement: dict[str, Any] = {}
-        for name in names:
-            existing = previous.get(name)
-            if existing is not None:
-                existing_contract = self._tool_contract(name, existing)
-                if existing_contract == source_contracts[name]:
-                    replacement[name] = existing
-                    continue
-            replacement[name] = source_snapshot[name]
+        missing = tuple(name for name in selected if name not in previous)
+        if missing:
+            raise FastMCPRegistryError(
+                f"FastMCP target registry is missing retained tools {missing!r}"
+            )
+        replacement = {name: previous[name] for name in selected}
 
         try:
             target_registry.clear()
             target_registry.update(replacement)
-            installed = self._snapshot()
-            if set(installed) != set(source_snapshot):
+            installed = self._snapshot(allow_empty=not selected)
+            if tuple(sorted(installed)) != selected:
                 raise FastMCPRegistryError(
-                    "FastMCP synchronized registry did not preserve the complete tool set"
+                    "FastMCP target registry did not preserve the retained tool set"
                 )
-            if any(installed[name] is not replacement[name] for name in names):
+            if any(installed[name] is not replacement[name] for name in selected):
                 raise FastMCPRegistryError(
-                    "FastMCP synchronized registry changed selected tool objects"
-                )
-            installed_contracts = {
-                name: self._tool_contract(name, installed[name])
-                for name in names
-            }
-            if installed_contracts != source_contracts:
-                raise FastMCPRegistryError(
-                    "FastMCP synchronized registry changed canonical tool contracts"
+                    "FastMCP target registry changed a retained tool object"
                 )
         except Exception as exc:
             self._rollback(target_registry, previous, exc)
-        return names
+        return selected
 
     def replace_tools_from(
         self,
