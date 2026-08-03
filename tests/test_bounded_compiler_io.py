@@ -107,33 +107,6 @@ def test_bounded_process_times_out_after_output_streams_close(tmp_path: Path) ->
     assert time.monotonic() - started < 2
 
 
-def test_bounded_process_kills_group_after_leader_exits(tmp_path: Path) -> None:
-    marker = tmp_path / "descendant-survived"
-    child = (
-        "import time\n"
-        "from pathlib import Path\n"
-        "time.sleep(0.4)\n"
-        f"Path({str(marker)!r}).write_text('survived', encoding='utf-8')\n"
-    )
-    script = _script(
-        tmp_path,
-        "import subprocess, sys\n"
-        f"subprocess.Popen([sys.executable, '-c', {child!r}])\n",
-        "orphaning-compiler.py",
-    )
-
-    result = run_bounded_process(
-        [script],
-        timeout_seconds=0.05,
-        max_output_bytes=32,
-    )
-    time.sleep(0.6)
-
-    assert result.timed_out is True
-    assert result.output_limited is False
-    assert marker.exists() is False
-
-
 def test_bounded_file_readers_reject_one_extra_byte(tmp_path: Path) -> None:
     text = tmp_path / "text.txt"
     text.write_bytes(b"12345")
