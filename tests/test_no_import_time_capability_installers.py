@@ -12,6 +12,7 @@ _CONTEXT_OWNED_CAPABILITY_MODULES = (
     "mcp_revert.py",
     "mcp_database_backup.py",
     "mcp_artifact_storage.py",
+    "mcp_runtime_identity.py",
 )
 
 

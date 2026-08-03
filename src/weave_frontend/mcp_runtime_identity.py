@@ -54,12 +54,6 @@ def runtime_identities() -> RuntimeIdentityWithServices:
     )
 
 
-def install_capability() -> None:
-    """Discard stale runtime identity evidence during recomposition."""
-
-    runtime_identities.cache_clear()
-
-
 @mcp.tool()
 def runtime_identity() -> dict[str, Any]:
     """Report exact runtime identity with configuration values redacted."""
