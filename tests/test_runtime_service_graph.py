@@ -226,12 +226,11 @@ def test_two_containers_supply_isolated_named_services(tmp_path: Path) -> None:
 
 
 def test_foundational_factories_are_stable_runtime_proxies_without_module_scan() -> None:
-    concurrent_nodes.install_capability()
-
     assert server_module.workspace is concurrent_nodes.workspace
     assert build_module.workspace is concurrent_nodes.workspace
     assert build_module.compiler_bridge is concurrent_nodes.compiler_bridge
-    assert "sys.modules" not in inspect.getsource(concurrent_nodes.install_capability)
+    assert not hasattr(concurrent_nodes, "install_capability")
+    assert "sys.modules" not in inspect.getsource(concurrent_nodes)
     assert "os.environ" not in inspect.getsource(server_module.workspace)
     assert "lru_cache" not in inspect.getsource(build_module.edit_batches)
 
