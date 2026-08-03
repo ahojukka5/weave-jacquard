@@ -13,7 +13,7 @@ issue #106.
 
 ## Composition model
 
-`JacquardApp.compose()` now follows this sequence:
+`JacquardApp.compose()` follows this sequence:
 
 ```text
 select or create RuntimeServices
@@ -50,14 +50,14 @@ The production table covers:
 - runtime-identity invalidation.
 
 Production composition consults this table before looking at a module-local
-`install_capability` function. The historical zero-argument hooks therefore are not
-part of the public application composition path, even when their modules were already
-cached before composition.
+`install_capability` function. The historical zero-argument production hooks therefore
+are not part of the public application composition path, even when their modules were
+already cached before composition.
 
-A generic compatibility dispatcher remains for non-production/custom capability
-modules. It supports the prior zero-argument form temporarily, while context-aware
-custom installers may accept exactly one `ApplicationContext`. Ambiguous and variadic
-signatures fail closed.
+A custom capability module may expose `install_capability`, but the function must
+accept exactly one `ApplicationContext`. Positional and keyword-only context parameters
+are supported. Zero-argument, variadic, and multi-argument signatures fail closed
+before final guidance or tool registration mutates the application server.
 
 ## Tool registration ownership
 
@@ -91,21 +91,20 @@ Every cloned public tool contains an asynchronous wrapper around its original
 callable. The wrapper selects `context.runtime` before invoking the original function
 and retains that selection until any returned awaitable completes.
 
-The current runtime container still exposes a process-global selector. To prevent two
-overlapping requests from overwriting it, wrappers use one process-wide asynchronous
-gate. The gate:
+Runtime selection is task-local through a `ContextVar`. Independent asynchronous tasks
+may bind different application runtimes and execute concurrently without observing one
+another's configuration or services. Nested bindings restore the previous runtime after
+normal return, failure, or cancellation, and synchronous callers use the same scoped
+context-manager contract.
 
-- serializes public tool execution across application runtimes;
-- permits nested calls that retain the same application runtime;
-- rejects a nested call that attempts to switch runtimes;
-- restores the previous process runtime after success, failure, or cancellation;
-- supports both synchronous and asynchronous original tool functions.
+A child task inherits the runtime that was selected when the task was created. The
+application owner must keep that runtime open until inherited child work has completed.
+Resolving services through an inherited binding after its runtime has closed fails with
+`RuntimeClosedError` rather than falling back to the process-default container.
 
-This is an isolation compatibility layer, not the final concurrency architecture.
-Overlapping requests are safe but execute one at a time while the process-global
-runtime selector remains. A later runtime-container change should replace the selector
-with task-local state, after which this gate can be removed and tools from independent
-applications can execute in parallel.
+Outside an application binding, runtime accessors continue to resolve the process
+default. Process lifecycle operations replace or close only that default container;
+they do not mutate an application runtime selected in another task.
 
 ## Runtime ownership
 
@@ -123,16 +122,16 @@ container.
 
 Follow-up work must:
 
-- replace the process-global runtime selector with task-local runtime state and remove
-  the serialized request gate;
 - replace import-time registration onto the historical server with direct
   context-server registration, then remove the registry-transfer adapter;
-- remove historical module-local installer calls and the custom zero-argument
-  compatibility dispatcher;
+- remove historical module-local production installer calls and remaining import-time
+  production mutation;
 - construct two complete applications with different databases and artifact roots in
   one process and prove parallel tools, services, manifests, and shutdown do not
   cross-contaminate;
-- simplify fixtures once process-global cache clearing is no longer required.
+- simplify fixtures once process-global cache clearing is no longer required;
+- update the final runtime ownership documentation after the migration boundary is
+  removed.
 
 Public MCP tool names, schemas, result contracts, application-manifest formats, and
 persisted data formats remain unchanged during this migration.
