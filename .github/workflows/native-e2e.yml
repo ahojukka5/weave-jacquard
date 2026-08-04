@@ -1,4 +1,4 @@
-name: Packaged weavec native E2E
+name: Pinned weavec native E2E
 
 on:
   push:
@@ -14,24 +14,25 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  WEAVEC_RELEASE: v0.3.0
+  WEAVEC_REPOSITORY: ahojukka5/weavec
+  WEAVEC_COMMIT: f5c1196b3a75c0b2721b3bd753edbcc8d1388244
 
 jobs:
   native-qualification:
-    name: Packaged compiler qualification
+    name: Pinned compiler qualification
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 60
 
     steps:
       - name: Check out Jacquard
         uses: actions/checkout@v4
 
       - name: Set up job-local scratch directories
-        # Job-level env: can't reference the runner context, so these are
-        # set here instead of in the job's env: block above.
+        # Job-level env cannot reference the runner context, so these are
+        # published here instead of in the job's env block.
         run: |
           echo "QUALIFICATION_DIR=${{ runner.temp }}/jacquard-native-qualification" >> "$GITHUB_ENV"
-          echo "COMPILER_STAGE=${{ runner.temp }}/jacquard-weavec-release" >> "$GITHUB_ENV"
+          echo "COMPILER_STAGE=${{ runner.temp }}/jacquard-weavec-provider" >> "$GITHUB_ENV"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -44,7 +45,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e '.[dev]'
 
-      - name: Install native and sandbox runtimes
+      - name: Install native, compiler, and sandbox runtimes
         run: |
           sudo apt-get update
           sudo apt-get install -y bubblewrap clang file llvm
@@ -55,91 +56,88 @@ jobs:
             sudo sysctl -w kernel.unprivileged_userns_clone=1
           fi
 
-      - name: Resolve immutable weavec release assets
-        id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Build and verify exact weavec provider
         run: |
           set -euo pipefail
           mkdir -p "$COMPILER_STAGE"
-          gh api "repos/ahojukka5/weavec/releases/tags/$WEAVEC_RELEASE" \
-            > "$COMPILER_STAGE/release-metadata.json"
+          source_root="$COMPILER_STAGE/source"
+          git init "$source_root"
+          git -C "$source_root" remote add origin \
+            "https://github.com/$WEAVEC_REPOSITORY.git"
+          git -C "$source_root" fetch --depth=1 origin "$WEAVEC_COMMIT"
+          git -C "$source_root" checkout --detach FETCH_HEAD
+          actual_commit="$(git -C "$source_root" rev-parse HEAD)"
+          test "$actual_commit" = "$WEAVEC_COMMIT"
 
-          python - <<'PY'
+          (
+            cd "$source_root"
+            ./build.sh
+          )
+
+          compiler_path="$source_root/build/weavec"
+          test -x "$compiler_path"
+          command -v clang
+          command -v llvm-as
+          file "$compiler_path"
+          "$compiler_path" capabilities --json \
+            > "$COMPILER_STAGE/capabilities.json"
+          printf 'WEAVEC_BIN=%s\n' "$compiler_path" >> "$GITHUB_ENV"
+
+          WEAVEC_BIN="$compiler_path" python - <<'PY'
+          import hashlib
           import json
           import os
           from pathlib import Path
 
           stage = Path(os.environ["COMPILER_STAGE"])
-          release = json.loads(
-              (stage / "release-metadata.json").read_text(encoding="utf-8")
-          )
-          assets = release.get("assets", [])
-          archives = [
-              asset
-              for asset in assets
-              if asset["name"].endswith("-linux-x86_64-glibc.tar.gz")
-          ]
-          checksums = [asset for asset in assets if asset["name"] == "SHA256SUMS"]
-          assert len(archives) == 1, [asset["name"] for asset in assets]
-          assert len(checksums) == 1, [asset["name"] for asset in assets]
+          compiler = Path(os.environ["WEAVEC_BIN"])
+          capabilities_path = stage / "capabilities.json"
+          capabilities_bytes = capabilities_path.read_bytes()
+          capabilities = json.loads(capabilities_bytes)
+          assert capabilities["format"] == "weavec-capabilities-v1"
+          assert capabilities["compiler"]["public_variant"] == "final"
+          assert capabilities["language"]["wir_core_version"] == 2
 
-          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as stream:
-              stream.write(f"archive_name={archives[0]['name']}\n")
-              stream.write(f"archive_url={archives[0]['browser_download_url']}\n")
-              stream.write(f"checksum_url={checksums[0]['browser_download_url']}\n")
+          metadata = {
+              "format": "weave-jacquard-weavec-provider-v1",
+              "repository": os.environ["WEAVEC_REPOSITORY"],
+              "commit": os.environ["WEAVEC_COMMIT"],
+              "compiler_sha256": hashlib.sha256(compiler.read_bytes()).hexdigest(),
+              "compiler_bytes": compiler.stat().st_size,
+              "capabilities_sha256": hashlib.sha256(capabilities_bytes).hexdigest(),
+              "capabilities_bytes": len(capabilities_bytes),
+              "capabilities_format": capabilities["format"],
+              "compiler_version": capabilities["compiler"]["version"],
+              "surface_version": capabilities["language"]["surface_version"],
+              "grammar_id": capabilities["language"]["grammar_id"],
+              "wir_core_version": capabilities["language"]["wir_core_version"],
+              "default_target": capabilities["targets"]["default"],
+          }
+          (stage / "provider-metadata.json").write_text(
+              json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
           PY
-
-      - name: Download and verify packaged weavec
-        env:
-          ARCHIVE_NAME: ${{ steps.release.outputs.archive_name }}
-          ARCHIVE_URL: ${{ steps.release.outputs.archive_url }}
-          CHECKSUM_URL: ${{ steps.release.outputs.checksum_url }}
-        run: |
-          set -euo pipefail
-          mkdir -p "$COMPILER_STAGE/dist" "$COMPILER_STAGE/compiler"
-          curl --fail --location --retry 3 \
-            "$ARCHIVE_URL" \
-            --output "$COMPILER_STAGE/dist/$ARCHIVE_NAME"
-          curl --fail --location --retry 3 \
-            "$CHECKSUM_URL" \
-            --output "$COMPILER_STAGE/dist/SHA256SUMS"
-
-          grep -F " $ARCHIVE_NAME" "$COMPILER_STAGE/dist/SHA256SUMS" \
-            > "$COMPILER_STAGE/dist/GLIBC-SHA256SUM"
-          (
-            cd "$COMPILER_STAGE/dist"
-            sha256sum --check GLIBC-SHA256SUM
-          )
-
-          tar -C "$COMPILER_STAGE/compiler" \
-            -xzf "$COMPILER_STAGE/dist/$ARCHIVE_NAME"
-          compiler_path="$(
-            find "$COMPILER_STAGE/compiler" \
-              -type f -path '*/bin/weavec' -print -quit
-          )"
-          test -n "$compiler_path"
-          test -x "$compiler_path"
-          command -v clang
-          command -v llvm-as
-          file "$compiler_path"
-          printf 'WEAVEC_BIN=%s\n' "$compiler_path" >> "$GITHUB_ENV"
 
       - name: Run unified native qualification
         run: bash scripts/qualify-release.sh native "$QUALIFICATION_DIR"
 
       - name: Upload qualification evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: jacquard-native-qualification
           path: ${{ env.QUALIFICATION_DIR }}
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
 
-      - name: Upload compiler release metadata
+      - name: Upload compiler provider metadata
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: jacquard-weavec-release-metadata
-          path: ${{ env.COMPILER_STAGE }}/release-metadata.json
+          name: jacquard-weavec-provider-metadata
+          path: |
+            ${{ env.COMPILER_STAGE }}/provider-metadata.json
+            ${{ env.COMPILER_STAGE }}/capabilities.json
           if-no-files-found: error
           retention-days: 7
