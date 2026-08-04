@@ -35,6 +35,9 @@ def test_distribution_and_entry_points_use_jacquard_name() -> None:
         "weave-artifact-reconcile": (
             "weave_frontend.artifact_reconciliation_cli:main"
         ),
+        "weave-artifact-retention-plan": (
+            "weave_frontend.artifact_retention_cli:main"
+        ),
     }
 
 
