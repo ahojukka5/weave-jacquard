@@ -2,15 +2,71 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
+from .compiler_capabilities import (
+    CapabilityAwareWeavecValidator,
+    CapabilityGrammarIndex,
+    WeavecCapabilities,
+)
 from .concurrent_workspace import SExpressionWorkspace as _ConcurrentWorkspace
 from .errors import NotFoundError, ValidationError
 from .snapshot_codec import SnapshotIntegrityError, load_revision_state
+from .weavec import WeavecValidator
 
 
 class SExpressionWorkspace(_ConcurrentWorkspace):
     """Race-safe workspace that verifies every loaded immutable revision state."""
+
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        weavec_source_root: str | Path | None = None,
+        weavec_binary: str | Path | None = None,
+    ) -> None:
+        self._validator: Any
+        super().__init__(
+            path,
+            weavec_source_root=weavec_source_root,
+            weavec_binary=weavec_binary,
+        )
+        self.capabilities = WeavecCapabilities(
+            weavec_binary,
+            source_root=weavec_source_root,
+        )
+        self.grammar = CapabilityGrammarIndex(
+            weavec_source_root,
+            capabilities=self.capabilities,
+        )
+        self.validator = self._validator
+
+    @property
+    def validator(self) -> Any:
+        return self._validator
+
+    @validator.setter
+    def validator(self, value: Any) -> None:
+        """Keep production compiler validators behind the capability handshake."""
+
+        capabilities = getattr(self, "capabilities", None)
+        if (
+            capabilities is None
+            or isinstance(value, CapabilityAwareWeavecValidator)
+            or not isinstance(value, WeavecValidator)
+        ):
+            self._validator = value
+            return
+        self._validator = CapabilityAwareWeavecValidator(
+            value._configured_binary,
+            value.source_root,
+            capabilities=capabilities,
+            timeout_seconds=value.timeout_seconds,
+            max_output_bytes=value.max_output_bytes,
+            max_wir_bytes=value.max_wir_bytes,
+            environment_fallback=value.environment_fallback,
+        )
 
     def _state_at_revision(self, revision_id: str) -> dict[str, dict[str, Any]]:
         row = self.db.connection.execute(
