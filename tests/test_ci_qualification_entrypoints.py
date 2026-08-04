@@ -40,8 +40,14 @@ def test_native_ci_delegates_to_release_qualification() -> None:
     assert "python -m pytest" not in workflow
     assert "qualification-summary.json" not in workflow
     assert "bubblewrap clang file llvm" in workflow
-    # Job-level env: can't reference the runner context, so this is set via
-    # GITHUB_ENV in a step instead of a literal `COMPILER_STAGE: ...` env line.
-    assert 'COMPILER_STAGE=${{ runner.temp }}/jacquard-weavec-release' in workflow
-    assert '> "$COMPILER_STAGE/release-metadata.json"' in workflow
+    # Job-level env cannot reference runner.temp, so scratch roots are exported
+    # through GITHUB_ENV before the exact provider is fetched and built.
+    assert 'COMPILER_STAGE=${{ runner.temp }}/jacquard-weavec-provider' in workflow
+    assert "WEAVEC_REPOSITORY: ahojukka5/weavec" in workflow
+    assert "WEAVEC_COMMIT: f5c1196b3a75c0b2721b3bd753edbcc8d1388244" in workflow
+    assert 'git -C "$source_root" fetch --depth=1 origin "$WEAVEC_COMMIT"' in workflow
+    assert '"$compiler_path" capabilities --json' in workflow
+    assert 'provider-metadata.json' in workflow
+    assert 'capabilities.json' in workflow
+    assert "if: always()" in workflow
     assert "if-no-files-found: error" in workflow

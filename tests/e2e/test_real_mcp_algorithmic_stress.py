@@ -245,7 +245,7 @@ def binary_search_batch16() -> ProgramCase:
             "sdiv i32",
             "call i32 @search16(ptr",
             "getelementptr i8",
-            "phi i32",
+            "load i32, ptr %found.addr",
         ),
     )
 
