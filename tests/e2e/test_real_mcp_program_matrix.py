@@ -109,7 +109,7 @@ def while_accumulator() -> ProgramCase:
             ),
         ),
         source_tokens=("while", "sum", "local_get"),
-        llvm_fragments=("phi i32", "br i1", "add i32"),
+        llvm_fragments=("load i32, ptr %sum.addr", "br i1", "add i32"),
     )
 
 
