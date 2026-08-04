@@ -14,6 +14,9 @@ from .errors import ValidationError
 ARTIFACT_RETENTION_ENTRY_SNAPSHOT_FORMAT = (
     "weave-artifact-retention-entry-snapshot-v1"
 )
+ARTIFACT_RETENTION_RELOCATION_SNAPSHOT_FORMAT = (
+    "weave-artifact-retention-relocation-snapshot-v1"
+)
 MAX_RETENTION_SCAN_ENTRIES = 1_000_000
 MAX_RETENTION_SCAN_DEPTH = 64
 
@@ -41,6 +44,17 @@ class ArtifactRetentionAccountant:
     ) -> tuple[dict[str, Any], int]:
         """Return stable projected logical recovery and remaining scan budget."""
 
+        captured, entries_remaining = self.capture(path, entries_remaining)
+        captured.pop("relocation_snapshot_id")
+        return captured, entries_remaining
+
+    def capture(
+        self,
+        path: Path,
+        entries_remaining: int,
+    ) -> tuple[dict[str, Any], int]:
+        """Return stable accounting plus a rename-invariant snapshot identity."""
+
         first, entries_remaining = self._scan(path, entries_remaining)
         second, entries_remaining = self._scan(path, entries_remaining)
         if first != second:
@@ -48,6 +62,15 @@ class ArtifactRetentionAccountant:
                 "ARTIFACT_RETENTION_ENTRY_CHANGED",
                 "selected entry changed during projected-recovery accounting",
             )
+        root_id = self._relative_id(".")
+        relocation = [
+            (
+                {key: value for key, value in item.items() if key != "ctime_ns"}
+                if item["relative_path_id"] == root_id
+                else item
+            )
+            for item in first
+        ]
         return (
             {
                 "logical_bytes": sum(
@@ -72,6 +95,12 @@ class ArtifactRetentionAccountant:
                     {
                         "format": ARTIFACT_RETENTION_ENTRY_SNAPSHOT_FORMAT,
                         "entries": first,
+                    }
+                ),
+                "relocation_snapshot_id": hash_json(
+                    {
+                        "format": ARTIFACT_RETENTION_RELOCATION_SNAPSHOT_FORMAT,
+                        "entries": relocation,
                     }
                 ),
             },
@@ -149,6 +178,7 @@ class ArtifactRetentionAccountant:
 
 __all__ = [
     "ARTIFACT_RETENTION_ENTRY_SNAPSHOT_FORMAT",
+    "ARTIFACT_RETENTION_RELOCATION_SNAPSHOT_FORMAT",
     "MAX_RETENTION_SCAN_DEPTH",
     "MAX_RETENTION_SCAN_ENTRIES",
     "ArtifactRetentionAccountant",
