@@ -30,6 +30,16 @@ class BuildTargetValidator:
             branch=branch,
             revision_id=revision,
         )
+        capability_identity: dict[str, Any] | None = None
+        capabilities = getattr(self.workspace.validator, "capabilities", None)
+        if capabilities is not None:
+            capability_registry = capabilities.require(
+                command="frontend",
+                protocols=("weave-wir-core-v2",),
+                target=config["compiler_target"],
+            )
+            capability_identity = capability_registry["_jacquard_identity"]
+
         documents = [config["document"], *config["additional_documents"]]
         state = self.workspace._state_at_revision(revision)
 
@@ -65,4 +75,6 @@ class BuildTargetValidator:
                 },
             }
         )
+        if capability_identity is not None:
+            result["compiler_capabilities"] = capability_identity
         return result

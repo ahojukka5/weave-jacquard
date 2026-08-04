@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .errors import ValidationError
 from .mcp_build import compiler_bridge
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_runs import test_runs
@@ -20,7 +21,7 @@ def _application_manifest() -> dict[str, Any]:
 
 
 class RuntimeIdentityWithServices:
-    """Bind the stable typed service composition into normal runtime identity."""
+    """Bind stable service and compiler contracts into normal runtime identity."""
 
     def __init__(self, identity: RuntimeIdentityService) -> None:
         self.identity = identity
@@ -28,6 +29,32 @@ class RuntimeIdentityWithServices:
     def report(self) -> dict[str, Any]:
         result = self.identity.report()
         result.pop("runtime_id", None)
+        compiler_result = result.get("compiler")
+        compiler_service = getattr(self.identity, "compiler", None)
+        if isinstance(compiler_result, dict) and compiler_service is not None:
+            try:
+                registry = compiler_service.capability_registry()
+            except ValidationError as exc:
+                compiler_result["capabilities"] = {
+                    "available": False,
+                    "identity": None,
+                    "error": exc.as_dict(),
+                }
+            except (AttributeError, OSError, ValueError):
+                compiler_result["capabilities"] = {
+                    "available": False,
+                    "identity": None,
+                    "error": {
+                        "code": "WEAVEC_CAPABILITIES_UNAVAILABLE",
+                        "message": "weavec capability identity is unavailable",
+                    },
+                }
+            else:
+                compiler_result["capabilities"] = {
+                    "available": True,
+                    "identity": registry["_jacquard_identity"],
+                    "error": None,
+                }
         result["service_graph"] = runtime_services().service_manifest(
             include_state=False
         )
