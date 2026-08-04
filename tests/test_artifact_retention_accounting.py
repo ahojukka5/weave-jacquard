@@ -33,6 +33,6 @@ def test_relocation_snapshot_survives_rename_and_detects_payload_change(
     assert moved["relocation_snapshot_id"] == before["relocation_snapshot_id"]
     assert moved["logical_bytes"] == before["logical_bytes"]
 
-    (destination / "payload.bin").write_bytes(b"after!")
+    (destination / "payload.bin").write_bytes(b"after-longer")
     changed, _remaining = accountant.capture(destination, 100)
     assert changed["relocation_snapshot_id"] != before["relocation_snapshot_id"]
