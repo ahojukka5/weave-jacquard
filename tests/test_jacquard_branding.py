@@ -38,6 +38,9 @@ def test_distribution_and_entry_points_use_jacquard_name() -> None:
         "weave-artifact-retention-plan": (
             "weave_frontend.artifact_retention_cli:main"
         ),
+        "weave-artifact-quarantine": (
+            "weave_frontend.artifact_quarantine_cli:main"
+        ),
     }
 
 
