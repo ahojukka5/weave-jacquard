@@ -46,14 +46,23 @@ def _document(entry: dict[str, object] | None, *, status: str, exit_code: int) -
     }
 
 
-def _entry(*, source: str | None, span: dict[str, int] | None) -> dict[str, object]:
+def _entry(
+    *,
+    source: str | None,
+    span: dict[str, int] | None,
+    span_origin: str | None = None,
+) -> dict[str, object]:
     return {
         "code": "backend.example",
         "severity": "error",
         "phase": "backend",
         "message": "example diagnostic",
         "source": source,
-        "span_origin": "inferred-unique-token" if span is not None else "none",
+        "span_origin": (
+            span_origin
+            if span_origin is not None
+            else ("inferred-unique-token" if span is not None else "none")
+        ),
         "span": span,
     }
 
@@ -98,6 +107,40 @@ def test_canonical_span_maps_to_smallest_node(tmp_path: Path) -> None:
     assert result["entries"][0]["node_id"] == "n_name"
     assert result["entries"][0]["source"] == "program.weave"
     assert result["entries"][0]["compiler_source"] == "program.weave"
+
+
+def test_propagated_wir_span_maps_to_smallest_node(tmp_path: Path) -> None:
+    source = tmp_path / "program.weave"
+    source.write_text("(program name value)\n", encoding="utf-8")
+    diagnostics_path = tmp_path / "compiler-diagnostics.json"
+    diagnostics_path.write_text(
+        json.dumps(
+            _document(
+                _entry(
+                    source=str(source),
+                    span=_span(),
+                    span_origin="propagated-wir-location",
+                ),
+                status="failed",
+                exit_code=11,
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    result, valid = collect_build_diagnostics(
+        diagnostics_path,
+        node_map=_node_map(),
+        canonical_source_path=source,
+        returncode=11,
+        timed_out=False,
+        stdout="",
+        stderr="",
+    )
+
+    assert valid is True
+    assert result["entries"][0]["span_origin"] == "propagated-wir-location"
+    assert result["entries"][0]["node_id"] == "n_name"
 
 
 def test_spanless_and_noncanonical_diagnostics_remain_unmapped(tmp_path: Path) -> None:
