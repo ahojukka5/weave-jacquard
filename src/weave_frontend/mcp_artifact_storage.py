@@ -12,7 +12,7 @@ from .artifact_reconciliation import (
     RetainedArtifactFamily,
     RetainedArtifactInventoryService,
 )
-from .artifact_storage import ArtifactStorageService
+from .artifact_storage_lifecycle import ArtifactLifecycleStorageService
 from .mcp_build import compiler_bridge
 from .mcp_database_backup import database_backups
 from .mcp_merge_candidate_test_runs import (
@@ -107,10 +107,10 @@ def _artifact_families() -> tuple[RetainedArtifactFamily, ...]:
         "database_backups",
     ),
 )
-def artifact_storage() -> ArtifactStorageService:
-    """Return bounded accounting for all live retained-artifact roots."""
+def artifact_storage() -> ArtifactLifecycleStorageService:
+    """Return bounded lifecycle accounting for all retained-artifact roots."""
 
-    return ArtifactStorageService(_artifact_roots())
+    return ArtifactLifecycleStorageService(_artifact_roots())
 
 
 @runtime_service(
