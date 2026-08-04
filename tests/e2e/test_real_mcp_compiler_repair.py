@@ -250,7 +250,7 @@ async def _run(tmp_path: Path, compiler: Path) -> dict[str, Any]:
         assert diagnostic["code"] == "backend.unknown-expression-operator"
         assert diagnostic["node_id"] == invalid_node_id
         assert diagnostic["document"] == DOCUMENT
-        assert diagnostic["span_origin"] == "inferred-unique-token"
+        assert diagnostic["span_origin"] == "propagated-wir-location"
 
         after_failure = await _call(
             session,
