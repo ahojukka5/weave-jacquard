@@ -44,6 +44,12 @@ def test_distribution_and_entry_points_use_jacquard_name() -> None:
         "weave-artifact-quarantine-restore": (
             "weave_frontend.artifact_quarantine_restore_cli:main"
         ),
+        "weave-artifact-quarantine-verify": (
+            "weave_frontend.artifact_quarantine_lifecycle_cli:verification_main"
+        ),
+        "weave-artifact-quarantine-delete": (
+            "weave_frontend.artifact_quarantine_lifecycle_cli:delete_main"
+        ),
     }
 
 
