@@ -12,7 +12,12 @@ from .source_map import smallest_node_for_span
 
 COMPILER_DIAGNOSTICS_FORMAT = "weavec-diagnostics-v1"
 BUILD_DIAGNOSTICS_FORMAT = "weave-build-diagnostics-v1"
-SPAN_ORIGINS = {"compiler-preflight", "inferred-unique-token", "none"}
+SPAN_ORIGINS = {
+    "compiler-preflight",
+    "propagated-wir-location",
+    "inferred-unique-token",
+    "none",
+}
 
 
 def collect_build_diagnostics(
@@ -219,7 +224,11 @@ def _validate_entry(value: Any, *, index: int) -> list[str]:
     span = value.get("span")
     if span_origin == "none" and span is not None:
         errors.append(f"{prefix} span must be null when span_origin is 'none'")
-    if span_origin in {"compiler-preflight", "inferred-unique-token"} and span is None:
+    if span_origin in {
+        "compiler-preflight",
+        "propagated-wir-location",
+        "inferred-unique-token",
+    } and span is None:
         errors.append(f"{prefix} span is required for span_origin {span_origin!r}")
 
     if span is not None:
