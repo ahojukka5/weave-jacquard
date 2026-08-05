@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .artifact_quota import artifact_quota_admission
+from .artifacts.quota import artifact_quota_admission
 from .bounded_merge_candidate_build import (
     MergeCandidateBuildService as _BoundedMergeCandidateBuildService,
 )
@@ -33,9 +33,7 @@ class MergeCandidateBuildService(_BoundedMergeCandidateBuildService):
                 f"cannot read merge candidate build manifest: {exc}"
             ) from exc
         if not isinstance(value, dict):
-            raise ArtifactIntegrityError(
-                "merge candidate build manifest root must be an object"
-            )
+            raise ArtifactIntegrityError("merge candidate build manifest root must be an object")
         return value
 
     def _publish(self, temporary: Path, final: Path, build_id: str) -> None:

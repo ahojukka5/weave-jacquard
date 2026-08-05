@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from weave_frontend.artifact_quota import ArtifactQuotaService
+from weave_frontend.artifacts.quota import ArtifactQuotaService
 from weave_frontend.artifacts.storage import ArtifactStorageService
 from weave_frontend.errors import ArtifactQuotaExceededError, ValidationError
 

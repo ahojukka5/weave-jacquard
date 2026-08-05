@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .quota_publication import QuotaPublicationLockMixin
+from .artifacts.quota import QuotaPublicationLockMixin
 from .tested_merge_attestations import (
     TestedMergeAttestationService as _TestedMergeAttestationService,
 )

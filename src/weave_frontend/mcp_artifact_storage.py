@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .artifact_quota import ArtifactQuotaService
+from .artifacts.quota import ArtifactQuotaService
 from .artifacts.reconciliation import (
     ArtifactReconciliationService,
     RetainedArtifactFamily,

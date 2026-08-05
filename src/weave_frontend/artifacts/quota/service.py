@@ -1,4 +1,4 @@
-"""Interprocess logical-byte quota admission for retained artifact publication."""
+"""Aggregate artifact quota policy, reporting, locking, and admission."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from .artifacts.storage import ArtifactStorageService
-from .errors import ArtifactQuotaExceededError, ValidationError
+from ...errors import ArtifactQuotaExceededError, ValidationError
+from ..storage import ArtifactStorageService
 
 ARTIFACT_QUOTA_REPORT_FORMAT = "weave-artifact-quota-report-v1"
 ARTIFACT_QUOTA_POLICY_FORMAT = "weave-artifact-quota-policy-v1"
@@ -35,54 +35,6 @@ def parse_artifact_quota(value: str | None) -> int | None:
     if parsed > MAX_ARTIFACT_QUOTA_BYTES:
         raise ValueError(f"{ARTIFACT_QUOTA_ENV} must not exceed {MAX_ARTIFACT_QUOTA_BYTES}")
     return parsed
-
-
-@contextmanager
-def artifact_quota_admission(
-    owner: Any,
-    *,
-    family: str,
-    temporary: Path,
-    final: Path,
-) -> Iterator[dict[str, Any] | None]:
-    """Admit an exact staged directory for a service with an attached quota guard."""
-
-    quota = _attached_quota(owner)
-    if quota is None:
-        yield None
-        return
-    with quota.admit(
-        family=family,
-        temporary=temporary,
-        final=final,
-    ) as evidence:
-        yield evidence
-
-
-@contextmanager
-def artifact_quota_publication_lock(
-    owner: Any,
-    *,
-    family: str,
-    final: Path,
-) -> Iterator[dict[str, Any] | None]:
-    """Admit an existing temporary-prefix stage and hold the global lock."""
-
-    quota = _attached_quota(owner)
-    if quota is None:
-        yield None
-        return
-    with quota.admit_staged_prefix(family=family, final=final) as evidence:
-        yield evidence
-
-
-def _attached_quota(owner: Any) -> ArtifactQuotaService | None:
-    quota = getattr(owner, "artifact_quota", None)
-    if quota is None:
-        return None
-    if not isinstance(quota, ArtifactQuotaService):
-        raise RuntimeError("attached artifact_quota has an unsupported type")
-    return quota
 
 
 class ArtifactQuotaService:
@@ -442,7 +394,5 @@ __all__ = [
     "MAX_ARTIFACT_QUOTA_ROOT_ENTRIES",
     "MAX_ARTIFACT_STAGED_CANDIDATES",
     "ArtifactQuotaService",
-    "artifact_quota_admission",
-    "artifact_quota_publication_lock",
     "parse_artifact_quota",
 ]

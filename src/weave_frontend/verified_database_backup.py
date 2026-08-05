@@ -10,7 +10,7 @@ from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Any
 
-from .artifact_quota import ArtifactQuotaService, artifact_quota_admission
+from .artifacts.quota import ArtifactQuotaService, artifact_quota_admission
 from .database_backup import (
     MAX_DATABASE_BACKUP_MANIFEST_BYTES,
 )
@@ -77,13 +77,9 @@ class DatabaseBackupService(_DatabaseBackupService):
     ) -> None:
         super()._verify_manifest(manifest, directory, expected_id=expected_id)
         if set(manifest) != _DATABASE_BACKUP_MANIFEST_FIELDS:
-            raise ArtifactIntegrityError(
-                "database backup manifest fields are invalid"
-            )
+            raise ArtifactIntegrityError("database backup manifest fields are invalid")
         if manifest.get("cached") is not False:
-            raise ArtifactIntegrityError(
-                "database backup stored cache state is invalid"
-            )
+            raise ArtifactIntegrityError("database backup stored cache state is invalid")
         self._verify_manifest_encoding(directory / "backup-manifest.json", manifest)
         self._verify_directory_layout(directory)
 
@@ -147,15 +143,11 @@ class DatabaseBackupService(_DatabaseBackupService):
                             "ARTIFACT_STORAGE_SCAN_FAILED",
                             "database backup staging changed during quota admission",
                         ) from exc
-                    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(
-                        metadata.st_mode
-                    ):
+                    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
                         continue
                     directory = Path(entry.path)
                     try:
-                        manifest = self._read_manifest(
-                            directory / "backup-manifest.json"
-                        )
+                        manifest = self._read_manifest(directory / "backup-manifest.json")
                         if manifest.get("backup_id") != final.name:
                             continue
                         self._verify_manifest(
@@ -188,22 +180,16 @@ class DatabaseBackupService(_DatabaseBackupService):
 
     @staticmethod
     def _verify_manifest_encoding(path: Path, manifest: dict[str, Any]) -> None:
-        expected = (
-            json.dumps(manifest, indent=2, sort_keys=True) + "\n"
-        ).encode("utf-8")
+        expected = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8")
         try:
             observed = read_bounded_regular_bytes(
                 path,
                 max_bytes=MAX_DATABASE_BACKUP_MANIFEST_BYTES,
             )
         except RetainedArtifactReadError as exc:
-            raise ArtifactIntegrityError(
-                "cannot re-read database backup manifest bytes"
-            ) from exc
+            raise ArtifactIntegrityError("cannot re-read database backup manifest bytes") from exc
         if observed != expected:
-            raise ArtifactIntegrityError(
-                "database backup manifest encoding is not canonical"
-            )
+            raise ArtifactIntegrityError("database backup manifest encoding is not canonical")
 
     @staticmethod
     def _verify_directory_layout(directory: Path) -> None:
@@ -213,14 +199,10 @@ class DatabaseBackupService(_DatabaseBackupService):
             with os.scandir(directory) as iterator:
                 entries = list(iterator)
         except OSError as exc:
-            raise ArtifactIntegrityError(
-                "cannot enumerate database backup directory"
-            ) from exc
+            raise ArtifactIntegrityError("cannot enumerate database backup directory") from exc
 
         if {entry.name for entry in entries} != _DATABASE_BACKUP_FILES:
-            raise ArtifactIntegrityError(
-                "database backup directory layout is invalid"
-            )
+            raise ArtifactIntegrityError("database backup directory layout is invalid")
         for entry in entries:
             try:
                 metadata = entry.stat(follow_symlinks=False)

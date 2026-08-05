@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .artifact_quota import artifact_quota_admission
+from .artifacts.quota import artifact_quota_admission
 from .compiler import CompilerBridge as _CompilerBridge
 from .compiler import WeavecCapabilities
 

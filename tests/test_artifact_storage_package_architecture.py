@@ -81,7 +81,7 @@ def test_storage_public_boundary_is_explicit() -> None:
 
 
 def test_quota_remains_a_separate_consumer_of_storage() -> None:
-    quota_path = PACKAGE_ROOT / "artifact_quota.py"
+    quota_path = PACKAGE_ROOT / "artifacts" / "quota" / "service.py"
     tree = ast.parse(quota_path.read_text(encoding="utf-8"), filename=str(quota_path))
     imports = {
         _resolve_import(quota_path, node) for node in tree.body if isinstance(node, ast.ImportFrom)

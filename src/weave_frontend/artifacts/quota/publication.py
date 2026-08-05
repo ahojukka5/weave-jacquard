@@ -1,4 +1,4 @@
-"""Reusable production publication lock with aggregate artifact quota admission."""
+"""Reusable publication guard backed by aggregate artifact quota admission."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from .artifact_quota import artifact_quota_publication_lock
+from .admission import artifact_quota_publication_lock
 
 
 class QuotaPublicationLockMixin:
