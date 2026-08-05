@@ -14,6 +14,7 @@ import weave_frontend.mcp_concurrent_nodes as concurrent_nodes
 import weave_frontend.mcp_server as server_module
 import weave_frontend.runtime_config as runtime_config_module
 import weave_frontend.runtime_container as runtime_module
+from weave_frontend.compiler import WeavecValidator
 from weave_frontend.concurrent_workspace import SExpressionWorkspace
 from weave_frontend.errors import ValidationError
 from weave_frontend.quota_aware_compiler_bridge import CompilerBridge
@@ -31,7 +32,6 @@ from weave_frontend.runtime_container import (
     runtime_services,
 )
 from weave_frontend.runtime_sandbox import RuntimeBubblewrapSandbox
-from weave_frontend.weavec import WeavecValidator
 
 
 class _Workspace:

@@ -9,8 +9,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from .compiler_io import CompilerFileTooLarge, read_bounded_json
-from .compiler_limits import MAX_COMPILER_PROTOCOL_BYTES
+from .compiler import MAX_COMPILER_PROTOCOL_BYTES, CompilerFileTooLarge, read_bounded_json
 from .manifest_compatibility import (
     ManifestCompatibilityError,
     compare_manifests,

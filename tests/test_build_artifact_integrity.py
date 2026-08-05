@@ -7,8 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from weave_frontend.compiler_bridge import BUILD_KEY_FORMAT, CompilerBridge
-from weave_frontend.compiler_limits import MAX_COMPILER_OUTPUT_BYTES
+from weave_frontend.compiler import BUILD_KEY_FORMAT, MAX_COMPILER_OUTPUT_BYTES, CompilerBridge
 from weave_frontend.errors import ValidationError
 
 

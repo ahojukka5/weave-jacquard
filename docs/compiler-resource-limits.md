@@ -6,7 +6,7 @@ authority; resource admission is Jacquard responsibility.
 
 ## Current ceilings
 
-The canonical constants live in `weave_frontend.compiler_limits`:
+The canonical constants live in `weave_frontend.compiler.limits`:
 
 | Limit | Value | Applies to |
 |---|---:|---|

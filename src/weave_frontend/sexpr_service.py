@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from .compiler import WeavecValidator
 from .errors import ConflictError, NotFoundError, ValidationError
 from .grammar_help import GrammarIndex
 from .service import Workspace
@@ -23,7 +24,6 @@ from .sexpr import (
     validate_tree,
     walk_nodes,
 )
-from .weavec import WeavecValidator
 
 
 class SExpressionWorkspace(Workspace):

@@ -13,10 +13,10 @@ from functools import wraps
 from threading import RLock
 from typing import Any, TypeVar, cast
 
+from .compiler import WeavecValidator
 from .quota_aware_compiler_bridge import CompilerBridge
 from .runtime_config import RuntimeConfig
 from .verified_workspace import SExpressionWorkspace
-from .weavec import WeavecValidator
 
 WorkspaceFactory = Callable[[RuntimeConfig], Any]
 CompilerBridgeFactory = Callable[[Any, RuntimeConfig], Any]

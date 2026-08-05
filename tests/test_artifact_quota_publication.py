@@ -8,7 +8,7 @@ import pytest
 
 from weave_frontend.artifact_quota import ArtifactQuotaService
 from weave_frontend.artifact_storage import ArtifactStorageService
-from weave_frontend.compiler_bridge import CompilerBridge as BaseCompilerBridge
+from weave_frontend.compiler import CompilerBridge as BaseCompilerBridge
 from weave_frontend.errors import ArtifactQuotaExceededError
 from weave_frontend.quota_aware_compiler_bridge import (
     CompilerBridge,

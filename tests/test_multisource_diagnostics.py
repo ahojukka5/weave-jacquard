@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from weave_frontend.compiler_diagnostics import collect_build_diagnostics
+from weave_frontend.compiler import collect_build_diagnostics
 
 
 def _node_map(document: str, node_id: str) -> dict[str, object]:

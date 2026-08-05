@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from weave_frontend.weavec import WeavecValidator
+from weave_frontend.compiler import WeavecValidator
 
 PROGRAM = '(program (name "demo") (version "0.1"))\n'
 
