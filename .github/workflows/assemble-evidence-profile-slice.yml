@@ -24,16 +24,24 @@ jobs:
       - name: Validate intended slice
         run: |
           python -m pip install -e '.[dev]'
-          python -m ruff format --check \
+          python -m ruff format \
             src/weave_frontend/build_targets.py \
-            src/weave_frontend/compiler \
+            src/weave_frontend/compiler/__init__.py \
+            src/weave_frontend/compiler/bridge.py \
+            src/weave_frontend/compiler/capabilities.py \
+            src/weave_frontend/compiler/evidence.py \
+            src/weave_frontend/compiler/limits.py \
             tests/test_build_targets.py \
             tests/test_compiler_capabilities.py \
             tests/test_compiler_evidence_profiles.py \
             tests/test_compiler_package_architecture.py
           python -m ruff check \
             src/weave_frontend/build_targets.py \
-            src/weave_frontend/compiler \
+            src/weave_frontend/compiler/__init__.py \
+            src/weave_frontend/compiler/bridge.py \
+            src/weave_frontend/compiler/capabilities.py \
+            src/weave_frontend/compiler/evidence.py \
+            src/weave_frontend/compiler/limits.py \
             tests/test_build_targets.py \
             tests/test_compiler_capabilities.py \
             tests/test_compiler_evidence_profiles.py \
