@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -48,6 +50,38 @@ def test_cached_compiler_bridge_can_be_upgraded_idempotently() -> None:
     assert first is bridge
     assert second is bridge
     assert type(bridge) is CompilerBridge
+
+
+def test_quota_bridge_forwards_evidence_profile(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    def base_build(
+        self: BaseCompilerBridge,
+        project: str,
+        document: str,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        captured.update(kwargs)
+        return {"build_id": "a" * 32}
+
+    bridge = CompilerBridge.__new__(CompilerBridge)
+    bridge._weavec_capabilities = SimpleNamespace(
+        require=lambda **kwargs: {"_jacquard_identity": {"format": "test"}}
+    )
+    monkeypatch.setattr(bridge, "_compiler_path", lambda: tmp_path / "weavec")
+    monkeypatch.setattr(BaseCompilerBridge, "build", base_build)
+
+    result = bridge.build(
+        "demo",
+        "main.weave",
+        evidence_profile="full",
+    )
+
+    assert captured["evidence_profile"] == "full"
+    assert result["compiler_capabilities"] == {"format": "test"}
 
 
 def test_production_wrappers_preserve_base_service_contracts() -> None:

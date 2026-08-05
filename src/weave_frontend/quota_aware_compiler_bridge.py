@@ -35,6 +35,7 @@ class CompilerBridge(_CompilerBridge):
         branch: str = "main",
         revision_id: str | None = None,
         target: str | None = None,
+        evidence_profile: str | None = None,
     ) -> dict[str, Any]:
         """Build only through an advertised final-compiler public contract."""
 
@@ -63,6 +64,7 @@ class CompilerBridge(_CompilerBridge):
             branch=branch,
             revision_id=revision_id,
             target=target,
+            evidence_profile=evidence_profile,
         )
         result["compiler_capabilities"] = registry["_jacquard_identity"]
         return result

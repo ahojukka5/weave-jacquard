@@ -29,6 +29,7 @@ The implementation modules each own one compiler concern:
 - `validator.py`: frontend validation and WIR retrieval;
 - `inputs.py`: ordered source rendering and materialization;
 - `diagnostics.py`: compiler diagnostic validation and node mapping;
+- `evidence.py`: strict evidence profiles and their capability requirements;
 - `manifest.py`: build-manifest validation;
 - `artifacts.py`: artifact identity, verification, and publication primitives;
 - `io.py`: bounded compiler-generated file reads;

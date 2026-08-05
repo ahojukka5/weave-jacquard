@@ -183,13 +183,15 @@ class WeavecCapabilities:
 
         document = self.load()
         commands = {
-            item["name"]: item
-            for item in document["commands"]
-            if isinstance(item, Mapping)
+            item["name"]: item for item in document["commands"] if isinstance(item, Mapping)
         }
+        command_item: Mapping[str, Any] | None = None
         if command is not None:
-            item = commands.get(command)
-            if item is None or item.get("status") not in {"stable", "experimental"}:
+            command_item = commands.get(command)
+            if command_item is None or command_item.get("status") not in {
+                "stable",
+                "experimental",
+            }:
                 raise _invalid(
                     "WEAVEC_CAPABILITY_MISSING",
                     f"installed weavec does not advertise command {command!r}",
@@ -403,9 +405,7 @@ class WeavecCapabilities:
         for index, raw_item in enumerate(_sequence(raw, "protocols")):
             item = _mapping(raw_item, f"protocols[{index}]")
             protocol_id = _nonempty_string(item.get("id"), f"protocols[{index}].id")
-            version = _positive_integer(
-                item.get("version"), f"protocols[{index}].version"
-            )
+            version = _positive_integer(item.get("version"), f"protocols[{index}].version")
             _nonempty_string(item.get("kind"), f"protocols[{index}].kind")
             if protocol_id in seen:
                 raise _invalid(
@@ -446,9 +446,7 @@ class WeavecCapabilities:
                     "WEAVEC_CAPABILITIES_INVALID",
                     f"commands[{index}].status is invalid",
                 )
-            command_protocols = _sequence(
-                item.get("protocols"), f"commands[{index}].protocols"
-            )
+            command_protocols = _sequence(item.get("protocols"), f"commands[{index}].protocols")
             if any(
                 not isinstance(value, str) or value not in known_protocols
                 for value in command_protocols
@@ -478,26 +476,18 @@ class WeavecCapabilities:
         default = _nonempty_string(targets.get("default"), "targets.default")
         installed: list[dict[str, Any]] = []
         seen: set[str] = set()
-        for index, raw_item in enumerate(
-            _sequence(targets.get("installed"), "targets.installed")
-        ):
+        for index, raw_item in enumerate(_sequence(targets.get("installed"), "targets.installed")):
             item = _mapping(raw_item, f"targets.installed[{index}]")
-            triple = _nonempty_string(
-                item.get("triple"), f"targets.installed[{index}].triple"
-            )
+            triple = _nonempty_string(item.get("triple"), f"targets.installed[{index}].triple")
             for field in ("native", "cross_compilation"):
                 if not isinstance(item.get(field), bool):
                     raise _invalid(
                         "WEAVEC_CAPABILITIES_INVALID",
                         f"targets.installed[{index}].{field} must be boolean",
                     )
-            _nonempty_string(
-                item.get("runtime"), f"targets.installed[{index}].runtime"
-            )
+            _nonempty_string(item.get("runtime"), f"targets.installed[{index}].runtime")
             for field in ("optimization_levels", "cpu_selection"):
-                values = _sequence(
-                    item.get(field), f"targets.installed[{index}].{field}"
-                )
+                values = _sequence(item.get(field), f"targets.installed[{index}].{field}")
                 if any(not isinstance(value, str) for value in values):
                     raise _invalid(
                         "WEAVEC_CAPABILITIES_INVALID",
@@ -557,9 +547,7 @@ class WeavecCapabilities:
         feature_ids = {str(item["id"]) for item in features}
         forms: list[dict[str, Any]] = []
         seen: set[str] = set()
-        for index, raw_item in enumerate(
-            _sequence(surface.get("forms"), "surface.forms")
-        ):
+        for index, raw_item in enumerate(_sequence(surface.get("forms"), "surface.forms")):
             item = _mapping(raw_item, f"surface.forms[{index}]")
             head = _nonempty_string(item.get("head"), f"surface.forms[{index}].head")
             if item.get("status") not in {
@@ -581,9 +569,7 @@ class WeavecCapabilities:
                     f"surface.forms[{index}].arity.min_children is invalid",
                 )
             if maximum is not None and (
-                isinstance(maximum, bool)
-                or not isinstance(maximum, int)
-                or maximum < minimum
+                isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < minimum
             ):
                 raise _invalid(
                     "WEAVEC_CAPABILITIES_INVALID",
