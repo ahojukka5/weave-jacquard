@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-import weave_frontend.artifact_quota as quota_module
-from weave_frontend.artifact_quota import (
+import weave_frontend.artifacts.quota.service as quota_module
+from weave_frontend.artifacts.quota import (
     MAX_ARTIFACT_QUOTA_BYTES,
     ArtifactQuotaService,
     artifact_quota_admission,

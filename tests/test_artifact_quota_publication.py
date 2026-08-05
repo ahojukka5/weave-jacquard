@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from weave_frontend.artifact_quota import ArtifactQuotaService
+from weave_frontend.artifacts.quota import ArtifactQuotaService, QuotaPublicationLockMixin
 from weave_frontend.artifacts.storage import ArtifactStorageService
 from weave_frontend.compiler import CompilerBridge as BaseCompilerBridge
 from weave_frontend.errors import ArtifactQuotaExceededError
@@ -21,7 +21,6 @@ from weave_frontend.quota_aware_test_runs import TestRunService
 from weave_frontend.quota_aware_tested_merge_attestations import (
     TestedMergeAttestationService,
 )
-from weave_frontend.quota_publication import QuotaPublicationLockMixin
 from weave_frontend.test_batches import TestBatchService as BaseTestBatchService
 from weave_frontend.test_runs import TestRunService as BaseTestRunService
 from weave_frontend.tested_merge_attestations import (

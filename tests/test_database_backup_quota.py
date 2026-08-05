@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 import weave_frontend.verified_database_backup as backup_module
-from weave_frontend.artifact_quota import ArtifactQuotaService
+from weave_frontend.artifacts.quota import ArtifactQuotaService
 from weave_frontend.artifacts.storage import ArtifactStorageService
 from weave_frontend.database import Database
 from weave_frontend.errors import (

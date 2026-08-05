@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from weave_frontend.artifact_quota import ArtifactQuotaService
+from weave_frontend.artifacts.quota import ArtifactQuotaService
 from weave_frontend.artifacts.storage import ArtifactStorageService
 
 

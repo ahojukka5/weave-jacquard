@@ -10,7 +10,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import ClassVar
 
-from .artifact_quota import parse_artifact_quota
+from .artifacts.quota import parse_artifact_quota
 
 PUBLIC_CONFIGURATION_VARIABLES: tuple[str, ...] = (
     "WEAVEC_BIN",
@@ -54,8 +54,7 @@ class RuntimeConfig:
         """Capture and validate supported variables without retaining a mutable mapping."""
 
         values = {
-            name: cls._optional_value(environ, name)
-            for name in PUBLIC_CONFIGURATION_VARIABLES
+            name: cls._optional_value(environ, name) for name in PUBLIC_CONFIGURATION_VARIABLES
         }
         configured = tuple(
             (name, value)
@@ -88,9 +87,7 @@ class RuntimeConfig:
             database_path=database_path,
             weavec_binary=weavec_binary,
             weavec_source_root=source_root,
-            artifact_max_bytes=parse_artifact_quota(
-                values["WEAVE_ARTIFACT_MAX_BYTES"]
-            ),
+            artifact_max_bytes=parse_artifact_quota(values["WEAVE_ARTIFACT_MAX_BYTES"]),
             build_root=build_root,
             bubblewrap_binary=bubblewrap_binary,
             prlimit_binary=cls._optional_resolved_string(shutil.which("prlimit")),
