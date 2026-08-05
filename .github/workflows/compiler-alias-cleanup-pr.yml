@@ -33,8 +33,9 @@ jobs:
         run: |
           python -m compileall -q src tests scripts
           python -m pip install -e '.[dev]'
-          python -m pytest -q tests/test_compiler_package_architecture.py
+          python -m ruff check --fix .
           python -m ruff check .
+          python -m pytest -q tests/test_compiler_package_architecture.py
 
       - name: Commit generated cleanup
         run: |
