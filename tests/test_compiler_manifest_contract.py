@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from weave_frontend.compiler_manifest import validate_compiler_manifest
+from weave_frontend.compiler import validate_compiler_manifest
 
 
 def _manifest(source: Path, output: Path) -> dict[str, object]:

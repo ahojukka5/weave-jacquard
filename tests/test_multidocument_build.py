@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from weave_frontend.compiler_bridge import CompilerBridge
+from weave_frontend.compiler import CompilerBridge
 from weave_frontend.errors import NotFoundError, ValidationError
 from weave_frontend.sexpr_service import SExpressionWorkspace
 

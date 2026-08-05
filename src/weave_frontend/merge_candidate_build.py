@@ -10,10 +10,12 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from .compiler_artifacts import CompilerArtifactMixin
-from .compiler_diagnostics import collect_build_diagnostics
-from .compiler_inputs import RenderedSource
-from .compiler_manifest import validate_compiler_manifest
+from .compiler import (
+    CompilerArtifactMixin,
+    RenderedSource,
+    collect_build_diagnostics,
+    validate_compiler_manifest,
+)
 from .errors import ArtifactIntegrityError, ConflictError, NotFoundError, ValidationError
 from .merge_preview import MERGE_PREVIEW_FORMAT
 from .source_map import render_with_node_map

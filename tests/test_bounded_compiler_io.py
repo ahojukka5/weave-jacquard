@@ -9,16 +9,16 @@ from types import SimpleNamespace
 import pytest
 
 from weave_frontend.bounded_process import run_bounded_process
-from weave_frontend.compiler_bridge import CompilerBridge
-from weave_frontend.compiler_diagnostics import collect_build_diagnostics
-from weave_frontend.compiler_io import (
+from weave_frontend.compiler import (
+    CompilerBridge,
     CompilerFileTooLarge,
+    WeavecValidator,
+    collect_build_diagnostics,
     read_bounded_bytes,
     read_bounded_json,
     read_bounded_text,
+    validate_compiler_manifest,
 )
-from weave_frontend.compiler_manifest import validate_compiler_manifest
-from weave_frontend.weavec import WeavecValidator
 
 
 def _script(tmp_path: Path, body: str, name: str = "helper.py") -> Path:
@@ -199,7 +199,7 @@ def test_oversized_diagnostics_become_output_safe_bridge_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from weave_frontend import compiler_diagnostics as module
+    import weave_frontend.compiler.diagnostics as module
 
     source = tmp_path / "main.weave"
     source.write_text("(program)\n", encoding="utf-8")
@@ -263,7 +263,7 @@ def test_oversized_manifest_is_rejected_before_decode(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from weave_frontend import compiler_manifest as module
+    import weave_frontend.compiler.manifest as module
 
     manifest = tmp_path / "compiler-manifest.json"
     manifest.write_bytes(b"x" * 17)

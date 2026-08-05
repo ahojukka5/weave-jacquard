@@ -8,9 +8,9 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from .bounded_process import run_bounded_process
-from .compiler_io import CompilerFileTooLarge, read_bounded_text
-from .compiler_limits import MAX_COMPILER_OUTPUT_BYTES, MAX_WIR_BYTES
+from ..bounded_process import run_bounded_process
+from .io import CompilerFileTooLarge, read_bounded_text
+from .limits import MAX_COMPILER_OUTPUT_BYTES, MAX_WIR_BYTES
 
 
 class WeavecValidator:

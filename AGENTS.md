@@ -37,3 +37,11 @@ Mark a pull request ready for review only when all of the following are true:
 5. the validation record in the pull request body matches the exact final head.
 
 If any item is not true, keep working and keep the pull request in draft.
+
+## Compatibility discipline
+
+Internal modules and import paths are not compatibility commitments. Do not add
+aliases, forwarding modules, duplicate paths, or deprecation shims unless an
+explicit supported public compatibility requirement demands them. Migrate all
+repository callers and remove obsolete internal paths in the same change.
+

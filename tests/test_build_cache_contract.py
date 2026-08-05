@@ -4,8 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from weave_frontend.compiler_bridge import BUILD_KEY_FORMAT, CompilerBridge
-from weave_frontend.compiler_limits import MAX_COMPILER_OUTPUT_BYTES
+from weave_frontend.compiler import BUILD_KEY_FORMAT, MAX_COMPILER_OUTPUT_BYTES, CompilerBridge
 
 
 def _sha(path: Path) -> str:

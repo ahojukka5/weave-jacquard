@@ -4,7 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from weave_frontend.compiler_bridge import CompilerBridge
+from weave_frontend.compiler import CompilerBridge
 from weave_frontend.sexpr_service import SExpressionWorkspace
 from weave_frontend.source_map import smallest_node_for_span
 

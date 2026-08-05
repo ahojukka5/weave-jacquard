@@ -6,9 +6,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .compiler_io import CompilerFileTooLarge, read_bounded_json
-from .compiler_limits import MAX_COMPILER_OUTPUT_BYTES, MAX_COMPILER_PROTOCOL_BYTES
-from .source_map import smallest_node_for_span
+from ..source_map import smallest_node_for_span
+from .io import CompilerFileTooLarge, read_bounded_json
+from .limits import MAX_COMPILER_OUTPUT_BYTES, MAX_COMPILER_PROTOCOL_BYTES
 
 COMPILER_DIAGNOSTICS_FORMAT = "weavec-diagnostics-v1"
 BUILD_DIAGNOSTICS_FORMAT = "weave-build-diagnostics-v1"

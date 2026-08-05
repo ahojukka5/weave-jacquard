@@ -8,11 +8,14 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from .compiler_diagnostics import collect_build_diagnostics
-from .compiler_inputs import RenderedSource
-from .compiler_io import CompilerFileTooLarge, read_bounded_json
-from .compiler_limits import MAX_COMPILER_PROTOCOL_BYTES
-from .compiler_manifest import validate_compiler_manifest
+from .compiler import (
+    MAX_COMPILER_PROTOCOL_BYTES,
+    CompilerFileTooLarge,
+    RenderedSource,
+    collect_build_diagnostics,
+    read_bounded_json,
+    validate_compiler_manifest,
+)
 from .errors import ArtifactIntegrityError, ValidationError
 from .merge_candidate_build import (
     MERGE_CANDIDATE_BUILD_FORMAT,

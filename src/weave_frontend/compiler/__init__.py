@@ -1,7 +1,7 @@
 """Public compiler integration boundary."""
 
-from .compiler_bridge import CompilerBridge
-from .compiler_capabilities import (
+from .bridge import CompilerBridge
+from .capabilities import (
     CAPABILITIES_FORMAT,
     CAPABILITIES_SCHEMA_ID,
     CAPABILITIES_SCHEMA_VERSION,
@@ -11,26 +11,26 @@ from .compiler_capabilities import (
     CapabilityGrammarIndex,
     WeavecCapabilities,
 )
-from .compiler_diagnostics import (
+from .diagnostics import (
     BUILD_DIAGNOSTICS_FORMAT,
     COMPILER_DIAGNOSTICS_FORMAT,
     collect_build_diagnostics,
 )
-from .compiler_inputs import MaterializedSource, RenderedSource
-from .compiler_io import (
+from .inputs import MaterializedSource, RenderedSource
+from .io import (
     CompilerFileTooLarge,
     read_bounded_bytes,
     read_bounded_json,
     read_bounded_text,
 )
-from .compiler_limits import (
+from .limits import (
     BUILD_KEY_FORMAT,
     MAX_COMPILER_OUTPUT_BYTES,
     MAX_COMPILER_PROTOCOL_BYTES,
     MAX_WIR_BYTES,
 )
-from .compiler_manifest import COMPILER_MANIFEST_FORMAT, validate_compiler_manifest
-from .weavec import WeavecValidator
+from .manifest import COMPILER_MANIFEST_FORMAT, validate_compiler_manifest
+from .validator import WeavecValidator
 
 __all__ = [
     "BUILD_DIAGNOSTICS_FORMAT",

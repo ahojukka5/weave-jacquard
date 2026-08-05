@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from .compiler_artifacts import CompilerArtifactMixin
+from .compiler import CompilerArtifactMixin
 from .errors import ArtifactIntegrityError, ConflictError, NotFoundError, ValidationError
 from .retained_artifact_io import (
     RetainedArtifactReadError,

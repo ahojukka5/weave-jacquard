@@ -12,7 +12,7 @@ from weave_frontend.build_discovery import (
     BUILD_LIST_FORMAT,
     BuildDiscoveryService,
 )
-from weave_frontend.compiler_artifacts import BUILD_KEY_FORMAT
+from weave_frontend.compiler import BUILD_KEY_FORMAT
 from weave_frontend.errors import NotFoundError, ValidationError
 
 

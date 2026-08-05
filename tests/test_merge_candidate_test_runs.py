@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from weave_frontend.compiler_bridge import CompilerBridge
+from weave_frontend.compiler import CompilerBridge
 from weave_frontend.errors import ArtifactIntegrityError
 from weave_frontend.merge_candidate_build import MergeCandidateBuildService
 from weave_frontend.merge_candidate_test_runs import MergeCandidateTestBatchService

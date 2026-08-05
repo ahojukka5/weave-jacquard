@@ -11,11 +11,11 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from .bounded_process import run_bounded_process
-from .errors import ValidationError
-from .grammar_help import GrammarIndex
-from .sexpr import JsonObject, head_symbol
-from .weavec import WeavecValidator
+from ..bounded_process import run_bounded_process
+from ..errors import ValidationError
+from ..grammar_help import GrammarIndex
+from ..sexpr import JsonObject, head_symbol
+from .validator import WeavecValidator
 
 CAPABILITIES_FORMAT = "weavec-capabilities-v1"
 CAPABILITIES_SCHEMA_ID = "urn:weavec:schema:capabilities:v1"

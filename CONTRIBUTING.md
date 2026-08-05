@@ -39,3 +39,11 @@ A pull request may be marked ready for review only after:
 
 When any condition is unmet, keep working rather than handing off an incomplete
 pull request.
+
+## Compatibility discipline
+
+Internal modules and import paths are not compatibility commitments. Do not add
+aliases, forwarding modules, duplicate paths, or deprecation shims unless an
+explicit supported public compatibility requirement demands them. Migrate all
+repository callers and remove obsolete internal paths in the same change.
+
