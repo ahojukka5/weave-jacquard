@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, BinaryIO
 
-from ...artifact_retention_cli import load_policy
+from ...artifacts.retention import load_policy
 from ...errors import ValidationError, WeaveFrontendError
 from ...mcp_artifact_storage import artifact_reconciliation
 from ...runtime_container import close_runtime_services

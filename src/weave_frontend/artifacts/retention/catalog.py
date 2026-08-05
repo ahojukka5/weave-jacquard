@@ -6,9 +6,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from .artifact_reachability import ARTIFACT_RECONCILIATION_FORMAT
-from .artifact_retention_policy import entry_order
-from .errors import ValidationError
+from ...artifact_reachability import ARTIFACT_RECONCILIATION_FORMAT
+from ...errors import ValidationError
+from .policy import entry_order
 
 
 class ArtifactRetentionCatalog:
@@ -46,9 +46,7 @@ class ArtifactRetentionCatalog:
                 "ARTIFACT_RETENTION_STALE_RECONCILIATION",
                 "policy does not reference the current complete reconciliation",
             )
-        records = tuple(
-            record for family in families for record in family["records"]
-        )
+        records = tuple(record for family in families for record in family["records"])
         locations = self.locations()
         return reconciliation_id, self._join(records, locations), locations
 
@@ -63,9 +61,7 @@ class ArtifactRetentionCatalog:
             remaining -= len(snapshots)
             nested = inventory._nested_family_names(family)
             skipped = {
-                candidate.root
-                for candidate in inventory.families
-                if candidate.name in nested
+                candidate.root for candidate in inventory.families if candidate.name in nested
             }
             root_id = inventory._root_id(family)
             for snapshot in snapshots:

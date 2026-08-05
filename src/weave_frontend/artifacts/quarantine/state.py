@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ...artifact_reachability import ARTIFACT_RECONCILIATION_FORMAT
-from ...artifact_retention_policy import hash_json
+from ...artifacts.retention import hash_json
 from ...errors import ValidationError
 
 ARTIFACT_QUARANTINE_CATALOG_FORMAT = "weave-artifact-quarantine-catalog-v1"

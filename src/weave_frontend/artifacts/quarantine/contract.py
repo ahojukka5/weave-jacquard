@@ -7,17 +7,13 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from ...artifact_retention import (
+from ...artifacts.retention import (
     ARTIFACT_RETENTION_PLAN_FORMAT,
     MAX_RETENTION_PLAN_ENTRIES,
-)
-from ...artifact_retention_accounting import (
-    MAX_RETENTION_SCAN_DEPTH,
-    MAX_RETENTION_SCAN_ENTRIES,
-)
-from ...artifact_retention_policy import (
     MAX_RETENTION_PROTECTED_IDS,
     MAX_RETENTION_RULES,
+    MAX_RETENTION_SCAN_DEPTH,
+    MAX_RETENTION_SCAN_ENTRIES,
     RETENTION_SELECTABLE_CLASSIFICATIONS,
     hash_json,
     is_sha256,

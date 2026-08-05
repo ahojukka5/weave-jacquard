@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from ...artifact_retention_accounting import ArtifactRetentionAccountant
+from ...artifacts.retention import ArtifactRetentionAccountant
 from ...errors import ValidationError
 from .io import ArtifactQuarantineIO
 from .restoration_contract import (

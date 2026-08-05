@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ...artifact_retention_policy import hash_json, is_sha256
+from ...artifacts.retention import hash_json, is_sha256
 from ...errors import ValidationError, WeaveFrontendError
 from .deletion import ArtifactQuarantineDeleteService
 

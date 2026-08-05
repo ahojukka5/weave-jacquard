@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from weave_frontend import artifact_retention_accounting
+import weave_frontend.artifacts.retention.accounting as artifact_retention_accounting
 from weave_frontend.artifact_reconciliation import (
     RetainedArtifactInventoryService,
 )
-from weave_frontend.artifact_retention_accounting import (
+from weave_frontend.artifacts.retention import (
     ArtifactRetentionAccountant,
 )
 from weave_frontend.errors import ValidationError
@@ -17,9 +17,7 @@ from weave_frontend.errors import ValidationError
 
 def _accountant(**kwargs: int) -> ArtifactRetentionAccountant:
     return ArtifactRetentionAccountant(
-        RetainedArtifactInventoryService.__new__(
-            RetainedArtifactInventoryService
-        ),
+        RetainedArtifactInventoryService.__new__(RetainedArtifactInventoryService),
         max_scan_entries=100,
         **kwargs,
     )

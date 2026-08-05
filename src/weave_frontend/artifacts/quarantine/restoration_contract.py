@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from ...artifact_retention_policy import (
+from ...artifacts.retention import (
     RETENTION_SELECTABLE_CLASSIFICATIONS,
     hash_json,
     is_sha256,

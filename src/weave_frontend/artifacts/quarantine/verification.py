@@ -8,8 +8,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from ...artifact_retention_accounting import ArtifactRetentionAccountant
-from ...artifact_retention_policy import hash_json, is_sha256
+from ...artifacts.retention import ArtifactRetentionAccountant, hash_json, is_sha256
 from ...errors import ValidationError
 from .io import ArtifactQuarantineIO
 from .restoration_contract import (
