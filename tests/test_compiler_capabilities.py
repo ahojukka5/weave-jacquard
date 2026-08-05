@@ -105,9 +105,7 @@ def _registry(
                 }
             ],
         },
-        "features": [
-            {"id": "typed-surface-elaboration", "status": "stable", "issue": 49}
-        ],
+        "features": [{"id": "typed-surface-elaboration", "status": "stable", "issue": 49}],
         "surface": {
             "grammar_document": "docs/language-reference.md",
             "canonical_document": "docs/canonical-surface.md",
@@ -261,9 +259,30 @@ def test_frontend_validation_records_capability_identity(tmp_path: Path) -> None
         environment_fallback=False,
     )
 
-    result = validator.validate("(program (name \"demo\") (version \"0.1\"))\n")
+    result = validator.validate('(program (name "demo") (version "0.1"))\n')
 
     assert result["available"] is True
     assert result["valid"] is True
     assert result["compiler_capabilities"]["format"] == "weavec-capabilities-v1"
     assert result["wir"] == "(core-module (core-version 2) (decls))\n"
+
+
+def test_requested_protocol_must_belong_to_selected_command(tmp_path: Path) -> None:
+    compiler = tmp_path / "weavec"
+    registry = _registry()
+    commands = registry["commands"]
+    assert isinstance(commands, list)
+    build = next(item for item in commands if item["name"] == "build")
+    build["protocols"] = [
+        value for value in build["protocols"] if value != "weavec-compilation-trace-v1"
+    ]
+    _write_compiler(compiler, registry)
+    capabilities = WeavecCapabilities(compiler, environment_fallback=False)
+
+    with pytest.raises(ValidationError) as captured:
+        capabilities.require(
+            command="build",
+            protocols=("weavec-compilation-trace-v1",),
+        )
+
+    assert captured.value.code == "WEAVEC_PROTOCOL_UNSUPPORTED"

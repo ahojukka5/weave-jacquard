@@ -16,6 +16,7 @@ IMPLEMENTATION_MODULES = {
     "bridge.py",
     "capabilities.py",
     "diagnostics.py",
+    "evidence.py",
     "inputs.py",
     "io.py",
     "limits.py",
@@ -63,6 +64,7 @@ def test_compiler_package_exposes_one_public_surface() -> None:
         "CapabilityAwareWeavecValidator",
         "CapabilityGrammarIndex",
         "collect_build_diagnostics",
+        "normalize_evidence_profile",
         "validate_compiler_manifest",
         "read_bounded_json",
     }

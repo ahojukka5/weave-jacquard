@@ -6,6 +6,7 @@ import hashlib
 import re
 from typing import Any
 
+from .compiler import normalize_evidence_profile
 from .errors import NotFoundError, ValidationError
 from .sexpr import JsonObject, head_symbol, make_atom, make_form, validate_tree
 
@@ -30,11 +31,13 @@ class BuildTargetRegistry:
         *,
         additional_documents: list[str] | None = None,
         compiler_target: str | None = None,
+        evidence_profile: str | None = None,
         author: str = "agent",
     ) -> dict[str, Any]:
         target_name = self._validate_name(name)
         documents = self._validate_document_set(document, additional_documents)
         effective_target = self._normalize_compiler_target(compiler_target)
+        effective_profile = normalize_evidence_profile(evidence_profile)
         state = self.workspace._state(project, branch)
         self._require_program_documents(state, documents)
         storage_document = self._storage_document(target_name)
@@ -42,6 +45,7 @@ class BuildTargetRegistry:
             document,
             documents[1:],
             effective_target,
+            effective_profile,
             existing=state.get(storage_document),
         )
         validate_tree(root)
@@ -51,6 +55,7 @@ class BuildTargetRegistry:
             document,
             documents[1:],
             effective_target,
+            effective_profile,
         )
         revision = self.workspace._commit(
             project,
@@ -88,9 +93,7 @@ class BuildTargetRegistry:
             state,
             message=f"delete build target {target_name}",
             author=author,
-            operations=[
-                ("delete_build_target", storage_document, {"name": target_name})
-            ],
+            operations=[("delete_build_target", storage_document, {"name": target_name})],
         )
         return {
             "name": target_name,
@@ -182,6 +185,7 @@ class BuildTargetRegistry:
                 if config["compiler_target"] == NATIVE_COMPILER_TARGET
                 else config["compiler_target"]
             ),
+            evidence_profile=config["evidence_profile"],
         )
         result["build_target"] = {
             key: config[key]
@@ -190,6 +194,7 @@ class BuildTargetRegistry:
                 "document",
                 "additional_documents",
                 "compiler_target",
+                "evidence_profile",
             )
         }
         result["build_target"]["revision_id"] = revision
@@ -219,9 +224,7 @@ class BuildTargetRegistry:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
 
     @staticmethod
     def _validate_name(name: str) -> str:
@@ -293,12 +296,14 @@ class BuildTargetRegistry:
         document: str,
         additional_documents: list[str],
         compiler_target: str,
+        evidence_profile: str,
     ) -> dict[str, Any]:
         return {
             "name": name,
             "document": document,
             "additional_documents": list(additional_documents),
             "compiler_target": compiler_target,
+            "evidence_profile": evidence_profile,
         }
 
     @classmethod
@@ -307,6 +312,7 @@ class BuildTargetRegistry:
         document: str,
         additional_documents: list[str],
         compiler_target: str,
+        evidence_profile: str,
         *,
         existing: JsonObject | None,
     ) -> JsonObject:
@@ -337,6 +343,13 @@ class BuildTargetRegistry:
                 "compiler-target",
                 compiler_target,
                 existing=cls._first(existing_fields, "compiler-target"),
+            )
+        )
+        root["children"].append(
+            cls._field(
+                "evidence-profile",
+                evidence_profile,
+                existing=cls._first(existing_fields, "evidence-profile"),
             )
         )
         return root
@@ -419,17 +432,26 @@ class BuildTargetRegistry:
         fields: dict[str, list[str]] = {}
         for field in root.get("children", [])[1:]:
             head = head_symbol(field)
-            if head not in {"primary", "source", "compiler-target"}:
+            if head not in {
+                "primary",
+                "source",
+                "compiler-target",
+                "evidence-profile",
+            }:
                 raise cls._invalid_tree(name, f"unknown field {head!r}")
-            fields.setdefault(head, []).append(
-                cls._field_value(field, target_name=name)
-            )
+            fields.setdefault(head, []).append(cls._field_value(field, target_name=name))
         if len(fields.get("primary", [])) != 1:
             raise cls._invalid_tree(name, "exactly one primary field is required")
         if len(fields.get("compiler-target", [])) != 1:
             raise cls._invalid_tree(
                 name,
                 "exactly one compiler-target field is required",
+            )
+        profiles = fields.get("evidence-profile", [])
+        if len(profiles) != 1:
+            raise cls._invalid_tree(
+                name,
+                "exactly one evidence-profile field is required",
             )
         primary = fields["primary"][0]
         sources = fields.get("source", [])
@@ -439,6 +461,7 @@ class BuildTargetRegistry:
             primary,
             sources,
             fields["compiler-target"][0],
+            normalize_evidence_profile(profiles[0]),
         )
 
     @staticmethod
