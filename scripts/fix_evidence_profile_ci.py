@@ -191,5 +191,59 @@ for path in sorted((ROOT / "tests").rglob("*.py")):
 if fixture_updates == 0:
     raise SystemExit("no BUILD_KEY_FORMAT fixtures required an explicit profile")
 
+artifact_integrity = ROOT / "tests/test_build_artifact_integrity.py"
+replace_once(
+    artifact_integrity,
+    '''        "compiler_sha256": compiler_sha256,
+        "target": target,
+        "compiler_diagnostics_protocol_valid": True,
+''',
+    '''        "compiler_sha256": compiler_sha256,
+        "target": target,
+        "evidence_profile": "none",
+        "compiler_diagnostics_protocol_valid": True,
+''',
+)
+
+cache_contract = ROOT / "tests/test_build_cache_contract.py"
+replace_once(
+    cache_contract,
+    '''    build_id = hashlib.sha256(_canonical(cache_payload)).hexdigest()[:32]
+    manifest = {
+''',
+    '''    if build_key_format == BUILD_KEY_FORMAT:
+        cache_payload["evidence_profile"] = "none"
+    build_id = hashlib.sha256(_canonical(cache_payload)).hexdigest()[:32]
+    manifest = {
+''',
+)
+replace_once(
+    cache_contract,
+    '''    (directory / "manifest.json").write_text(
+        json.dumps(manifest) + "\\n", encoding="utf-8"
+    )
+''',
+    '''    if build_key_format == BUILD_KEY_FORMAT:
+        manifest["evidence_profile"] = "none"
+    (directory / "manifest.json").write_text(
+        json.dumps(manifest) + "\\n", encoding="utf-8"
+    )
+''',
+)
+
+build_discovery = ROOT / "tests/test_build_discovery.py"
+replace_once(
+    build_discovery,
+    '''    manifest.update(
+        {
+            "source_sha256": key_documents[0]["source_sha256"],
+''',
+    '''    manifest.update(
+        {
+            "evidence_profile": "none",
+            "source_sha256": key_documents[0]["source_sha256"],
+''',
+)
+
 (ROOT / ".github/workflows/fix-evidence-profile-ci.yml").unlink()
 Path(__file__).unlink()
