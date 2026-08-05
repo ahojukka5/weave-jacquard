@@ -1,0 +1,47 @@
+name: Generate compiler alias cleanup from PR
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: write
+
+jobs:
+  rewrite:
+    if: >-
+      github.head_ref == 'agent/compiler-alias-cleanup-runner' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out generator branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Generate alias-free compiler tree
+        run: python scripts/compiler_alias_cleanup.py
+
+      - name: Validate generated tree
+        run: |
+          python -m compileall -q src tests scripts
+          python -m pip install -e '.[dev]'
+          python -m pytest -q tests/test_compiler_package_architecture.py
+          python -m ruff check .
+
+      - name: Commit generated cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit \
+            -m "refactor(compiler): remove compatibility layers" \
+            -m "Migrate every repository caller to the owned compiler package and remove obsolete flat aliases and pass-through dependency adapters."
+          git push origin HEAD:${{ github.head_ref }}
