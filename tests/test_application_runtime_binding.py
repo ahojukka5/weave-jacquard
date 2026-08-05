@@ -8,16 +8,16 @@ from typing import Any
 
 import pytest
 
-from weave_frontend.application_runtime_binding import bind_application_runtime
 from weave_frontend.mcp_capabilities import (
     ApplicationContext,
     Capability,
     install_public_capabilities,
 )
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import (
+from weave_frontend.runtime import (
     RuntimeClosedError,
+    RuntimeConfig,
     RuntimeServices,
+    bind_application_runtime,
     clear_runtime_service,
     runtime_config,
     runtime_service_cache_info,
@@ -50,9 +50,7 @@ class _FakeFastMCP:
 
 def _runtime(tmp_path: Path, name: str) -> RuntimeServices:
     return RuntimeServices(
-        RuntimeConfig.from_environ(
-            {"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")}
-        )
+        RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")})
     )
 
 
@@ -109,12 +107,8 @@ def test_concurrent_runtime_bindings_overlap_without_cross_contamination(
                 await release.wait()
                 observations.append((f"{name}:after", runtime_services()))
 
-        left_task = asyncio.create_task(
-            observe("left", left, left_started, right_started)
-        )
-        right_task = asyncio.create_task(
-            observe("right", right, right_started, left_started)
-        )
+        left_task = asyncio.create_task(observe("left", left, left_started, right_started))
+        right_task = asyncio.create_task(observe("right", right, right_started, left_started))
         await left_started.wait()
         await right_started.wait()
         release.set()
@@ -209,9 +203,7 @@ def test_capability_loading_and_installation_use_context_runtime(
         else:
 
             def install_capability(selected: ApplicationContext) -> None:
-                observed.append(
-                    ("install:context", runtime_services(), runtime_config())
-                )
+                observed.append(("install:context", runtime_services(), runtime_config()))
                 assert selected is context
 
             module.install_capability = install_capability  # type: ignore[attr-defined]
@@ -227,14 +219,8 @@ def test_capability_loading_and_installation_use_context_runtime(
     )
 
     assert observed
-    assert all(
-        runtime is application_runtime
-        for _event, runtime, _config in observed
-    )
-    assert all(
-        config is application_runtime.config
-        for _event, _runtime, config in observed
-    )
+    assert all(runtime is application_runtime for _event, runtime, _config in observed)
+    assert all(config is application_runtime.config for _event, _runtime, config in observed)
     assert application_runtime.service_initialized("legacy_probe")
     assert not process_runtime.service_initialized("legacy_probe")
     assert server._mcp_server.instructions == "bound instructions"

@@ -15,10 +15,10 @@ from .merge_impact import MergeTargetImpactService
 from .merge_preview import MergePreviewService
 from .merge_validation import MergeValidationService
 from .merge_validation_set import MergeValidationSetService
-from .quota_aware_compiler_bridge import CompilerBridge
 from .revision_diff import RevisionNodeDiffService
 from .revision_inspection import RevisionNodeInspectionService
-from .runtime_container import (
+from .runtime import (
+    CompilerBridge,
     clear_runtime_compiler_bridge,
     compiler_bridge_cache_info,
     runtime_service,
@@ -113,9 +113,7 @@ def branch_merge_preview(
 ) -> dict[str, object]:
     """Preview a stable-ID merge without advancing either branch."""
 
-    return _result(
-        lambda: merge_previews().preview(project, target_branch, source_branch)
-    )
+    return _result(lambda: merge_previews().preview(project, target_branch, source_branch))
 
 
 @mcp.tool()

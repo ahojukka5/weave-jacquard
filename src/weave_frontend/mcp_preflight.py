@@ -6,7 +6,7 @@ from .mcp_build import merge_impacts, merge_validation_sets
 from .mcp_server import _result, mcp, workspace
 from .merge_policy import MergePolicyRegistry
 from .merge_preflight import MergePreflightService
-from .runtime_container import runtime_service
+from .runtime import runtime_service
 
 
 @runtime_service("merge_policies", depends_on=("workspace",))

@@ -8,9 +8,9 @@ from types import SimpleNamespace
 import pytest
 
 import weave_frontend.mcp_artifact_storage as artifact_module
-import weave_frontend.runtime_container as runtime_module
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import (
+import weave_frontend.runtime.container as runtime_module
+from weave_frontend.runtime import (
+    RuntimeConfig,
     RuntimeServices,
     close_runtime_services,
     install_runtime_services,
@@ -121,11 +121,6 @@ def test_artifact_services_are_runtime_owned(
         lambda: attestations,
     )
     monkeypatch.setattr(artifact_module, "database_backups", lambda: backups)
-    monkeypatch.setattr(
-        artifact_module,
-        "install_quota_aware_compiler_bridge",
-        lambda bridge: bridge,
-    )
 
     runtime = RuntimeServices(
         _config(tmp_path),

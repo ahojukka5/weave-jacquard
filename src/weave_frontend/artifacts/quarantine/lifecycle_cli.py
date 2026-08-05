@@ -11,7 +11,7 @@ from typing import Any, BinaryIO
 
 from ...errors import ValidationError, WeaveFrontendError
 from ...mcp_artifact_storage import artifact_reconciliation
-from ...runtime_container import close_runtime_services
+from ...runtime import close_runtime_services
 from .deletion_batch import (
     ArtifactQuarantineDeleteBatchService,
 )

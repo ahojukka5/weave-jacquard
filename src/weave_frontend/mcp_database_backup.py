@@ -6,7 +6,7 @@ from typing import Any
 
 from .database_backup import DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS
 from .mcp_server import _result, mcp, workspace
-from .runtime_container import runtime_config, runtime_service
+from .runtime import runtime_config, runtime_service
 from .verified_database_backup import DatabaseBackupService
 
 DATABASE_BACKUP_ROOT_ENV = "WEAVE_DATABASE_BACKUP_ROOT"
@@ -28,9 +28,7 @@ def database_backup_create(
 ) -> dict[str, Any]:
     """Create and verify one immutable online SQLite backup."""
 
-    return _result(
-        lambda: database_backups().create(timeout_seconds=timeout_seconds)
-    )
+    return _result(lambda: database_backups().create(timeout_seconds=timeout_seconds))
 
 
 @mcp.tool()

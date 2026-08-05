@@ -5,23 +5,21 @@ from types import SimpleNamespace
 import pytest
 
 import weave_frontend.mcp_concurrent_nodes as concurrent_nodes
-from weave_frontend.application_runtime_binding import bind_application_runtime
 from weave_frontend.context_capability_installers import (
     install_production_capability,
 )
 from weave_frontend.mcp_capabilities import ApplicationContext
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import (
+from weave_frontend.runtime import (
     RuntimeClosedError,
+    RuntimeConfig,
     RuntimeServices,
+    bind_application_runtime,
     runtime_services,
 )
 
 
 def _runtime(database: str) -> RuntimeServices:
-    return RuntimeServices(
-        RuntimeConfig.from_environ({"WEAVE_DB_PATH": database})
-    )
+    return RuntimeServices(RuntimeConfig.from_environ({"WEAVE_DB_PATH": database}))
 
 
 def test_public_application_owns_exact_process_context() -> None:

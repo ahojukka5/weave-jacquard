@@ -11,7 +11,7 @@ from .metadata_build_targets import BuildTargetRegistry
 from .metadata_merge_impact import MergeTargetImpactService
 from .metadata_merge_preview import MergePreviewService
 from .metadata_selected_merge_train_preview import SelectedMergeTrainPreviewService
-from .runtime_container import runtime_service
+from .runtime import runtime_service
 from .test_target_views import (
     DEFAULT_TEST_TARGET_PAGE_SIZE,
     TestTargetPageService,

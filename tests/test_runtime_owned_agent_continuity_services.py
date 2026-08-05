@@ -10,9 +10,9 @@ import weave_frontend.mcp_agent_checkpoint_timeline as timeline_module
 import weave_frontend.mcp_build as build_module
 import weave_frontend.mcp_project_agent_status as status_module
 import weave_frontend.mcp_task_contracts as task_module
-import weave_frontend.runtime_container as runtime_module
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import (
+import weave_frontend.runtime.container as runtime_module
+from weave_frontend.runtime import (
+    RuntimeConfig,
     RuntimeServices,
     close_runtime_services,
     install_runtime_services,
@@ -36,9 +36,7 @@ def _isolated_process_runtime() -> Iterator[None]:
 
 
 def _config(tmp_path: Path) -> RuntimeConfig:
-    return RuntimeConfig.from_environ(
-        {"WEAVE_DB_PATH": str(tmp_path / "runtime.db")}
-    )
+    return RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / "runtime.db")})
 
 
 def test_agent_continuity_services_are_runtime_owned(tmp_path: Path) -> None:
@@ -64,22 +62,15 @@ def test_agent_continuity_services_are_runtime_owned(tmp_path: Path) -> None:
         assert timelines.registry is checkpoints
         assert statuses.checkpoints is checkpoints
 
-        entries = {
-            item["name"]: item
-            for item in services.service_manifest()["services"]
-        }
+        entries = {item["name"]: item for item in services.service_manifest()["services"]}
         assert entries["task_contracts"]["depends_on"] == ["workspace"]
         assert entries["task_scoped_batches"]["depends_on"] == [
             "edit_batches",
             "task_contracts",
         ]
         assert entries["agent_checkpoints"]["depends_on"] == ["workspace"]
-        assert entries["checkpoint_timelines"]["depends_on"] == [
-            "agent_checkpoints"
-        ]
-        assert entries["project_agent_statuses"]["depends_on"] == [
-            "agent_checkpoints"
-        ]
+        assert entries["checkpoint_timelines"]["depends_on"] == ["agent_checkpoints"]
+        assert entries["project_agent_statuses"]["depends_on"] == ["agent_checkpoints"]
 
         services.clear_service("workspace")
 

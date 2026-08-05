@@ -13,10 +13,10 @@ from functools import wraps
 from threading import RLock
 from typing import Any, TypeVar, cast
 
-from .compiler import WeavecValidator
-from .quota_aware_compiler_bridge import CompilerBridge
-from .runtime_config import RuntimeConfig
-from .verified_workspace import SExpressionWorkspace
+from ..compiler import WeavecValidator
+from ..verified_workspace import SExpressionWorkspace
+from .config import RuntimeConfig
+from .publication import CompilerBridge
 
 WorkspaceFactory = Callable[[RuntimeConfig], Any]
 CompilerBridgeFactory = Callable[[Any, RuntimeConfig], Any]
@@ -57,9 +57,7 @@ def _register_runtime_service(
     dependencies: Iterable[str],
 ) -> None:
     service_name = _validate_service_name(name)
-    dependency_names = frozenset(
-        _validate_service_name(dependency) for dependency in dependencies
-    )
+    dependency_names = frozenset(_validate_service_name(dependency) for dependency in dependencies)
     with _declaration_lock:
         previous = _runtime_service_declarations.get(service_name)
         if previous is not None and previous[0] != origin:
@@ -90,9 +88,7 @@ class RuntimeServices:
     ) -> None:
         self.config = config
         self._workspace_factory = workspace_factory or self._default_workspace
-        self._compiler_bridge_factory = (
-            compiler_bridge_factory or self._default_compiler_bridge
-        )
+        self._compiler_bridge_factory = compiler_bridge_factory or self._default_compiler_bridge
         self._services: dict[str, Any] = {}
         self._service_origins: dict[str, str] = {}
         self._service_dependencies: dict[str, set[str]] = {}
@@ -162,18 +158,14 @@ class RuntimeServices:
         """Return one lazy named service and record its deterministic dependencies."""
 
         service_name = _validate_service_name(name)
-        dependencies = tuple(
-            _validate_service_name(dependency) for dependency in depends_on
-        )
+        dependencies = tuple(_validate_service_name(dependency) for dependency in depends_on)
         factory_origin = origin or _factory_origin(factory)
         with self._lock:
             self._require_open()
             self._record_parent_dependency(service_name)
             self._declare_service(service_name, factory_origin, dependencies)
             if service_name in self._services:
-                self._service_hits[service_name] = (
-                    self._service_hits.get(service_name, 0) + 1
-                )
+                self._service_hits[service_name] = self._service_hits.get(service_name, 0) + 1
                 return cast(ServiceValue, self._services[service_name])
             if service_name in self._construction_stack:
                 cycle = [*self._construction_stack, service_name]
@@ -181,9 +173,7 @@ class RuntimeServices:
                     "runtime service dependency cycle: " + " -> ".join(cycle)
                 )
 
-            self._service_misses[service_name] = (
-                self._service_misses.get(service_name, 0) + 1
-            )
+            self._service_misses[service_name] = self._service_misses.get(service_name, 0) + 1
             self._construction_stack.append(service_name)
             try:
                 value = factory()
@@ -300,8 +290,7 @@ class RuntimeServices:
         previous_origin = self._service_origins.get(name)
         if previous_origin is not None and previous_origin != origin:
             raise RuntimeError(
-                f"runtime service {name!r} was declared by both "
-                f"{previous_origin!r} and {origin!r}"
+                f"runtime service {name!r} was declared by both {previous_origin!r} and {origin!r}"
             )
         self._service_origins[name] = origin
         declared = self._service_dependencies.setdefault(name, set())
@@ -314,9 +303,7 @@ class RuntimeServices:
             value = self._services.pop(name, None)
             if value is not None:
                 close_values.append(value)
-        self._service_order = [
-            name for name in self._service_order if name not in selected
-        ]
+        self._service_order = [name for name in self._service_order if name not in selected]
         for name in names:
             self._service_hits.pop(name, None)
             self._service_misses.pop(name, None)
@@ -340,9 +327,7 @@ class RuntimeServices:
             if name in visited:
                 return
             if name in visiting:
-                raise RuntimeServiceCycleError(
-                    "runtime service dependency graph contains a cycle"
-                )
+                raise RuntimeServiceCycleError("runtime service dependency graph contains a cycle")
             visiting.add(name)
             for dependent in sorted(
                 reverse_dependencies[name],
@@ -558,9 +543,7 @@ def runtime_service(
     """Decorate a no-argument factory as one selected-runtime lazy service."""
 
     service_name = _validate_service_name(name)
-    dependency_names = tuple(
-        _validate_service_name(dependency) for dependency in depends_on
-    )
+    dependency_names = tuple(_validate_service_name(dependency) for dependency in depends_on)
 
     def decorate(factory: Callable[[], ServiceValue]) -> Callable[[], ServiceValue]:
         origin = _factory_origin(factory)

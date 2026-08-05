@@ -8,7 +8,7 @@ import pytest
 import weave_frontend.application as application_module
 import weave_frontend.mcp_artifact_storage as composition
 from weave_frontend.artifacts.quota import ARTIFACT_QUOTA_ENV
-from weave_frontend.quota_aware_compiler_bridge import CompilerBridge
+from weave_frontend.runtime import CompilerBridge
 
 
 def test_quota_composition_attaches_one_guard_to_every_publisher(

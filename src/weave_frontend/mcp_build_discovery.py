@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .mcp_build import compiler_bridge
 from .mcp_server import _result, mcp
-from .runtime_container import runtime_service
+from .runtime import runtime_service
 from .verified_build_discovery import BuildDiscoveryService
 
 

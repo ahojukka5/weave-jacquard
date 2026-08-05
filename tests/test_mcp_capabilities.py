@@ -14,8 +14,7 @@ from weave_frontend.mcp_capabilities import (
     install_public_capabilities,
     validate_capabilities,
 )
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import RuntimeServices
+from weave_frontend.runtime import RuntimeConfig, RuntimeServices
 
 
 @dataclass
@@ -48,9 +47,7 @@ class _FakeFastMCP:
 
 
 def _runtime() -> RuntimeServices:
-    return RuntimeServices(
-        RuntimeConfig.from_environ({"WEAVE_DB_PATH": "capability-test.db"})
-    )
+    return RuntimeServices(RuntimeConfig.from_environ({"WEAVE_DB_PATH": "capability-test.db"}))
 
 
 def test_public_capabilities_have_unique_dependency_order() -> None:
@@ -83,12 +80,8 @@ def test_public_capabilities_have_unique_dependency_order() -> None:
     assert names.index("test_runs") < names.index("test_batches")
     assert names.index("test_batches") < names.index("test_impact")
     assert names.index("test_impact") < names.index("merge_test_impact")
-    assert names.index("merge_test_impact") < names.index(
-        "merge_candidate_test_execution"
-    )
-    assert names.index("merge_candidate_test_execution") < names.index(
-        "tested_merge_attestations"
-    )
+    assert names.index("merge_test_impact") < names.index("merge_candidate_test_execution")
+    assert names.index("merge_candidate_test_execution") < names.index("tested_merge_attestations")
     assert names.index("tested_merge_attestations") < names.index("revision_evidence")
     assert names.index("build_discovery") < names.index("revision_evidence")
     assert names.index("test_batches") < names.index("revision_evidence")

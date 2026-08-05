@@ -7,7 +7,7 @@ from typing import Any
 from .mcp_build import build_targets
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_targets import test_targets
-from .runtime_container import runtime_service
+from .runtime import runtime_service
 from .test_impact import (
     DEFAULT_TEST_IMPACT_EVIDENCE_LIMIT,
     DEFAULT_TEST_IMPACT_PAGE_SIZE,

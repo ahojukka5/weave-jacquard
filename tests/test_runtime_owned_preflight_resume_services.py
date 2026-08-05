@@ -11,9 +11,9 @@ import weave_frontend.mcp_preflight as preflight_module
 import weave_frontend.mcp_resume_snapshot as resume_module
 import weave_frontend.mcp_task_contracts as task_module
 import weave_frontend.mcp_test_targets as test_target_module
-import weave_frontend.runtime_container as runtime_module
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import (
+import weave_frontend.runtime.container as runtime_module
+from weave_frontend.runtime import (
+    RuntimeConfig,
     RuntimeServices,
     close_runtime_services,
     install_runtime_services,
@@ -37,9 +37,7 @@ def _isolated_process_runtime() -> Iterator[None]:
 
 
 def _config(tmp_path: Path) -> RuntimeConfig:
-    return RuntimeConfig.from_environ(
-        {"WEAVE_DB_PATH": str(tmp_path / "runtime.db")}
-    )
+    return RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / "runtime.db")})
 
 
 def test_preflight_and_resume_services_are_runtime_owned(tmp_path: Path) -> None:
@@ -67,10 +65,7 @@ def test_preflight_and_resume_services_are_runtime_owned(tmp_path: Path) -> None
         assert snapshots.tests is test_target_module.test_targets()
         assert snapshots.tasks is task_module.task_contracts()
 
-        entries = {
-            item["name"]: item
-            for item in services.service_manifest()["services"]
-        }
+        entries = {item["name"]: item for item in services.service_manifest()["services"]}
         assert entries["merge_policies"]["depends_on"] == ["workspace"]
         assert entries["merge_preflights"]["depends_on"] == [
             "merge_impacts",

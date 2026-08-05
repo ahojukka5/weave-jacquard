@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from . import runtime_container as _runtime
-from .runtime_container import RuntimeServices
+from . import container as _runtime
+from .container import RuntimeServices
 
 
 @contextmanager

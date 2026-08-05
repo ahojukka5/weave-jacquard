@@ -10,9 +10,9 @@ import weave_frontend.mcp_merge_candidate_test_runs as candidate_module
 import weave_frontend.mcp_merge_test_impact as impact_module
 import weave_frontend.mcp_test_targets as target_module
 import weave_frontend.mcp_tested_merge_attestations as attestation_module
-import weave_frontend.runtime_container as runtime_module
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import (
+import weave_frontend.runtime.container as runtime_module
+from weave_frontend.runtime import (
+    RuntimeConfig,
     RuntimeServices,
     close_runtime_services,
     install_runtime_services,
@@ -80,10 +80,7 @@ def test_virtual_candidate_services_are_runtime_owned(tmp_path: Path) -> None:
         assert attestations.workspace is workspace
         assert attestations.qualifications is batches
 
-        entries = {
-            item["name"]: item
-            for item in services.service_manifest()["services"]
-        }
+        entries = {item["name"]: item for item in services.service_manifest()["services"]}
         assert entries["merge_candidate_builds"]["depends_on"] == [
             "build_targets",
             "compiler_bridge",

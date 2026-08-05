@@ -9,7 +9,7 @@ from .mcp_preflight import merge_policies
 from .mcp_project_merge_queue import project_merge_queues
 from .mcp_server import _result, mcp
 from .project_merge_impact_queue import ProjectMergeImpactQueueService
-from .runtime_container import runtime_service
+from .runtime import runtime_service
 
 
 @runtime_service(
