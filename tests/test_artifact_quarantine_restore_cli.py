@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-import weave_frontend.artifact_quarantine_restore_cli as cli_module
+import weave_frontend.artifacts.quarantine.restoration_cli as cli_module
 
 _RESULT = {
     "format": "weave-artifact-quarantine-restore-result-v1",
@@ -95,15 +95,14 @@ def test_cli_emits_structured_restore_error_and_closes_runtime(
     assert captured.out == ""
     error = json.loads(captured.err)
     assert error["ok"] is False
-    assert error["error"]["code"] == (
-        "ARTIFACT_QUARANTINE_RESTORE_ID_INVALID"
-    )
+    assert error["error"]["code"] == ("ARTIFACT_QUARANTINE_RESTORE_ID_INVALID")
     assert closed == [True]
 
 
 def test_console_script_exposes_operator_quarantine_restore() -> None:
     project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
-    assert project["project"]["scripts"][
-        "weave-artifact-quarantine-restore"
-    ] == "weave_frontend.artifact_quarantine_restore_cli:main"
+    assert (
+        project["project"]["scripts"]["weave-artifact-quarantine-restore"]
+        == "weave_frontend.artifacts.quarantine.restoration_cli:main"
+    )

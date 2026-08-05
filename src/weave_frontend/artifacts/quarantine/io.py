@@ -11,8 +11,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from .errors import ValidationError
-from .retained_artifact_io import (
+from ...errors import ValidationError
+from ...retained_artifact_io import (
     RetainedArtifactReadError,
     read_bounded_regular_json,
 )

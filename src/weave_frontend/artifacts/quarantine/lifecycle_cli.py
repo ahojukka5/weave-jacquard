@@ -9,19 +9,17 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, BinaryIO
 
-from .artifact_quarantine_delete_batch import (
+from ...errors import ValidationError, WeaveFrontendError
+from ...mcp_artifact_storage import artifact_reconciliation
+from ...runtime_container import close_runtime_services
+from .deletion_batch import (
     ArtifactQuarantineDeleteBatchService,
 )
-from .artifact_quarantine_verification import (
+from .verification import (
     ArtifactQuarantineVerificationService,
 )
-from .errors import ValidationError, WeaveFrontendError
-from .mcp_artifact_storage import artifact_reconciliation
-from .runtime_container import close_runtime_services
 
-ARTIFACT_QUARANTINE_DELETE_REQUEST_FORMAT = (
-    "weave-artifact-quarantine-delete-request-v1"
-)
+ARTIFACT_QUARANTINE_DELETE_REQUEST_FORMAT = "weave-artifact-quarantine-delete-request-v1"
 MAX_ARTIFACT_QUARANTINE_DELETE_REQUEST_BYTES = 16 * 1024 * 1024
 
 
@@ -80,9 +78,7 @@ def generate_verification(
 ) -> dict[str, Any]:
     """Verify through the production reconciliation and retained family graph."""
 
-    return ArtifactQuarantineVerificationService(
-        artifact_reconciliation()
-    ).verify(
+    return ArtifactQuarantineVerificationService(artifact_reconciliation()).verify(
         quarantine_id=quarantine_id,
         manifest_id=manifest_id,
         plan_id=plan_id,
@@ -94,9 +90,7 @@ def generate_verification(
 def generate_delete_batch(entries: list[Mapping[str, Any]]) -> dict[str, Any]:
     """Delete an explicit batch through production reconciliation services."""
 
-    return ArtifactQuarantineDeleteBatchService(
-        artifact_reconciliation()
-    ).delete_batch(entries)
+    return ArtifactQuarantineDeleteBatchService(artifact_reconciliation()).delete_batch(entries)
 
 
 def load_delete_request(value: str) -> list[Mapping[str, Any]]:

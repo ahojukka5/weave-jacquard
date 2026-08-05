@@ -5,13 +5,11 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from .artifact_quarantine_delete import ArtifactQuarantineDeleteService
-from .artifact_retention_policy import hash_json, is_sha256
-from .errors import ValidationError, WeaveFrontendError
+from ...artifact_retention_policy import hash_json, is_sha256
+from ...errors import ValidationError, WeaveFrontendError
+from .deletion import ArtifactQuarantineDeleteService
 
-ARTIFACT_QUARANTINE_DELETE_BATCH_FORMAT = (
-    "weave-artifact-quarantine-delete-batch-v1"
-)
+ARTIFACT_QUARANTINE_DELETE_BATCH_FORMAT = "weave-artifact-quarantine-delete-batch-v1"
 MAX_ARTIFACT_QUARANTINE_DELETE_BATCH_ENTRIES = 100
 _REQUIRED_ENTRY_KEYS = {
     "quarantine_id",

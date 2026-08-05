@@ -7,10 +7,10 @@ import json
 import sys
 from typing import Any
 
-from .artifact_quarantine_restore import ArtifactQuarantineRestoreService
-from .errors import ValidationError, WeaveFrontendError
-from .mcp_artifact_storage import artifact_reconciliation
-from .runtime_container import close_runtime_services
+from ...errors import ValidationError, WeaveFrontendError
+from ...mcp_artifact_storage import artifact_reconciliation
+from ...runtime_container import close_runtime_services
+from .restoration import ArtifactQuarantineRestoreService
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -43,9 +43,7 @@ def generate_restore(
 ) -> dict[str, Any]:
     """Restore through the production reconciliation and family graph."""
 
-    return ArtifactQuarantineRestoreService(
-        artifact_reconciliation()
-    ).restore(
+    return ArtifactQuarantineRestoreService(artifact_reconciliation()).restore(
         quarantine_id=quarantine_id,
         manifest_id=manifest_id,
     )

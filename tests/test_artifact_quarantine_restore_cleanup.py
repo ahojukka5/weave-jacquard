@@ -7,10 +7,6 @@ from typing import Any
 
 import pytest
 
-from weave_frontend.artifact_quarantine import ArtifactQuarantineService
-from weave_frontend.artifact_quarantine_restore import (
-    ArtifactQuarantineRestoreService,
-)
 from weave_frontend.artifact_reachability import ArtifactReconciliationService
 from weave_frontend.artifact_reconciliation import (
     RetainedArtifactFamily,
@@ -20,6 +16,10 @@ from weave_frontend.artifact_retention import (
     ARTIFACT_RETENTION_POLICY_FORMAT,
     ArtifactRetentionPlanner,
 )
+from weave_frontend.artifacts.quarantine.restoration import (
+    ArtifactQuarantineRestoreService,
+)
+from weave_frontend.artifacts.quarantine.service import ArtifactQuarantineService
 from weave_frontend.database import Database
 
 _HEX32 = re.compile(r"^[0-9a-f]{32}$")
@@ -101,9 +101,7 @@ def test_restore_resumes_partially_completed_capsule_cleanup(
             )
         capsule = root / f".quarantine-{quarantine['quarantine_entry_id']}"
         assert (root / artifact_id).is_dir()
-        assert sorted(path.name for path in capsule.iterdir()) == [
-            "quarantine-manifest.json"
-        ]
+        assert sorted(path.name for path in capsule.iterdir()) == ["quarantine-manifest.json"]
 
         monkeypatch.setattr(Path, "unlink", original_unlink)
         result = service.restore(

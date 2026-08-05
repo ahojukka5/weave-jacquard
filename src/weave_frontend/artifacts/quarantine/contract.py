@@ -7,15 +7,15 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from .artifact_retention import (
+from ...artifact_retention import (
     ARTIFACT_RETENTION_PLAN_FORMAT,
     MAX_RETENTION_PLAN_ENTRIES,
 )
-from .artifact_retention_accounting import (
+from ...artifact_retention_accounting import (
     MAX_RETENTION_SCAN_DEPTH,
     MAX_RETENTION_SCAN_ENTRIES,
 )
-from .artifact_retention_policy import (
+from ...artifact_retention_policy import (
     MAX_RETENTION_PROTECTED_IDS,
     MAX_RETENTION_RULES,
     RETENTION_SELECTABLE_CLASSIFICATIONS,
@@ -23,7 +23,7 @@ from .artifact_retention_policy import (
     is_sha256,
     normalize_retention_policy,
 )
-from .errors import ValidationError
+from ...errors import ValidationError
 
 ARTIFACT_QUARANTINE_FORMAT = "weave-artifact-quarantine-v1"
 ARTIFACT_QUARANTINE_INTENT_FORMAT = "weave-artifact-quarantine-intent-v1"
@@ -137,9 +137,7 @@ def validate_quarantine_request(
     for name in ("reconciliation_id", "policy_id", "plan_id"):
         if not is_sha256(normalized_plan.get(name)):
             _plan_error(f"{name} must be lowercase SHA-256")
-    if normalized_plan["reconciliation_id"] != normalized_policy[
-        "reconciliation_id"
-    ]:
+    if normalized_plan["reconciliation_id"] != normalized_policy["reconciliation_id"]:
         _plan_error("policy and plan reconciliation identities differ")
     if normalized_plan["policy_id"] != hash_json(normalized_policy):
         _plan_error("policy identity does not match the plan")
@@ -202,11 +200,7 @@ def validate_quarantine_request(
             "entry_id must be 64 lowercase hexadecimal characters",
         )
     selected = next(
-        (
-            copy.deepcopy(dict(item))
-            for item in entries
-            if item.get("entry_id") == entry_id
-        ),
+        (copy.deepcopy(dict(item)) for item in entries if item.get("entry_id") == entry_id),
         None,
     )
     if selected is None:
@@ -331,16 +325,10 @@ def build_manifest(
         "original_entry_type": entry["entry_type"],
         "payload": "payload",
         "quarantined_at_unix_ns": intent["quarantined_at_unix_ns"],
-        "source_entry_snapshot_id": intent["source_capture"][
-            "entry_snapshot_id"
-        ],
-        "source_relocation_snapshot_id": intent["source_capture"][
-            "relocation_snapshot_id"
-        ],
+        "source_entry_snapshot_id": intent["source_capture"]["entry_snapshot_id"],
+        "source_relocation_snapshot_id": intent["source_capture"]["relocation_snapshot_id"],
         "quarantined_entry_snapshot_id": capture["entry_snapshot_id"],
-        "quarantined_relocation_snapshot_id": capture[
-            "relocation_snapshot_id"
-        ],
+        "quarantined_relocation_snapshot_id": capture["relocation_snapshot_id"],
         **{name: capture[name] for name in _CAPTURE_COUNT_KEYS},
     }
     return {**identity, "manifest_id": hash_json(identity)}
@@ -352,13 +340,8 @@ def verify_relocation(
 ) -> None:
     """Reject a payload that differs across the atomic rename."""
 
-    changed = (
-        source["relocation_snapshot_id"]
-        != quarantined["relocation_snapshot_id"]
-        or any(
-            source[name] != quarantined[name]
-            for name in _CAPTURE_COUNT_KEYS
-        )
+    changed = source["relocation_snapshot_id"] != quarantined["relocation_snapshot_id"] or any(
+        source[name] != quarantined[name] for name in _CAPTURE_COUNT_KEYS
     )
     if changed:
         raise ValidationError(
@@ -374,25 +357,16 @@ def valid_capture(value: Any) -> bool:
     }
     if not isinstance(value, Mapping) or set(value) != required:
         return False
-    if not is_sha256(value["entry_snapshot_id"]) or not is_sha256(
-        value["relocation_snapshot_id"]
-    ):
+    if not is_sha256(value["entry_snapshot_id"]) or not is_sha256(value["relocation_snapshot_id"]):
         return False
     return all(
-        not isinstance(value[name], bool)
-        and isinstance(value[name], int)
-        and value[name] >= 0
+        not isinstance(value[name], bool) and isinstance(value[name], int) and value[name] >= 0
         for name in _CAPTURE_COUNT_KEYS
     )
 
 
 def validate_original_name(value: Any) -> None:
-    if (
-        not isinstance(value, str)
-        or not value
-        or value in {".", ".."}
-        or Path(value).name != value
-    ):
+    if not isinstance(value, str) or not value or value in {".", ".."} or Path(value).name != value:
         _metadata_error("quarantine original name is invalid")
 
 
@@ -429,8 +403,7 @@ def _validate_plan_entry(reconciliation: Any, entry: Mapping[str, Any]) -> None:
     ):
         _plan_error("selected plan entry fields are invalid")
     patterns = {
-        family.name: family.artifact_id_pattern
-        for family in reconciliation.inventory.families
+        family.name: family.artifact_id_pattern for family in reconciliation.inventory.families
     }
     if entry["family"] not in patterns:
         _plan_error("selected plan entry family is not configured")
@@ -447,10 +420,7 @@ def _validate_plan_entry(reconciliation: Any, entry: Mapping[str, Any]) -> None:
         if not is_sha256(entry.get(name)):
             _plan_error("selected plan entry identities are invalid")
     artifact_id = entry.get("artifact_id")
-    if (
-        artifact_id is not None
-        and patterns[entry["family"]].fullmatch(artifact_id) is None
-    ):
+    if artifact_id is not None and patterns[entry["family"]].fullmatch(artifact_id) is None:
         _plan_error("selected artifact identity is invalid for its family")
     for name in (
         "mtime_unix_ns",
@@ -466,11 +436,7 @@ def _nonnegative_int(
     *,
     metadata: bool = False,
 ) -> None:
-    invalid = (
-        isinstance(value, bool)
-        or not isinstance(value, int)
-        or not 0 <= value <= 2**63 - 1
-    )
+    invalid = isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 2**63 - 1
     if invalid:
         if metadata:
             _metadata_error(f"{name} must be a non-negative signed 64-bit integer")
