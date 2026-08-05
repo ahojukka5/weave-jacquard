@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .build_targets import BuildTargetRegistry as _BaseBuildTargetRegistry
+from .compiler import normalize_evidence_profile
 from .errors import NotFoundError, ValidationError
 from .revision_limits import MAX_BUILD_DOCUMENTS
 from .sexpr import validate_tree
@@ -23,8 +24,7 @@ class BuildTargetRegistry(_BaseBuildTargetRegistry):
         if len(documents) > MAX_BUILD_DOCUMENTS:
             raise ValidationError(
                 "BUILD_DOCUMENT_LIMIT_EXCEEDED",
-                "one build target may reference at most "
-                f"{MAX_BUILD_DOCUMENTS} documents",
+                f"one build target may reference at most {MAX_BUILD_DOCUMENTS} documents",
             )
         return documents
 
@@ -37,12 +37,14 @@ class BuildTargetRegistry(_BaseBuildTargetRegistry):
         *,
         additional_documents: list[str] | None = None,
         compiler_target: str | None = None,
+        evidence_profile: str | None = None,
         expected_revision_id: str | None = None,
         author: str = "agent",
     ) -> dict[str, Any]:
         target_name = self._validate_name(name)
         documents = self._validate_document_set(document, additional_documents)
         effective_target = self._normalize_compiler_target(compiler_target)
+        effective_profile = normalize_evidence_profile(evidence_profile)
         base_revision_id, state = self.workspace._state_for_write(
             project,
             branch,
@@ -54,6 +56,7 @@ class BuildTargetRegistry(_BaseBuildTargetRegistry):
             document,
             documents[1:],
             effective_target,
+            effective_profile,
             existing=state.get(storage_document),
         )
         validate_tree(root)
@@ -63,6 +66,7 @@ class BuildTargetRegistry(_BaseBuildTargetRegistry):
             document,
             documents[1:],
             effective_target,
+            effective_profile,
         )
         revision = self.workspace._commit(
             project,
@@ -108,9 +112,7 @@ class BuildTargetRegistry(_BaseBuildTargetRegistry):
             state,
             message=f"delete build target {target_name}",
             author=author,
-            operations=[
-                ("delete_build_target", storage_document, {"name": target_name})
-            ],
+            operations=[("delete_build_target", storage_document, {"name": target_name})],
             expected_branch_heads={branch: base_revision_id},
             stale_error_code="STALE_BRANCH_HEAD",
         )

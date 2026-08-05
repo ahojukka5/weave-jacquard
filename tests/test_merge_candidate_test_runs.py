@@ -160,6 +160,7 @@ def _state() -> tuple[dict[str, Any], dict[str, Any]]:
         "main.weave",
         [],
         "native",
+        "none",
         existing=None,
     )
     passing_config = TestTargetRegistry._config(
@@ -199,7 +200,7 @@ def _state() -> tuple[dict[str, Any], dict[str, Any]]:
 
 def _fake_compiler(path: Path) -> Path:
     path.write_text(
-        r'''#!/usr/bin/env python3
+        r"""#!/usr/bin/env python3
 from __future__ import annotations
 import json
 import os
@@ -246,14 +247,16 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-''',
+""",
         encoding="utf-8",
     )
     path.chmod(0o755)
     return path
 
 
-def _services(tmp_path: Path) -> tuple[
+def _services(
+    tmp_path: Path,
+) -> tuple[
     MergeCandidateBuildService,
     MergeCandidateTestBatchService,
     _Previews,

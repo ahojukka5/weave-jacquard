@@ -17,6 +17,11 @@ from .diagnostics import (
     COMPILER_DIAGNOSTICS_FORMAT,
     collect_build_diagnostics,
 )
+from .evidence import (
+    DEFAULT_EVIDENCE_PROFILE,
+    EVIDENCE_PROFILES,
+    normalize_evidence_profile,
+)
 from .inputs import CompilerInputMixin, MaterializedSource, RenderedSource
 from .io import (
     CompilerFileTooLarge,
@@ -42,6 +47,8 @@ __all__ = [
     "CAPABILITIES_TIMEOUT_SECONDS",
     "COMPILER_DIAGNOSTICS_FORMAT",
     "COMPILER_MANIFEST_FORMAT",
+    "DEFAULT_EVIDENCE_PROFILE",
+    "EVIDENCE_PROFILES",
     "MAX_BUILD_MANIFEST_BYTES",
     "MAX_CAPABILITIES_BYTES",
     "MAX_COMPILER_OUTPUT_BYTES",
@@ -58,6 +65,7 @@ __all__ = [
     "WeavecCapabilities",
     "WeavecValidator",
     "collect_build_diagnostics",
+    "normalize_evidence_profile",
     "read_bounded_bytes",
     "read_bounded_json",
     "read_bounded_text",

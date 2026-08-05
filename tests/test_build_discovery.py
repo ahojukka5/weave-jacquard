@@ -148,13 +148,12 @@ def _current_manifest(
                 "source_sha256": source_hash,
             }
         )
-        key_documents.append(
-            {"document": document, "source_sha256": source_hash}
-        )
+        key_documents.append({"document": document, "source_sha256": source_hash})
         artifact_hashes[relative] = source_hash
 
     payload = {
         "format": BUILD_KEY_FORMAT,
+        "evidence_profile": "none",
         "revision_hash": revision_hash,
         "revision_id": revision_id,
         "documents": key_documents,
@@ -178,6 +177,7 @@ def _current_manifest(
     )
     manifest.update(
         {
+            "evidence_profile": "none",
             "source_sha256": key_documents[0]["source_sha256"],
             "sources": source_entries,
             "artifact_sha256": artifact_hashes,
@@ -331,6 +331,7 @@ def test_current_build_key_and_revision_provenance_are_verified(tmp_path: Path) 
     assert result["returned_count"] == 1
     assert result["builds"][0]["revision_provenance_verified"] is True
     assert result["builds"][0]["build_key_format"] == BUILD_KEY_FORMAT
+    assert result["builds"][0]["evidence_profile"] == "none"
     assert result["builds"][0]["build_key_verified"] is True
 
 
@@ -339,14 +340,10 @@ def test_discovery_rejects_tampered_current_build_key(tmp_path: Path) -> None:
     manifest["target"] = "wasm32-wasi"
     _candidate(tmp_path, build_id)
 
-    result = BuildDiscoveryService(_Bridge(tmp_path, {build_id: manifest})).page(
-        "demo"
-    )
+    result = BuildDiscoveryService(_Bridge(tmp_path, {build_id: manifest})).page("demo")
 
     assert result["builds"] == []
-    assert result["rejected_builds"] == [
-        {"build_id": build_id, "code": "BUILD_KEY_MISMATCH"}
-    ]
+    assert result["rejected_builds"] == [{"build_id": build_id, "code": "BUILD_KEY_MISMATCH"}]
 
 
 def test_discovery_rejects_tampered_source_metadata(tmp_path: Path) -> None:
@@ -355,9 +352,7 @@ def test_discovery_rejects_tampered_source_metadata(tmp_path: Path) -> None:
     manifest["artifact_sha256"][source_path] = "c" * 64
     _candidate(tmp_path, build_id)
 
-    result = BuildDiscoveryService(_Bridge(tmp_path, {build_id: manifest})).page(
-        "demo"
-    )
+    result = BuildDiscoveryService(_Bridge(tmp_path, {build_id: manifest})).page("demo")
 
     assert result["builds"] == []
     assert result["rejected_builds"] == [
@@ -374,9 +369,7 @@ def test_discovery_rejects_missing_revision_provenance(tmp_path: Path) -> None:
 
     result = BuildDiscoveryService(bridge).page("demo")
 
-    assert result["rejected_builds"] == [
-        {"build_id": build_id, "code": "BUILD_REVISION_NOT_FOUND"}
-    ]
+    assert result["rejected_builds"] == [{"build_id": build_id, "code": "BUILD_REVISION_NOT_FOUND"}]
 
 
 def test_discovery_rejects_revision_hash_mismatch(tmp_path: Path) -> None:
@@ -425,9 +418,7 @@ def test_discovery_rejects_invalid_summary_without_returning_it(tmp_path: Path) 
     result = BuildDiscoveryService(bridge).page("demo")
 
     assert result["builds"] == []
-    assert result["rejected_builds"] == [
-        {"build_id": build_id, "code": "INVALID_BUILD_MANIFEST"}
-    ]
+    assert result["rejected_builds"] == [{"build_id": build_id, "code": "INVALID_BUILD_MANIFEST"}]
 
 
 @pytest.mark.parametrize(
