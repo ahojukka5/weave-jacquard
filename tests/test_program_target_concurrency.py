@@ -57,9 +57,7 @@ def test_program_create_and_import_publish_from_exact_base(tmp_path: Path) -> No
         )
         assert replaced["base_revision_id"] == imported["revision_id"]
         assert workspace.branch_head("demo", "main") == replaced["revision_id"]
-        assert '(version "0.2")' in workspace.render(
-            "demo", "main", "library.weave"
-        )
+        assert '(version "0.2")' in workspace.render("demo", "main", "library.weave")
 
         operations = workspace.db.connection.execute(
             """SELECT operation_kind FROM operations
@@ -154,9 +152,10 @@ def test_unprepared_program_write_rejects_mid_call_advance(
         assert {item["document"] for item in workspace.list_documents("demo", "main")} == {
             "main.weave"
         }
-        assert workspace.find_nodes(
-            "demo", "main", "main.weave", head="competitor"
-        )[0]["node_id"] == competitor_result["node_id"]
+        assert (
+            workspace.find_nodes("demo", "main", "main.weave", head="competitor")[0]["node_id"]
+            == competitor_result["node_id"]
+        )
 
 
 def test_build_target_set_update_and_delete_report_exact_bases(tmp_path: Path) -> None:
@@ -245,6 +244,4 @@ def test_build_target_writes_reject_stale_prepared_base(
         assert raised.value.code == "STALE_BRANCH_HEAD"
         assert workspace.branch_head("demo", "main") == target["revision_id"]
         assert _counts(workspace) == counts
-        assert [item["name"] for item in targets.list("demo", branch="main")] == [
-            "application"
-        ]
+        assert [item["name"] for item in targets.list("demo", branch="main")] == ["application"]

@@ -176,8 +176,7 @@ def smallest_node_for_span(
     matches = [
         span
         for span in node_map.get("nodes", [])
-        if int(span["start_byte"]) <= start_byte
-        and int(span["end_byte"]) >= end_byte
+        if int(span["start_byte"]) <= start_byte and int(span["end_byte"]) >= end_byte
     ]
     if not matches:
         return None

@@ -12,7 +12,13 @@ from typing import Any
 from ..bounded_process import BoundedProcessResult, run_bounded_process
 from ..errors import NotFoundError, ValidationError
 from .artifacts import CompilerArtifactMixin
+from .capabilities import WeavecCapabilities
 from .diagnostics import collect_build_diagnostics
+from .evidence import (
+    DEFAULT_EVIDENCE_PROFILE,
+    normalize_evidence_profile,
+    required_evidence_protocols,
+)
 from .inputs import CompilerInputMixin, RenderedSource
 from .io import CompilerFileTooLarge, read_bounded_json
 from .limits import (
@@ -32,6 +38,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         *,
         compiler: str | Path | None = None,
         build_root: str | Path | None = None,
+        capabilities: WeavecCapabilities | None = None,
         timeout_seconds: int = 120,
         max_output_bytes: int = MAX_COMPILER_OUTPUT_BYTES,
     ) -> None:
@@ -42,6 +49,12 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         self.workspace = workspace
         self._configured_compiler = compiler
         self._compiler: Path | None = None
+        workspace_capabilities = getattr(workspace, "capabilities", None)
+        self._capabilities = capabilities or (
+            workspace_capabilities
+            if isinstance(workspace_capabilities, WeavecCapabilities)
+            else None
+        )
         default_root = workspace.db.path.parent / ".weave-build"
         configured_root = build_root or os.environ.get("WEAVE_BUILD_ROOT")
         self.build_root = Path(configured_root or default_root).resolve()
@@ -58,9 +71,11 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         branch: str = "main",
         revision_id: str | None = None,
         target: str | None = None,
+        evidence_profile: str | None = None,
     ) -> dict[str, Any]:
         """Build an ordered document set from one exact immutable revision."""
 
+        profile = normalize_evidence_profile(evidence_profile)
         documents = self._ordered_documents(document, additional_documents)
         revision = revision_id or self.workspace.branch_head(project, branch)
         revision_hash = self._require_project_revision(project, revision)
@@ -73,6 +88,12 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
 
         compiler = self._compiler_path()
         compiler_hash = self._sha256_file(compiler)
+        self._require_evidence_profile(
+            compiler,
+            compiler_hash=compiler_hash,
+            evidence_profile=profile,
+            target=target,
+        )
         cache_payload = {
             "format": BUILD_KEY_FORMAT,
             "revision_hash": revision_hash,
@@ -87,10 +108,9 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
             "compiler_sha256": compiler_hash,
             "compiler_output_limit_bytes": self.max_output_bytes,
             "target": target or "native",
+            "evidence_profile": profile,
         }
-        build_id = hashlib.sha256(
-            self._canonical_cache_payload(cache_payload)
-        ).hexdigest()[:32]
+        build_id = hashlib.sha256(self._canonical_cache_payload(cache_payload)).hexdigest()[:32]
         final_directory = self.build_root / build_id
 
         cached = self._read_successful_manifest(
@@ -101,9 +121,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
             cached["cached"] = True
             return cached
 
-        temporary_directory = Path(
-            tempfile.mkdtemp(prefix=f".{build_id}-", dir=self.build_root)
-        )
+        temporary_directory = Path(tempfile.mkdtemp(prefix=f".{build_id}-", dir=self.build_root))
         try:
             return self._execute_build(
                 project=project,
@@ -115,6 +133,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
                 compiler=compiler,
                 compiler_hash=compiler_hash,
                 target=target,
+                evidence_profile=profile,
                 build_id=build_id,
                 final_directory=final_directory,
                 rendered_sources=rendered_sources,
@@ -144,6 +163,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         compiler: Path,
         compiler_hash: str,
         target: str | None,
+        evidence_profile: str,
         build_id: str,
         final_directory: Path,
         rendered_sources: list[RenderedSource],
@@ -176,9 +196,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         process = self._run_compiler(command)
         diagnostics, diagnostics_valid = collect_build_diagnostics(
             compiler_diagnostics_path,
-            canonical_sources=[
-                (item.source_path, item.node_map) for item in materialized_sources
-            ],
+            canonical_sources=[(item.source_path, item.node_map) for item in materialized_sources],
             returncode=process.returncode,
             timed_out=process.timed_out,
             output_limited=process.output_limited,
@@ -188,9 +206,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         )
         compiler_summary = diagnostics.get("compiler")
         diagnostics_status = (
-            compiler_summary.get("status")
-            if isinstance(compiler_summary, dict)
-            else None
+            compiler_summary.get("status") if isinstance(compiler_summary, dict) else None
         )
         compiler_manifest, compiler_manifest_errors = validate_compiler_manifest(
             compiler_manifest_path,
@@ -271,6 +287,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
             "compiler_manifest_protocol_valid": compiler_manifest_valid,
             "compiler_manifest_errors": list(compiler_manifest_errors),
             "target": target or "native",
+            "evidence_profile": evidence_profile,
             "compiler_target": (
                 compiler_manifest.get("target")
                 if compiler_manifest_valid and compiler_manifest is not None
@@ -288,9 +305,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
                     "compiler-manifest.json" if compiler_manifest_path.is_file() else None
                 ),
                 "compiler_diagnostics": (
-                    "compiler-diagnostics.json"
-                    if compiler_diagnostics_path.is_file()
-                    else None
+                    "compiler-diagnostics.json" if compiler_diagnostics_path.is_file() else None
                 ),
                 "executable": "program" if executable_path.is_file() else None,
             },
@@ -299,6 +314,35 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         self._write_json(manifest_path, manifest)
         self._publish_directory(temporary_directory, final_directory)
         return self.get(build_id)
+
+    def _require_evidence_profile(
+        self,
+        compiler: Path,
+        *,
+        compiler_hash: str,
+        evidence_profile: str,
+        target: str | None,
+    ) -> None:
+        if evidence_profile == DEFAULT_EVIDENCE_PROFILE:
+            return
+        capabilities = self._capabilities
+        if capabilities is None:
+            capabilities = WeavecCapabilities(
+                compiler,
+                environment_fallback=False,
+            )
+            self._capabilities = capabilities
+        document = capabilities.require(
+            command="build",
+            protocols=required_evidence_protocols(evidence_profile),
+            target=target,
+        )
+        identity = document.get("_jacquard_identity")
+        if not isinstance(identity, dict) or identity.get("compiler_sha256") != compiler_hash:
+            raise ValidationError(
+                "WEAVEC_CAPABILITY_COMPILER_MISMATCH",
+                "compiler capability registry does not identify the selected build binary",
+            )
 
     def _run_compiler(self, command: list[str]) -> BoundedProcessResult:
         try:
@@ -325,11 +369,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
                 f"{self.max_output_bytes} bytes\n"
             )
         return BoundedProcessResult(
-            returncode=(
-                None
-                if result.timed_out or result.output_limited
-                else result.returncode
-            ),
+            returncode=(None if result.timed_out or result.output_limited else result.returncode),
             timed_out=result.timed_out,
             output_limited=result.output_limited,
             stdout=result.stdout,
@@ -353,10 +393,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         errors: list[str],
     ) -> None:
         diagnostics["compiler_manifest"] = (
-            {
-                key: compiler_manifest.get(key)
-                for key in ("format", "status", "phase", "target")
-            }
+            {key: compiler_manifest.get(key) for key in ("format", "status", "phase", "target")}
             if compiler_manifest is not None
             else None
         )
@@ -402,11 +439,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         directory: Path,
     ) -> None:
         output_limit = manifest.get("compiler_output_limit_bytes")
-        if (
-            isinstance(output_limit, bool)
-            or not isinstance(output_limit, int)
-            or output_limit <= 0
-        ):
+        if isinstance(output_limit, bool) or not isinstance(output_limit, int) or output_limit <= 0:
             raise ValidationError(
                 "INVALID_BUILD_MANIFEST",
                 "compiler output limit must be a positive integer",
@@ -490,12 +523,11 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
         compiler_sha256 = manifest.get("compiler_sha256")
         revision_id = manifest.get("revision_id")
         target = manifest.get("target")
+        evidence_profile = normalize_evidence_profile(manifest.get("evidence_profile"))
         documents = manifest.get("documents")
         sources = manifest.get("sources")
         artifact_hashes = manifest.get("artifact_sha256")
-        if not cls._valid_sha256(revision_hash) or not cls._valid_sha256(
-            compiler_sha256
-        ):
+        if not cls._valid_sha256(revision_hash) or not cls._valid_sha256(compiler_sha256):
             raise ValidationError(
                 "INVALID_BUILD_MANIFEST",
                 "current build key requires revision and compiler SHA-256 values",
@@ -554,9 +586,7 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
                     "INVALID_BUILD_MANIFEST",
                     f"source record {index} hash disagrees with artifact evidence",
                 )
-            key_documents.append(
-                {"document": document, "source_sha256": str(source_sha256)}
-            )
+            key_documents.append({"document": document, "source_sha256": str(source_sha256)})
         if manifest.get("source_sha256") != key_documents[0]["source_sha256"]:
             raise ValidationError(
                 "INVALID_BUILD_MANIFEST",
@@ -571,10 +601,9 @@ class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):
             "compiler_sha256": compiler_sha256,
             "compiler_output_limit_bytes": manifest["compiler_output_limit_bytes"],
             "target": target,
+            "evidence_profile": evidence_profile,
         }
-        expected_build_id = hashlib.sha256(
-            cls._canonical_cache_payload(payload)
-        ).hexdigest()[:32]
+        expected_build_id = hashlib.sha256(cls._canonical_cache_payload(payload)).hexdigest()[:32]
         if manifest.get("build_id") != expected_build_id:
             raise ValidationError(
                 "INVALID_BUILD_MANIFEST",

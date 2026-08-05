@@ -81,10 +81,7 @@ class EditBatchExecutor:
             )
 
         base_revision_id = self.workspace.branch_head(project, branch)
-        if (
-            expected_revision_id is not None
-            and expected_revision_id != base_revision_id
-        ):
+        if expected_revision_id is not None and expected_revision_id != base_revision_id:
             raise ValidationError(
                 "STALE_REVISION",
                 "branch head does not match expected_revision_id",
@@ -114,9 +111,7 @@ class EditBatchExecutor:
                     exc.code,
                     exc.message,
                     operation_index=index,
-                    operation=(
-                        operation_name if isinstance(operation_name, str) else None
-                    ),
+                    operation=(operation_name if isinstance(operation_name, str) else None),
                     node_id=exc.node_id,
                 ) from exc
             except NotFoundError as exc:
@@ -124,9 +119,7 @@ class EditBatchExecutor:
                     "NOT_FOUND",
                     str(exc),
                     operation_index=index,
-                    operation=(
-                        operation_name if isinstance(operation_name, str) else None
-                    ),
+                    operation=(operation_name if isinstance(operation_name, str) else None),
                 ) from exc
             operation_log.append(log_entry)
             operation_results.append(result)
@@ -429,9 +422,7 @@ class EditBatchExecutor:
         parent, position = find_parent(root, node_id)
         removed = parent["children"].pop(position)
         removed_ids = {node["id"] for node in walk_nodes(removed)}
-        invalidated = sorted(
-            alias for alias, target in aliases.items() if target in removed_ids
-        )
+        invalidated = sorted(alias for alias, target in aliases.items() if target in removed_ids)
         for alias in invalidated:
             aliases.pop(alias)
         payload: JsonObject = {

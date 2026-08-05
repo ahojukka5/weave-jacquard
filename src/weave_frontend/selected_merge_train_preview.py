@@ -63,8 +63,7 @@ class SelectedMergeTrainPreviewService:
         if missing:
             raise ValidationError(
                 "INVALID_SELECTED_MERGE_TRAIN_SOURCE",
-                "selected sources are not source branches in the catalog: "
-                + ", ".join(missing),
+                "selected sources are not source branches in the catalog: " + ", ".join(missing),
             )
 
         target_head = target["head_revision_id"]
@@ -196,9 +195,7 @@ class SelectedMergeTrainPreviewService:
         except ConflictError as exc:
             conflicts = list(exc.conflicts)
             relation = (
-                "consistent_conflict"
-                if not original["mergeable"]
-                else "order_introduced_conflict"
+                "consistent_conflict" if not original["mergeable"] else "order_introduced_conflict"
             )
             return {
                 "public": {
@@ -226,11 +223,7 @@ class SelectedMergeTrainPreviewService:
 
         changed_documents = sorted(changed)
         merged_root_hash = self.workspace.db.hash_value(merged_state)
-        relation = (
-            "consistent_clean"
-            if original["mergeable"]
-            else "order_removed_conflict"
-        )
+        relation = "consistent_clean" if original["mergeable"] else "order_removed_conflict"
         return {
             "public": {
                 "step_index": index,
@@ -248,9 +241,7 @@ class SelectedMergeTrainPreviewService:
                 "conflicts_truncated": False,
                 "changed_document_count": len(changed_documents),
                 "changed_documents": changed_documents[:changed_document_limit],
-                "changed_documents_truncated": (
-                    len(changed_documents) > changed_document_limit
-                ),
+                "changed_documents_truncated": (len(changed_documents) > changed_document_limit),
                 "no_changes": not changed_documents,
                 "publication_requires_refresh_after_prior_step": index > 0,
             },
@@ -279,8 +270,7 @@ class SelectedMergeTrainPreviewService:
         if len(value) > MAX_SELECTED_MERGE_TRAIN_SOURCES:
             raise ValidationError(
                 "INVALID_SELECTED_MERGE_TRAIN_SOURCES",
-                "sources may contain at most "
-                f"{MAX_SELECTED_MERGE_TRAIN_SOURCES} branches",
+                f"sources may contain at most {MAX_SELECTED_MERGE_TRAIN_SOURCES} branches",
             )
         result: list[str] = []
         for source in value:
@@ -307,12 +297,7 @@ class SelectedMergeTrainPreviewService:
 
     @staticmethod
     def _validate_limit(name: str, value: Any, maximum: int) -> None:
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or value < 1
-            or value > maximum
-        ):
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > maximum:
             raise ValidationError(
                 "INVALID_SELECTED_MERGE_TRAIN_LIMIT",
                 f"{name} must be an integer between 1 and {maximum}",

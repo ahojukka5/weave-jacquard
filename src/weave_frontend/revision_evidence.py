@@ -117,9 +117,7 @@ class RevisionEvidenceService:
             )
 
         start_index = (
-            bisect.bisect_right(members, start_after_id)
-            if start_after_id is not None
-            else 0
+            bisect.bisect_right(members, start_after_id) if start_after_id is not None else 0
         )
         scanned_ids = members[start_index : start_index + scan_limit]
         nodes = [revision_node(revision)]
@@ -213,11 +211,7 @@ class RevisionEvidenceService:
                 if not EVIDENCE_ID.fullmatch(entry.name) or entry.is_symlink():
                     continue
                 manifest = entry / store.manifest_name
-                is_member = (
-                    entry.is_dir()
-                    and manifest.is_file()
-                    and not manifest.is_symlink()
-                )
+                is_member = entry.is_dir() and manifest.is_file() and not manifest.is_symlink()
             except OSError:
                 continue
             if is_member:
@@ -239,9 +233,7 @@ class RevisionEvidenceService:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
         return {
             "revision_id": str(row["id"]),
             "parent1_revision_id": row["parent1_id"],
@@ -266,11 +258,7 @@ class RevisionEvidenceService:
             ("limit", limit, MAX_EVIDENCE_PAGE),
             ("scan_limit", scan_limit, MAX_EVIDENCE_SCAN),
         ):
-            if (
-                isinstance(value, bool)
-                or not isinstance(value, int)
-                or not 1 <= value <= maximum
-            ):
+            if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum:
                 raise ValidationError(
                     "INVALID_REVISION_EVIDENCE_LIMIT",
                     f"{name} must be an integer between 1 and {maximum}",
@@ -283,9 +271,7 @@ class RevisionEvidenceService:
 
     @staticmethod
     def _validate_start_after(value: Any) -> None:
-        if value is not None and (
-            not isinstance(value, str) or not EVIDENCE_ID.fullmatch(value)
-        ):
+        if value is not None and (not isinstance(value, str) or not EVIDENCE_ID.fullmatch(value)):
             raise ValidationError(
                 "INVALID_REVISION_EVIDENCE_CURSOR",
                 "start_after_id must be 32 lowercase hexadecimal characters or null",
@@ -293,9 +279,7 @@ class RevisionEvidenceService:
 
     @staticmethod
     def _validate_catalog_id(value: Any) -> None:
-        if value is not None and (
-            not isinstance(value, str) or not CATALOG_ID.fullmatch(value)
-        ):
+        if value is not None and (not isinstance(value, str) or not CATALOG_ID.fullmatch(value)):
             raise ValidationError(
                 "INVALID_REVISION_EVIDENCE_CATALOG_ID",
                 "catalog_id must be 64 lowercase hexadecimal characters or null",

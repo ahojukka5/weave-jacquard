@@ -114,9 +114,7 @@ def test_release_manifest_evidence_is_canonical_and_indexed(
         assert payload.endswith(b"\n")
         assert b": " not in payload
     capability = json.loads(
-        (output / "manifests" / "capability-manifest.json").read_text(
-            encoding="utf-8"
-        )
+        (output / "manifests" / "capability-manifest.json").read_text(encoding="utf-8")
     )
     assert capability["format"] == "weave-jacquard-capability-manifest-v1"
     assert capability["capabilities"][0]["name"] == "base"
@@ -162,9 +160,7 @@ def test_release_manifest_evidence_requires_passed_qualification(
 
 def test_release_qualification_regenerates_checksums_after_manifests() -> None:
     wrapper = (ROOT / "scripts" / "qualify-release.sh").read_text(encoding="utf-8")
-    workflow = (ROOT / ".github" / "workflows" / "native-e2e.yml").read_text(
-        encoding="utf-8"
-    )
+    workflow = (ROOT / ".github" / "workflows" / "native-e2e.yml").read_text(encoding="utf-8")
 
     qualify = wrapper.index('scripts/qualify.sh"')
     retain = wrapper.index('scripts/retain-public-manifests.py"')

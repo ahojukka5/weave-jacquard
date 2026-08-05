@@ -133,9 +133,7 @@ def test_rejected_public_atom_write_does_not_advance_branch(
         "main.weave",
         program_name="bounded",
     )
-    root_id = str(
-        sexpr_workspace.list_documents("sexpr-demo", "main")[0]["root_node_id"]
-    )
+    root_id = str(sexpr_workspace.list_documents("sexpr-demo", "main")[0]["root_node_id"])
     before = sexpr_workspace.branch_head("sexpr-demo", "main")
     # Keep the limit above already-admitted atoms so the verified loader can
     # reconstruct the revision, then reject only the oversized new write.

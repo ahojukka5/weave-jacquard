@@ -63,9 +63,7 @@ REVISION_RESOURCE_LIMITS: dict[str, int] = {
     "node_inspect_depth": MAX_NODE_INSPECT_DEPTH,
     "operation_page_size": MAX_OPERATION_PAGE_SIZE,
     "preflight_impact_targets": MAX_PREFLIGHT_IMPACT_TARGETS,
-    "project_merge_impact_queue_documents": (
-        MAX_PROJECT_MERGE_IMPACT_QUEUE_DOCUMENTS
-    ),
+    "project_merge_impact_queue_documents": (MAX_PROJECT_MERGE_IMPACT_QUEUE_DOCUMENTS),
     "project_merge_impact_queue_page": MAX_PROJECT_MERGE_IMPACT_QUEUE_PAGE,
     "project_merge_queue_conflicts": MAX_PROJECT_MERGE_QUEUE_CONFLICTS,
     "project_merge_queue_documents": MAX_PROJECT_MERGE_QUEUE_DOCUMENTS,

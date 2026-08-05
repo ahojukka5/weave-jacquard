@@ -187,9 +187,7 @@ def test_preflight_preserves_non_ready_coverage_result() -> None:
     impacts = _ImpactService(impact)
     validation_sets = _ValidationSetService(_validation_set(ready=False))
 
-    result = MergePreflightService(impacts, validation_sets).run(
-        "demo", "main", "agent/feature"
-    )
+    result = MergePreflightService(impacts, validation_sets).run("demo", "main", "agent/feature")
 
     assert result["ready_for_publication"] is False
     assert result["impact"]["uncovered_changed_documents"] == ["orphan.weave"]
@@ -220,9 +218,7 @@ def test_preflight_reports_bounded_impact_truncation() -> None:
     impacts = _ImpactService(_impact(truncated=True))
     validation_sets = _ValidationSetService(_validation_set())
 
-    result = MergePreflightService(impacts, validation_sets).run(
-        "demo", "main", "agent/feature"
-    )
+    result = MergePreflightService(impacts, validation_sets).run("demo", "main", "agent/feature")
 
     assert result["impact_targets_truncated"] is True
     assert result["impact"]["has_more"] is True

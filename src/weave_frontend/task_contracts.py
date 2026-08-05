@@ -161,11 +161,7 @@ class TaskContractRegistry:
         self._require_project_revision(project, selected_revision_id)
         state = self.workspace._state_at_revision(selected_revision_id)
         prefix = "@task/"
-        names = sorted(
-            document[len(prefix) :]
-            for document in state
-            if document.startswith(prefix)
-        )
+        names = sorted(document[len(prefix) :] for document in state if document.startswith(prefix))
         start = self._page_start(names, start_after_name)
         selected = names[start : start + limit]
         tasks = []
@@ -362,9 +358,7 @@ class TaskContractRegistry:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
 
     @staticmethod
     def _require_owner_and_branch(

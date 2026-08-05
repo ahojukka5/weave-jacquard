@@ -36,13 +36,16 @@ def _public_manifests() -> tuple[Mapping[str, Any], Mapping[str, Any], Sequence[
 
 def _canonical_bytes(value: Any) -> bytes:
     try:
-        encoded = json.dumps(
-            value,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        ).encode("utf-8") + b"\n"
+        encoded = (
+            json.dumps(
+                value,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+            + b"\n"
+        )
     except (TypeError, ValueError) as exc:
         raise ManifestEvidenceError(f"manifest is not canonical JSON: {exc}") from exc
     if len(encoded) > MAX_MANIFEST_BYTES:
@@ -71,9 +74,7 @@ def _read_completion(out: Path) -> Mapping[str, Any]:
             "qualification completion evidence is missing or invalid"
         ) from exc
     if not isinstance(document, Mapping):
-        raise ManifestEvidenceError(
-            "qualification completion evidence must be an object"
-        )
+        raise ManifestEvidenceError("qualification completion evidence must be an object")
     if document.get("format") != QUALIFICATION_COMPLETION_FORMAT:
         raise ManifestEvidenceError("qualification completion format is unsupported")
     if document.get("status") != "passed":
@@ -89,17 +90,11 @@ def retain_public_manifests(out: Path) -> dict[str, Any]:
         raise ManifestEvidenceError("qualification output must not be a symlink")
     output = candidate.resolve()
     if not output.is_dir():
-        raise ManifestEvidenceError(
-            "qualification output must be an existing directory"
-        )
+        raise ManifestEvidenceError("qualification output must be an existing directory")
     completion = _read_completion(output)
     tool_manifest, application_manifest, capability_manifest = _public_manifests()
-    if not isinstance(tool_manifest, Mapping) or not isinstance(
-        application_manifest, Mapping
-    ):
-        raise ManifestEvidenceError(
-            "public tool and application manifests must be objects"
-        )
+    if not isinstance(tool_manifest, Mapping) or not isinstance(application_manifest, Mapping):
+        raise ManifestEvidenceError("public tool and application manifests must be objects")
     if not isinstance(capability_manifest, Sequence) or isinstance(
         capability_manifest, (str, bytes, bytearray)
     ):
@@ -122,9 +117,7 @@ def retain_public_manifests(out: Path) -> dict[str, Any]:
             "application manifest does not reference the retained tool manifest"
         )
     if application_manifest.get("tool_count") != tool_manifest.get("tool_count"):
-        raise ManifestEvidenceError(
-            "application and tool manifests disagree about tool_count"
-        )
+        raise ManifestEvidenceError("application and tool manifests disagree about tool_count")
 
     manifest_root = output / "manifests"
     if manifest_root.exists() or manifest_root.is_symlink():

@@ -37,9 +37,7 @@ def validate_compiler_manifest(
         return None, ["compiler build manifest root must be an object"]
 
     if document.get("format") != COMPILER_MANIFEST_FORMAT:
-        errors.append(
-            f"unsupported compiler build manifest format: {document.get('format')!r}"
-        )
+        errors.append(f"unsupported compiler build manifest format: {document.get('format')!r}")
 
     status = document.get("status")
     if status not in {"succeeded", "failed"}:
@@ -82,17 +80,13 @@ def validate_compiler_manifest(
         for index, value in enumerate(sources):
             resolved = _manifest_path(value, base=path.parent)
             if resolved is None:
-                errors.append(
-                    f"compiler build manifest source {index} must be a non-empty path"
-                )
+                errors.append(f"compiler build manifest source {index} must be a non-empty path")
             else:
                 resolved_sources.append(resolved)
         if len(resolved_sources) == len(sources) and resolved_sources != [
             source.resolve() for source in expected_sources
         ]:
-            errors.append(
-                "compiler build manifest sources do not match ordered compiler inputs"
-            )
+            errors.append("compiler build manifest sources do not match ordered compiler inputs")
 
     return document, errors
 

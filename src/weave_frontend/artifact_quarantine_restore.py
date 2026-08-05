@@ -31,9 +31,7 @@ class ArtifactQuarantineRestoreService:
 
     def __init__(self, reconciliation: Any) -> None:
         if not hasattr(reconciliation, "inventory"):
-            raise TypeError(
-                "reconciliation must expose its retained artifact inventory"
-            )
+            raise TypeError("reconciliation must expose its retained artifact inventory")
         self.reconciliation = reconciliation
         self.io = ArtifactQuarantineIO(reconciliation)
 
@@ -47,12 +45,8 @@ class ArtifactQuarantineRestoreService:
         """Restore one capsule without overwriting any live retained entry."""
 
         restore_id = restore_identities(quarantine_id, manifest_id)
-        restore_intent_path = self.io.control_root / (
-            f"{restore_id}.restore-intent.json"
-        )
-        restore_result_path = self.io.control_root / (
-            f"{restore_id}.restore-result.json"
-        )
+        restore_intent_path = self.io.control_root / (f"{restore_id}.restore-intent.json")
+        restore_result_path = self.io.control_root / (f"{restore_id}.restore-result.json")
         with self.io.lock(self.io.control_lock_path(quarantine_id)):
             quarantine_intent = validate_stored_quarantine_intent(
                 self.io.read_metadata(self.io.journal_path(quarantine_id)),
@@ -61,9 +55,7 @@ class ArtifactQuarantineRestoreService:
             family = self._family(quarantine_intent["family"])
             source_lock = family.root / quarantine_intent["source_lock_name"]
             with self.io.lock(source_lock):
-                stored_restore_intent = self.io.read_optional_metadata(
-                    restore_intent_path
-                )
+                stored_restore_intent = self.io.read_optional_metadata(restore_intent_path)
                 if stored_restore_intent is None:
                     self._verify_ready_capsule(
                         family.root,
@@ -77,9 +69,7 @@ class ArtifactQuarantineRestoreService:
                             "original retained entry name is already occupied",
                         )
                     timestamp = (
-                        time.time_ns()
-                        if restored_at_unix_ns is None
-                        else restored_at_unix_ns
+                        time.time_ns() if restored_at_unix_ns is None else restored_at_unix_ns
                     )
                     restore_intent = build_restore_intent(
                         quarantine_intent,
@@ -107,9 +97,7 @@ class ArtifactQuarantineRestoreService:
                         restore_intent,
                     )
                     verify_result_payload(result, capture)
-                    self._cleanup_capsule(
-                        family.root / restore_intent["capsule_name"]
-                    )
+                    self._cleanup_capsule(family.root / restore_intent["capsule_name"])
                     return result
 
                 result = self._continue_restore(
@@ -119,9 +107,7 @@ class ArtifactQuarantineRestoreService:
                     manifest_id,
                 )
                 self.io.write_metadata(restore_result_path, result)
-                self._cleanup_capsule(
-                    family.root / restore_intent["capsule_name"]
-                )
+                self._cleanup_capsule(family.root / restore_intent["capsule_name"])
                 return result
 
     def _continue_restore(
@@ -195,9 +181,7 @@ class ArtifactQuarantineRestoreService:
                 "ARTIFACT_QUARANTINE_RESTORE_CAPSULE_INVALID",
                 "quarantine capsule is incomplete or has unexpected entries",
             )
-        stored_intent = self.io.read_metadata(
-            capsule / "quarantine-intent.json"
-        )
+        stored_intent = self.io.read_metadata(capsule / "quarantine-intent.json")
         if stored_intent != dict(quarantine_intent):
             raise ValidationError(
                 "ARTIFACT_QUARANTINE_RESTORE_METADATA_INVALID",
@@ -227,9 +211,7 @@ class ArtifactQuarantineRestoreService:
                 "ARTIFACT_QUARANTINE_RESTORE_CAPSULE_INVALID",
                 "interrupted restore capsule has unexpected entries",
             )
-        stored_intent = self.io.read_metadata(
-            capsule / "quarantine-intent.json"
-        )
+        stored_intent = self.io.read_metadata(capsule / "quarantine-intent.json")
         if stored_intent != dict(quarantine_intent):
             raise ValidationError(
                 "ARTIFACT_QUARANTINE_RESTORE_METADATA_INVALID",

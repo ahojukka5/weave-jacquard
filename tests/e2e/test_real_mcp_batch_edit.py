@@ -112,9 +112,7 @@ def _sum80_batch(root_id: str) -> list[dict[str, Any]]:
         alias = f"node_{next_alias}"
         next_alias += 1
         if count == 1:
-            operations.extend(
-                [_form(parent, "const_i32", alias), _atom(f"@{alias}", "integer", 1)]
-            )
+            operations.extend([_form(parent, "const_i32", alias), _atom(f"@{alias}", "integer", 1)])
             return
         operations.append(_form(parent, "add_i32", alias))
         left = count // 2

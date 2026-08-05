@@ -114,9 +114,7 @@ class ResumeSnapshotService:
             "branch": branch,
             "branch_head_revision_id": branch_head_revision_id,
             "revision_id": selected_revision_id,
-            "revision_is_branch_head": (
-                selected_revision_id == branch_head_revision_id
-            ),
+            "revision_is_branch_head": (selected_revision_id == branch_head_revision_id),
             "revision": revision,
             "limits": {
                 "document_limit": document_limit,
@@ -129,9 +127,7 @@ class ResumeSnapshotService:
             },
             "program_document_count": total_program_count,
             "returned_program_document_count": len(program_entries),
-            "program_documents_truncated": (
-                len(program_entries) < total_program_count
-            ),
+            "program_documents_truncated": (len(program_entries) < total_program_count),
             "program_documents": program_entries,
             "build_target_count": total_target_count,
             "returned_build_target_count": len(target_entries),
@@ -166,8 +162,7 @@ class ResumeSnapshotService:
                     "revision_id": selected_revision_id,
                 },
                 "ordering_note": (
-                    "build discovery is lexical by content-derived build ID, "
-                    "not chronological"
+                    "build discovery is lexical by content-derived build ID, not chronological"
                 ),
             },
         }
@@ -184,9 +179,7 @@ class ResumeSnapshotService:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
         return dict(row)
 
     def _revision_modules(self, revision_id: str) -> dict[str, dict[str, Any]]:
@@ -198,11 +191,7 @@ class ResumeSnapshotService:
         self,
         modules: dict[str, dict[str, Any]],
     ) -> list[str]:
-        return sorted(
-            name
-            for name in modules
-            if not name.startswith(BUILD_TARGET_PREFIX)
-        )
+        return sorted(name for name in modules if not name.startswith(BUILD_TARGET_PREFIX))
 
     def _programs(
         self,
@@ -233,9 +222,7 @@ class ResumeSnapshotService:
         limit: int,
         source_limit: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        names = sorted(
-            name for name in modules if name.startswith(BUILD_TARGET_PREFIX)
-        )
+        names = sorted(name for name in modules if name.startswith(BUILD_TARGET_PREFIX))
         page = names[:limit]
         result: list[dict[str, Any]] = []
         for storage_document in page:
@@ -252,9 +239,7 @@ class ResumeSnapshotService:
                     "document": config["document"],
                     "additional_document_count": len(additional),
                     "returned_additional_document_count": len(returned_additional),
-                    "additional_documents_truncated": (
-                        len(returned_additional) < len(additional)
-                    ),
+                    "additional_documents_truncated": (len(returned_additional) < len(additional)),
                     "additional_documents": returned_additional,
                     "compiler_target": config["compiler_target"],
                     "root_node_id": root["id"],

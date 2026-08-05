@@ -10,9 +10,7 @@ from weave_frontend.concurrent_merge_policy import MergePolicyRegistry
 
 
 def _table_count(workspace: SExpressionWorkspace, table: str) -> int:
-    row = workspace.db.connection.execute(
-        f"SELECT COUNT(*) AS count FROM {table}"
-    ).fetchone()
+    row = workspace.db.connection.execute(f"SELECT COUNT(*) AS count FROM {table}").fetchone()
     return int(row["count"])
 
 
@@ -56,9 +54,10 @@ def test_context_document_and_revision_publish_atomically(tmp_path: Path) -> Non
             "target": "main.weave",
             "payload": {"document_id": result["document_id"]},
         }
-        assert workspace.get_context(
-            "demo", "main", scope_name="main.weave"
-        )[0]["body"] == "The entry point returns i32."
+        assert (
+            workspace.get_context("demo", "main", scope_name="main.weave")[0]["body"]
+            == "The entry point returns i32."
+        )
 
 
 def test_identical_context_reuses_content_addressed_document(tmp_path: Path) -> None:
@@ -116,9 +115,7 @@ def test_stale_context_rejects_without_orphan_document(tmp_path: Path) -> None:
 
         assert raised.value.code == "STALE_BRANCH_HEAD"
         assert workspace.branch_head("demo", "main") == accepted["revision_id"]
-        assert {
-            table: _table_count(workspace, table) for table in counts
-        } == counts
+        assert {table: _table_count(workspace, table) for table in counts} == counts
 
 
 def test_transaction_prepare_failure_rolls_back_document_and_revision(
@@ -161,9 +158,7 @@ def test_transaction_prepare_failure_rolls_back_document_and_revision(
             )
 
         assert workspace.branch_head("demo", "main") == initial_revision
-        assert {
-            table: _table_count(workspace, table) for table in counts
-        } == counts
+        assert {table: _table_count(workspace, table) for table in counts} == counts
 
 
 def test_merge_policy_document_and_revision_publish_atomically(tmp_path: Path) -> None:
@@ -223,6 +218,4 @@ def test_stale_merge_policy_rejects_without_orphan_document(tmp_path: Path) -> N
 
         assert raised.value.code == "STALE_BRANCH_HEAD"
         assert workspace.branch_head("demo", "main") == accepted["revision_id"]
-        assert {
-            table: _table_count(workspace, table) for table in counts
-        } == counts
+        assert {table: _table_count(workspace, table) for table in counts} == counts

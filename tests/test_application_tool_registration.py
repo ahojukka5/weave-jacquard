@@ -85,6 +85,7 @@ def _tool(
 
         def function(name: str = name) -> str:
             return name
+
     return _Tool(
         name=name,
         description=description or f"Tool {name}",
@@ -100,9 +101,7 @@ def _tool(
 
 def _runtime(tmp_path: Path, name: str) -> RuntimeServices:
     return RuntimeServices(
-        RuntimeConfig.from_environ(
-            {"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")}
-        )
+        RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")})
     )
 
 
@@ -271,9 +270,7 @@ def test_nested_same_runtime_invocation_is_reentrant(tmp_path: Path) -> None:
         "inner": inner,
         "outer": _tool("outer", function=outer_call),
     }
-    bind_registered_application_tools(
-        ApplicationContext(server=server, runtime=runtime)
-    )
+    bind_registered_application_tools(ApplicationContext(server=server, runtime=runtime))
 
     assert asyncio.run(server.tools["outer"].fn()) is runtime
 

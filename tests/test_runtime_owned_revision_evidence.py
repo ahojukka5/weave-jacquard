@@ -34,9 +34,7 @@ def _isolated_process_runtime() -> Iterator[None]:
 
 
 def _config(tmp_path: Path) -> RuntimeConfig:
-    return RuntimeConfig.from_environ(
-        {"WEAVE_DB_PATH": str(tmp_path / "runtime.db")}
-    )
+    return RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / "runtime.db")})
 
 
 def _publisher(root_name: str, root: Path, attribute: str) -> SimpleNamespace:
@@ -104,10 +102,7 @@ def test_revision_evidence_is_runtime_owned(
         assert attestation_store.root == attestations.attestation_root.resolve()
         assert attestation_store.getter is attestations.get
 
-        entries = {
-            item["name"]: item
-            for item in runtime.service_manifest()["services"]
-        }
+        entries = {item["name"]: item for item in runtime.service_manifest()["services"]}
         assert entries["revision_evidence"]["depends_on"] == [
             "compiler_bridge",
             "merge_candidate_test_batches",

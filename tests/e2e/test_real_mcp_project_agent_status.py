@@ -283,9 +283,7 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         assert main["checkpoint_state"] == "behind_head"
         assert main["revisions_since_checkpoint"] == 1
         assert main["program_state_changed_since_checkpoint"] is True
-        assert main["checkpoint"]["checkpoint_revision_id"] == main_checkpoint[
-            "revision_id"
-        ]
+        assert main["checkpoint"]["checkpoint_revision_id"] == main_checkpoint["revision_id"]
 
         second = await _call(
             session,
@@ -320,9 +318,7 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
             limit=1,
             checkpoint_scan_limit=10,
         )
-        assert complete["branches"][0]["checkpoint_state"] == (
-            "none_in_first_parent_history"
-        )
+        assert complete["branches"][0]["checkpoint_state"] == ("none_in_first_parent_history")
         assert complete["branches"][0]["complete_first_parent_history_scanned"] is True
 
         later_main = await _create_form(
@@ -379,9 +375,9 @@ def _verify_read_only_database(tmp_path: Path) -> None:
                WHERE operation_kind LIKE '%agent_status%'"""
         ).fetchone()["count"]
         assert status_operations == 0
-        branch_count = connection.execute(
-            "SELECT COUNT(*) AS count FROM branches"
-        ).fetchone()["count"]
+        branch_count = connection.execute("SELECT COUNT(*) AS count FROM branches").fetchone()[
+            "count"
+        ]
         assert branch_count == 4
     finally:
         connection.close()
@@ -399,7 +395,5 @@ def test_real_mcp_pages_project_agent_status(tmp_path: Path) -> None:
     assert len(reads) == 5
     assert sum(entry["payload"]["ok"] is True for entry in reads) == 4
     assert [
-        entry["payload"]["error"]["code"]
-        for entry in reads
-        if entry["payload"]["ok"] is False
+        entry["payload"]["error"]["code"] for entry in reads if entry["payload"]["ok"] is False
     ] == ["STALE_AGENT_STATUS_CATALOG"]

@@ -236,9 +236,7 @@ class AgentCheckpointRegistry:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
 
     @classmethod
     def _normalize(
@@ -311,8 +309,7 @@ class AgentCheckpointRegistry:
                 f"{name} may contain at most {MAX_CHECKPOINT_ITEMS} items",
             )
         normalized = [
-            cls._text(f"{name} item", value, maximum=MAX_CHECKPOINT_ITEM_CHARS)
-            for value in values
+            cls._text(f"{name} item", value, maximum=MAX_CHECKPOINT_ITEM_CHARS) for value in values
         ]
         if len(normalized) != len(set(normalized)):
             raise ValidationError(
@@ -340,9 +337,7 @@ class AgentCheckpointRegistry:
             "branch": branch,
             "revision_id": selected_revision_id,
             "branch_head_revision_id": branch_head_revision_id,
-            "revision_is_branch_head": (
-                selected_revision_id == branch_head_revision_id
-            ),
+            "revision_is_branch_head": (selected_revision_id == branch_head_revision_id),
             "checkpoint_revision_id": checkpoint_revision_id,
             "checkpoint_is_selected_revision": (
                 checkpoint_revision_id == selected_revision_id

@@ -101,9 +101,7 @@ def test_restore_resumes_partially_completed_capsule_cleanup(
             )
         capsule = root / f".quarantine-{quarantine['quarantine_entry_id']}"
         assert (root / artifact_id).is_dir()
-        assert sorted(path.name for path in capsule.iterdir()) == [
-            "quarantine-manifest.json"
-        ]
+        assert sorted(path.name for path in capsule.iterdir()) == ["quarantine-manifest.json"]
 
         monkeypatch.setattr(Path, "unlink", original_unlink)
         result = service.restore(

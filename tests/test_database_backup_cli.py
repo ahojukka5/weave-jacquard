@@ -69,9 +69,7 @@ def test_backup_cli_creates_inspects_and_restores_without_source_database(
     assert destination.is_file()
     assert not source.exists()
     with Database(destination) as database:
-        names = database.connection.execute(
-            "SELECT name FROM projects ORDER BY name"
-        ).fetchall()
+        names = database.connection.execute("SELECT name FROM projects ORDER BY name").fetchall()
     assert [row["name"] for row in names] == ["demo"]
 
 
@@ -80,16 +78,11 @@ def test_backup_cli_defaults_store_next_to_database(tmp_path: Path) -> None:
     with Database(source) as database:
         database.initialize_project("demo")
 
-    args = build_parser().parse_args(
-        ["--db", str(source), "db-backup"]
-    )
+    args = build_parser().parse_args(["--db", str(source), "db-backup"])
     created = _execute(args)
 
     assert (
-        source.parent
-        / ".weave-database-backups"
-        / created["backup_id"]
-        / "backup-manifest.json"
+        source.parent / ".weave-database-backups" / created["backup_id"] / "backup-manifest.json"
     ).is_file()
 
 
@@ -103,13 +96,7 @@ def test_backup_cli_honors_backup_root_environment(
         database.initialize_project("demo")
 
     monkeypatch.setenv("WEAVE_DATABASE_BACKUP_ROOT", str(backup_root))
-    created = _execute(
-        build_parser().parse_args(["--db", str(source), "db-backup"])
-    )
+    created = _execute(build_parser().parse_args(["--db", str(source), "db-backup"]))
 
-    assert (
-        backup_root / created["backup_id"] / "backup-manifest.json"
-    ).is_file()
-    assert not (
-        source.parent / ".weave-database-backups" / created["backup_id"]
-    ).exists()
+    assert (backup_root / created["backup_id"] / "backup-manifest.json").is_file()
+    assert not (source.parent / ".weave-database-backups" / created["backup_id"]).exists()

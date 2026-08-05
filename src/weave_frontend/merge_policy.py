@@ -232,9 +232,7 @@ class MergePolicyRegistry:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
 
     @staticmethod
     def _normalize(
@@ -269,8 +267,7 @@ class MergePolicyRegistry:
         ):
             raise ValidationError(
                 "INVALID_MERGE_POLICY",
-                "max_affected_targets must be between 1 and "
-                f"{MAX_AFFECTED_TARGET_VALIDATIONS}",
+                f"max_affected_targets must be between 1 and {MAX_AFFECTED_TARGET_VALIDATIONS}",
             )
         if require_preflight and not require_affected_validation:
             raise ValidationError(

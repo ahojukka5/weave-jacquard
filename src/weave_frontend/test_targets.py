@@ -210,9 +210,7 @@ class TestTargetRegistry:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
 
     @staticmethod
     def _require_build_target(state: dict[str, JsonObject], name: str) -> None:
@@ -381,9 +379,7 @@ class TestTargetRegistry:
             (head, kind, config[key]) for key, head, kind in _SINGLE_FIELDS[:1]
         ]
         ordered.extend(("arg", "string", value) for value in config["arguments"])
-        ordered.extend(
-            (head, kind, config[key]) for key, head, kind in _SINGLE_FIELDS[1:]
-        )
+        ordered.extend((head, kind, config[key]) for key, head, kind in _SINGLE_FIELDS[1:])
         ordered.extend(("tag", "string", value) for value in config["tags"])
         used: dict[str, int] = {}
         for head, kind, value in ordered:

@@ -81,9 +81,7 @@ def _invalid_result() -> dict[str, Any]:
 
 
 def _document(sexpr_workspace, name: str) -> dict[str, str]:
-    created = sexpr_workspace.create_program(
-        "sexpr-demo", "main", name, program_name=name
-    )
+    created = sexpr_workspace.create_program("sexpr-demo", "main", name, program_name=name)
     atom = sexpr_workspace.add_atom(
         "sexpr-demo",
         "main",
@@ -288,9 +286,7 @@ def test_validation_set_rejects_stale_preview(
     tmp_path: Path,
 ) -> None:
     values = _candidate(sexpr_workspace)
-    preview = MergePreviewService(sexpr_workspace).preview(
-        "sexpr-demo", "target", "source"
-    )
+    preview = MergePreviewService(sexpr_workspace).preview("sexpr-demo", "target", "source")
     sexpr_workspace.set_atom(
         "sexpr-demo",
         "source",
@@ -298,9 +294,7 @@ def test_validation_set_rejects_stale_preview(
         values["docs"]["orphan.weave"]["atom_id"],
         "advanced",
     )
-    sexpr_workspace.validator = _FakeValidator(
-        _compiler(tmp_path), [_valid_result()]
-    )
+    sexpr_workspace.validator = _FakeValidator(_compiler(tmp_path), [_valid_result()])
 
     with pytest.raises(ValidationError) as raised:
         _service(sexpr_workspace).validate(
@@ -338,9 +332,7 @@ def test_validation_set_bounds_compiler_fanout(
     sexpr_workspace.validator = fake
 
     with pytest.raises(ValidationError) as raised:
-        _service(sexpr_workspace).validate(
-            "sexpr-demo", "target", "source"
-        )
+        _service(sexpr_workspace).validate("sexpr-demo", "target", "source")
     assert raised.value.code == "TOO_MANY_AFFECTED_TARGETS"
     assert fake.calls == []
 
@@ -350,9 +342,7 @@ def test_validation_set_requires_boolean_uncovered_policy(
     tmp_path: Path,
 ) -> None:
     _candidate(sexpr_workspace)
-    sexpr_workspace.validator = _FakeValidator(
-        _compiler(tmp_path), [_valid_result()]
-    )
+    sexpr_workspace.validator = _FakeValidator(_compiler(tmp_path), [_valid_result()])
 
     with pytest.raises(ValidationError) as raised:
         _service(sexpr_workspace).validate(

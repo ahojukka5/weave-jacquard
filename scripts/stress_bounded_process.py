@@ -70,9 +70,7 @@ def _repeat(
         try:
             check(result)
         except AssertionError as error:
-            raise AssertionError(
-                f"{name} failed at iteration {iteration}: {result!r}"
-            ) from error
+            raise AssertionError(f"{name} failed at iteration {iteration}: {result!r}") from error
         if iteration % 100 == 0 or iteration == iterations:
             print(f"{name}: {iteration}/{iterations}", flush=True)
 
@@ -90,9 +88,7 @@ def run_stress_matrix(iterations: int) -> None:
         timeout_script = _write_script(
             root,
             "timeout.sh",
-            "printf 'timeout stdout'\n"
-            "printf 'timeout stderr' >&2\n"
-            "while :; do :; done\n",
+            "printf 'timeout stdout'\nprintf 'timeout stderr' >&2\nwhile :; do :; done\n",
         )
         output_limit_script = _write_script(
             root,
@@ -104,16 +100,12 @@ def run_stress_matrix(iterations: int) -> None:
         early_exit_script = _write_script(
             root,
             "early-exit.sh",
-            "printf 'early stdout'\n"
-            "printf 'early stderr' >&2\n"
-            "exit 7\n",
+            "printf 'early stdout'\nprintf 'early stderr' >&2\nexit 7\n",
         )
         closed_stream_script = _write_script(
             root,
             "closed-streams.sh",
-            "exec 1>&-\n"
-            "exec 2>&-\n"
-            "while :; do :; done\n",
+            "exec 1>&-\nexec 2>&-\nwhile :; do :; done\n",
         )
 
         _repeat(

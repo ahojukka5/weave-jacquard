@@ -89,9 +89,7 @@ def _schema(tool: Any) -> dict[str, Any]:
 
 
 def _document(snapshot: dict[str, Any], name: str) -> dict[str, Any]:
-    matches = [
-        item for item in snapshot["program_documents"] if item["document"] == name
-    ]
+    matches = [item for item in snapshot["program_documents"] if item["document"] == name]
     assert len(matches) == 1, snapshot["program_documents"]
     return matches[0]
 
@@ -217,12 +215,8 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         assert reviewed["context_count"] == 2
         assert reviewed["branch_count"] == 2
         assert reviewed["operation_count"] == 1
-        assert reviewed["reproducible_fork"]["arguments"]["revision_id"] == (
-            reviewed_revision
-        )
-        assert reviewed["build_recovery"]["arguments"]["revision_id"] == (
-            reviewed_revision
-        )
+        assert reviewed["reproducible_fork"]["arguments"]["revision_id"] == (reviewed_revision)
+        assert reviewed["build_recovery"]["arguments"]["revision_id"] == (reviewed_revision)
 
         advanced = await _call(
             session,
@@ -269,10 +263,13 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         assert current["merge_policy"]["max_affected_targets"] == 3
         assert historical["context_count"] == 2
         assert current["context_count"] == 3
-        assert _document(historical, DOCUMENT)["source_sha256"] != _document(
-            current,
-            DOCUMENT,
-        )["source_sha256"]
+        assert (
+            _document(historical, DOCUMENT)["source_sha256"]
+            != _document(
+                current,
+                DOCUMENT,
+            )["source_sha256"]
+        )
         assert historical["snapshot_id"] != current["snapshot_id"]
 
         bounded = await _call(
@@ -309,6 +306,4 @@ def test_real_mcp_returns_revision_consistent_resume_snapshots(tmp_path: Path) -
     snapshots = [entry for entry in trace if entry["tool"] == "branch_resume_snapshot"]
     assert len(snapshots) == 4
     assert all(entry["payload"]["ok"] is True for entry in snapshots)
-    assert all(
-        len(entry["payload"]["result"]["snapshot_id"]) == 64 for entry in snapshots
-    )
+    assert all(len(entry["payload"]["result"]["snapshot_id"]) == 64 for entry in snapshots)

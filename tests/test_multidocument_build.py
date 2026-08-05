@@ -31,7 +31,7 @@ FAILING_LIBRARY = LIBRARY.replace("(const_i32 7)", "(unknown_form 7)")
 
 def _fake_compiler(path: Path) -> Path:
     path.write_text(
-        r'''#!/usr/bin/env python3
+        r"""#!/usr/bin/env python3
 from __future__ import annotations
 
 import json
@@ -148,7 +148,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-''',
+""",
         encoding="utf-8",
     )
     path.chmod(0o755)
@@ -166,15 +166,9 @@ def _workspace(tmp_path: Path, compiler: Path) -> SExpressionWorkspace:
 def test_multidocument_build_preserves_requested_order(tmp_path: Path) -> None:
     compiler = _fake_compiler(tmp_path / "weavec")
     with _workspace(tmp_path, compiler) as workspace:
-        bridge = CompilerBridge(
-            workspace, compiler=compiler, build_root=tmp_path / "builds"
-        )
-        result = bridge.build(
-            "demo", "main.weave", additional_documents=["library.weave"]
-        )
-        cached = bridge.build(
-            "demo", "main.weave", additional_documents=["library.weave"]
-        )
+        bridge = CompilerBridge(workspace, compiler=compiler, build_root=tmp_path / "builds")
+        result = bridge.build("demo", "main.weave", additional_documents=["library.weave"])
+        cached = bridge.build("demo", "main.weave", additional_documents=["library.weave"])
 
     assert result["status"] == "succeeded"
     assert result["compiler_manifest_protocol_valid"] is True
@@ -194,9 +188,7 @@ def test_multidocument_build_preserves_requested_order(tmp_path: Path) -> None:
     assert result["artifact_paths"]["node_map"] == str(map_paths[0])
 
     compiler_manifest = json.loads(
-        Path(result["artifact_paths"]["compiler_manifest"]).read_text(
-            encoding="utf-8"
-        )
+        Path(result["artifact_paths"]["compiler_manifest"]).read_text(encoding="utf-8")
     )
     assert compiler_manifest["sources"] == [
         "sources/000-main.weave",
@@ -209,12 +201,8 @@ def test_multidocument_build_preserves_requested_order(tmp_path: Path) -> None:
 def test_secondary_document_diagnostic_maps_to_its_node(tmp_path: Path) -> None:
     compiler = _fake_compiler(tmp_path / "weavec")
     with _workspace(tmp_path, compiler) as workspace:
-        workspace.import_program(
-            "demo", "main", "library.weave", FAILING_LIBRARY, replace=True
-        )
-        result = CompilerBridge(
-            workspace, compiler=compiler, build_root=tmp_path / "builds"
-        ).build(
+        workspace.import_program("demo", "main", "library.weave", FAILING_LIBRARY, replace=True)
+        result = CompilerBridge(workspace, compiler=compiler, build_root=tmp_path / "builds").build(
             "demo", "main.weave", additional_documents=["library.weave"]
         )
 
@@ -237,16 +225,10 @@ def test_build_document_set_rejects_duplicates_and_missing_documents(
 ) -> None:
     compiler = _fake_compiler(tmp_path / "weavec")
     with _workspace(tmp_path, compiler) as workspace:
-        bridge = CompilerBridge(
-            workspace, compiler=compiler, build_root=tmp_path / "builds"
-        )
+        bridge = CompilerBridge(workspace, compiler=compiler, build_root=tmp_path / "builds")
         with pytest.raises(ValidationError) as duplicate:
-            bridge.build(
-                "demo", "main.weave", additional_documents=["main.weave"]
-            )
+            bridge.build("demo", "main.weave", additional_documents=["main.weave"])
         with pytest.raises(NotFoundError):
-            bridge.build(
-                "demo", "main.weave", additional_documents=["missing.weave"]
-            )
+            bridge.build("demo", "main.weave", additional_documents=["missing.weave"])
 
     assert duplicate.value.code == "DUPLICATE_BUILD_DOCUMENT"

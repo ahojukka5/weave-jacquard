@@ -50,9 +50,7 @@ class MergeValidationService:
     ) -> dict[str, Any]:
         """Validate one named target from the exact current merge candidate."""
 
-        if preview_id is not None and (
-            not isinstance(preview_id, str) or not preview_id
-        ):
+        if preview_id is not None and (not isinstance(preview_id, str) or not preview_id):
             raise ValidationError(
                 "INVALID_MERGE_PREVIEW_ID",
                 "preview_id must be a non-empty string",

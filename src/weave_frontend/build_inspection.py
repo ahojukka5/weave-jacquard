@@ -40,9 +40,7 @@ class BuildInspectionService:
             expected_sha256=expected_sha256,
         )
         entries = diagnostics.get("entries")
-        if not isinstance(entries, list) or not all(
-            isinstance(entry, dict) for entry in entries
-        ):
+        if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
             raise ValidationError(
                 "INVALID_BUILD_DIAGNOSTICS",
                 "mapped build diagnostics entries must be an array of objects",
@@ -64,9 +62,7 @@ class BuildInspectionService:
             "protocol_error_count": self._list_count(diagnostics.get("protocol_errors")),
             "compiler": diagnostics.get("compiler"),
             "compiler_manifest": diagnostics.get("compiler_manifest"),
-            "compiler_manifest_protocol_valid": diagnostics.get(
-                "compiler_manifest_protocol_valid"
-            ),
+            "compiler_manifest_protocol_valid": diagnostics.get("compiler_manifest_protocol_valid"),
             "total_diagnostic_count": len(entries),
             "start_index": start_index,
             "limit": limit,
@@ -82,9 +78,7 @@ class BuildInspectionService:
         artifacts = build.get("artifacts")
         hashes = build.get("artifact_sha256")
         diagnostics_path = (
-            artifact_paths.get("diagnostics")
-            if isinstance(artifact_paths, dict)
-            else None
+            artifact_paths.get("diagnostics") if isinstance(artifact_paths, dict) else None
         )
         relative = artifacts.get("diagnostics") if isinstance(artifacts, dict) else None
         expected_sha256 = hashes.get(relative) if isinstance(hashes, dict) else None
@@ -141,11 +135,7 @@ class BuildInspectionService:
 
     @staticmethod
     def _validate_start_index(start_index: int) -> None:
-        if (
-            isinstance(start_index, bool)
-            or not isinstance(start_index, int)
-            or start_index < 0
-        ):
+        if isinstance(start_index, bool) or not isinstance(start_index, int) or start_index < 0:
             raise ValidationError(
                 "INVALID_DIAGNOSTIC_INDEX",
                 "start_index must be a non-negative integer",

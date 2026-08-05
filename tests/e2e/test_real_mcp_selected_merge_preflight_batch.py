@@ -53,7 +53,7 @@ ORPHAN_SOURCE = """(program
 
 def _fake_compiler(path: Path) -> Path:
     path.write_text(
-        r'''#!/usr/bin/env python3
+        r"""#!/usr/bin/env python3
 from __future__ import annotations
 
 import json
@@ -138,7 +138,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-''',
+""",
         encoding="utf-8",
     )
     path.chmod(0o755)
@@ -463,9 +463,7 @@ async def _run(
         assert ready_result["passed_target_count"] == 1
         assert ready_result["failed_target_count"] == 0
         assert ready_result["returned_target_validation_count"] == 1
-        assert ready_result["publication_arguments"]["preflight_id"] == ready_result[
-            "preflight_id"
-        ]
+        assert ready_result["publication_arguments"]["preflight_id"] == ready_result["preflight_id"]
 
         failed_result = batch["sources"][1]
         assert failed_result["source_head_revision_id"] == not_ready["revision_id"]
@@ -541,9 +539,9 @@ def _verify_no_merge_publication(tmp_path: Path) -> None:
                WHERE operation_kind LIKE '%preflight_batch%'"""
         ).fetchone()["count"]
         assert batch_operations == 0
-        branch_count = connection.execute(
-            "SELECT COUNT(*) AS count FROM branches"
-        ).fetchone()["count"]
+        branch_count = connection.execute("SELECT COUNT(*) AS count FROM branches").fetchone()[
+            "count"
+        ]
         assert branch_count == 6
     finally:
         connection.close()
@@ -561,6 +559,4 @@ def test_real_mcp_runs_selected_merge_preflight_batch(tmp_path: Path) -> None:
     batch_calls = [entry for entry in trace if entry["tool"] == TOOL]
     assert len(batch_calls) == 2
     assert batch_calls[0]["payload"]["ok"] is True
-    assert batch_calls[1]["payload"]["error"]["code"] == (
-        "STALE_SELECTED_PREFLIGHT_CATALOG"
-    )
+    assert batch_calls[1]["payload"]["error"]["code"] == ("STALE_SELECTED_PREFLIGHT_CATALOG")

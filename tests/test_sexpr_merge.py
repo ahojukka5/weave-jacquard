@@ -12,9 +12,7 @@ def test_parallel_agents_can_append_different_forms_and_merge(sexpr_workspace):
     sexpr_workspace.create_branch("sexpr-demo", "agent/foo")
     sexpr_workspace.create_branch("sexpr-demo", "agent/bar")
 
-    foo = sexpr_workspace.create_form(
-        "sexpr-demo", "agent/foo", "main.weave", root_id, "fn"
-    )
+    foo = sexpr_workspace.create_form("sexpr-demo", "agent/foo", "main.weave", root_id, "fn")
     sexpr_workspace.add_atom(
         "sexpr-demo",
         "agent/foo",
@@ -24,9 +22,7 @@ def test_parallel_agents_can_append_different_forms_and_merge(sexpr_workspace):
         "foo",
     )
 
-    bar = sexpr_workspace.create_form(
-        "sexpr-demo", "agent/bar", "main.weave", root_id, "fn"
-    )
+    bar = sexpr_workspace.create_form("sexpr-demo", "agent/bar", "main.weave", root_id, "fn")
     sexpr_workspace.add_atom(
         "sexpr-demo",
         "agent/bar",

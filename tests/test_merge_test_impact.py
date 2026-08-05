@@ -179,7 +179,8 @@ def test_merge_candidate_plan_binds_preview_and_structural_reasons() -> None:
     assert by_name["smoke"]["reasons"] == ["source_changed"]
     assert by_name["smoke"]["changed_source_documents"] == ["main.weave"]
     assert all(
-        item["definition_subject"] == {
+        item["definition_subject"]
+        == {
             "kind": "virtual_merge_candidate",
             "preview_id": PREVIEW,
             "committed_revision_id": None,

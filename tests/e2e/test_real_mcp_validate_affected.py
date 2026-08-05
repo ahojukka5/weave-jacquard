@@ -307,9 +307,10 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             validate_affected_targets=True,
         )
         assert merged["affected_validation_enforced"] is True
-        assert merged["merge_validation_set"]["validation_set_id"] == validation_set[
-            "validation_set_id"
-        ]
+        assert (
+            merged["merge_validation_set"]["validation_set_id"]
+            == validation_set["validation_set_id"]
+        )
         assert merged["merge_validation_set"]["ready_for_publication"] is True
 
         built = await _call(
@@ -473,14 +474,13 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         )
         assert allowed_merge["affected_validation_enforced"] is True
         assert allowed_merge["allow_uncovered_documents"] is True
-        assert allowed_merge["merge_validation_set"]["validation_set_id"] == allowed_set[
-            "validation_set_id"
-        ]
+        assert (
+            allowed_merge["merge_validation_set"]["validation_set_id"]
+            == allowed_set["validation_set_id"]
+        )
 
         final_branches = await _call(session, trace, "branch_list", project=PROJECT)
-        final_heads = {
-            item["name"]: item["head_revision_id"] for item in final_branches
-        }
+        final_heads = {item["name"]: item["head_revision_id"] for item in final_branches}
         assert final_heads["broken"] != target_before_broken
         assert final_heads["uncovered"] == uncovered_edit["revision_id"]
         assert final_heads["target"] == allowed_merge["revision_id"]
@@ -501,9 +501,7 @@ def test_real_mcp_validates_all_affected_targets_and_coverage(tmp_path: Path) ->
     compiler = Path(configured).resolve()
     assert compiler.is_file()
     trace = asyncio.run(_run(tmp_path, compiler))
-    sets = [
-        entry for entry in trace if entry["tool"] == "branch_merge_validate_affected"
-    ]
+    sets = [entry for entry in trace if entry["tool"] == "branch_merge_validate_affected"]
     assert len(sets) == 4
     assert sets[0]["payload"]["result"]["passed_target_count"] == 2
     assert sets[1]["payload"]["result"]["failed_target_count"] == 2

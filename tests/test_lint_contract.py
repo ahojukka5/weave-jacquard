@@ -8,6 +8,6 @@ def test_qualification_enforces_repository_wide_ruff_gate() -> None:
     configuration = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
     assert '"${ruff_cmd[@]}" check .' in qualification
-    assert '[tool.ruff.lint]' in configuration
+    assert "[tool.ruff.lint]" in configuration
     assert 'select = ["E", "F", "I", "UP", "B", "SIM"]' in configuration
     assert "per-file-ignores" not in configuration

@@ -19,9 +19,7 @@ class _Bridge:
 
     def get(self, build_id: str) -> dict[str, Any]:
         self.calls.append(build_id)
-        expected = self.expected_sha256 or hashlib.sha256(
-            self.diagnostics.read_bytes()
-        ).hexdigest()
+        expected = self.expected_sha256 or hashlib.sha256(self.diagnostics.read_bytes()).hexdigest()
         return {
             "build_id": build_id,
             "status": "failed",

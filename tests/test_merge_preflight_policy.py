@@ -186,15 +186,9 @@ def test_preflight_uses_target_policy_and_ignores_weaker_source_policy() -> None
 
 
 def test_policy_hashes_are_bound_into_preflight_identity() -> None:
-    first, _, _ = _service(
-        _PolicyRegistry(target_hash="strict-a", source_hash="weak")
-    )
-    second, _, _ = _service(
-        _PolicyRegistry(target_hash="strict-b", source_hash="weak")
-    )
-    third, _, _ = _service(
-        _PolicyRegistry(target_hash="strict-a", source_hash="different-source")
-    )
+    first, _, _ = _service(_PolicyRegistry(target_hash="strict-a", source_hash="weak"))
+    second, _, _ = _service(_PolicyRegistry(target_hash="strict-b", source_hash="weak"))
+    third, _, _ = _service(_PolicyRegistry(target_hash="strict-a", source_hash="different-source"))
 
     first_result = first.run("demo", "protected", "incoming")
     second_result = second.run("demo", "protected", "incoming")
@@ -205,9 +199,7 @@ def test_policy_hashes_are_bound_into_preflight_identity() -> None:
 
 
 def test_forbidden_uncovered_override_fails_before_impact_or_validation() -> None:
-    service, impacts, validations = _service(
-        _PolicyRegistry(allow_uncovered=False)
-    )
+    service, impacts, validations = _service(_PolicyRegistry(allow_uncovered=False))
 
     with pytest.raises(ValidationError) as raised:
         service.run(
@@ -223,9 +215,7 @@ def test_forbidden_uncovered_override_fails_before_impact_or_validation() -> Non
 
 
 def test_allowed_uncovered_override_is_policy_bound() -> None:
-    service, _, validations = _service(
-        _PolicyRegistry(allow_uncovered=True, maximum=5)
-    )
+    service, _, validations = _service(_PolicyRegistry(allow_uncovered=True, maximum=5))
 
     result = service.run(
         "demo",

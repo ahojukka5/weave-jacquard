@@ -90,12 +90,8 @@ def test_database_backup_quota_accounts_successful_publication(tmp_path: Path) -
 
     assert (backup_root / backup["backup_id"]).is_dir()
     assert report["quota"]["current_logical_bytes"] > 0
-    assert report["quota"]["current_logical_bytes"] == report["aggregate"][
-        "logical_bytes"
-    ]
-    family = next(
-        item for item in report["families"] if item["family"] == "database_backups"
-    )
+    assert report["quota"]["current_logical_bytes"] == report["aggregate"]["logical_bytes"]
+    family = next(item for item in report["families"] if item["family"] == "database_backups")
     assert family["logical_bytes"] == report["aggregate"]["logical_bytes"]
 
 
@@ -158,9 +154,7 @@ def test_database_backup_rejects_unknown_manifest_fields(tmp_path: Path) -> None
     with _initialized_database(tmp_path / "source.db") as database:
         service = DatabaseBackupService(database, backup_root=backup_root)
         backup = service.create()
-        manifest_path = (
-            backup_root / backup["backup_id"] / "backup-manifest.json"
-        )
+        manifest_path = backup_root / backup["backup_id"] / "backup-manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest["unbound"] = "field"
         manifest_path.write_text(
@@ -179,9 +173,7 @@ def test_database_backup_rejects_noncanonical_manifest_encoding(
     with _initialized_database(tmp_path / "source.db") as database:
         service = DatabaseBackupService(database, backup_root=backup_root)
         backup = service.create()
-        manifest_path = (
-            backup_root / backup["backup_id"] / "backup-manifest.json"
-        )
+        manifest_path = backup_root / backup["backup_id"] / "backup-manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest_path.write_text(
             json.dumps(manifest, sort_keys=True) + "\n",

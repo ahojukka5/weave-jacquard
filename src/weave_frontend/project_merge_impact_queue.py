@@ -131,15 +131,9 @@ class ProjectMergeImpactQueueService:
                 "maximum_page_size": MAX_PROJECT_MERGE_IMPACT_QUEUE_PAGE,
                 "maximum_checkpoint_scan": MAX_AGENT_STATUS_CHECKPOINT_SCAN,
                 "maximum_conflicts_per_source": MAX_PROJECT_MERGE_QUEUE_CONFLICTS,
-                "maximum_changed_documents_per_source": (
-                    MAX_PROJECT_MERGE_QUEUE_DOCUMENTS
-                ),
-                "maximum_affected_targets_per_source": (
-                    MAX_MERGE_TARGET_IMPACT_PAGE_SIZE
-                ),
-                "maximum_coverage_documents_per_source": (
-                    MAX_PROJECT_MERGE_IMPACT_QUEUE_DOCUMENTS
-                ),
+                "maximum_changed_documents_per_source": (MAX_PROJECT_MERGE_QUEUE_DOCUMENTS),
+                "maximum_affected_targets_per_source": (MAX_MERGE_TARGET_IMPACT_PAGE_SIZE),
+                "maximum_coverage_documents_per_source": (MAX_PROJECT_MERGE_IMPACT_QUEUE_DOCUMENTS),
             },
             "target_merge_policy": target_policy,
             "sources": sources,
@@ -182,9 +176,7 @@ class ProjectMergeImpactQueueService:
         policy_context = {
             "target": target_policy,
             "source": source_policy,
-            "source_policy_ignored": (
-                target_policy["policy_hash"] != source_policy["policy_hash"]
-            ),
+            "source_policy_ignored": (target_policy["policy_hash"] != source_policy["policy_hash"]),
         }
         if not queue_entry["mergeable"]:
             return {
@@ -213,8 +205,7 @@ class ProjectMergeImpactQueueService:
                 ) from exc
             raise
         if (
-            impact["target_head_revision_id"]
-            != target_policy["revision_id"]
+            impact["target_head_revision_id"] != target_policy["revision_id"]
             or impact["source_head_revision_id"] != source_head
             or impact["preview_id"] != queue_entry["preview_id"]
         ):
@@ -241,24 +232,16 @@ class ProjectMergeImpactQueueService:
             "merged_root_hash": impact["merged_root_hash"],
             "changed_program_document_count": len(changed_program),
             "changed_program_documents": changed_program[:coverage_document_limit],
-            "changed_program_documents_truncated": (
-                len(changed_program) > coverage_document_limit
-            ),
+            "changed_program_documents_truncated": (len(changed_program) > coverage_document_limit),
             "changed_target_document_count": len(changed_targets),
             "changed_target_documents": changed_targets[:coverage_document_limit],
-            "changed_target_documents_truncated": (
-                len(changed_targets) > coverage_document_limit
-            ),
+            "changed_target_documents_truncated": (len(changed_targets) > coverage_document_limit),
             "covered_changed_document_count": len(covered),
             "covered_changed_documents": covered[:coverage_document_limit],
-            "covered_changed_documents_truncated": (
-                len(covered) > coverage_document_limit
-            ),
+            "covered_changed_documents_truncated": (len(covered) > coverage_document_limit),
             "uncovered_changed_document_count": len(uncovered),
             "uncovered_changed_documents": uncovered[:coverage_document_limit],
-            "uncovered_changed_documents_truncated": (
-                len(uncovered) > coverage_document_limit
-            ),
+            "uncovered_changed_documents_truncated": (len(uncovered) > coverage_document_limit),
             "total_target_count_before": impact["total_target_count_before"],
             "total_target_count_after": impact["total_target_count_after"],
             "total_affected_target_count": impact["total_affected_target_count"],
@@ -274,9 +257,7 @@ class ProjectMergeImpactQueueService:
             "impact": compact_impact,
             "coverage_gate": {
                 "uncovered_documents_present": bool(uncovered),
-                "target_allows_uncovered_documents": target_policy[
-                    "allow_uncovered_documents"
-                ],
+                "target_allows_uncovered_documents": target_policy["allow_uncovered_documents"],
                 "override_possible": bool(uncovered)
                 and bool(target_policy["allow_uncovered_documents"]),
             },

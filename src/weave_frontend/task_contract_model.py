@@ -357,10 +357,7 @@ def _items(
             "INVALID_TASK_CONTRACT",
             f"{name} must be a list with at most {MAX_TASK_ITEMS} items",
         )
-    normalized = [
-        _text(f"{name} item", value, maximum=MAX_TASK_ITEM_CHARS)
-        for value in values
-    ]
+    normalized = [_text(f"{name} item", value, maximum=MAX_TASK_ITEM_CHARS) for value in values]
     if require_nonempty and not normalized:
         raise ValidationError(
             "INVALID_TASK_CONTRACT",

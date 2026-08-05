@@ -85,7 +85,7 @@ def _main_head(branches: list[dict[str, Any]]) -> str:
 
 def _fake_compiler(path: Path) -> Path:
     path.write_text(
-        r'''#!/usr/bin/env python3
+        r"""#!/usr/bin/env python3
 from __future__ import annotations
 
 import json
@@ -151,7 +151,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-''',
+""",
         encoding="utf-8",
     )
     path.chmod(0o755)
@@ -226,9 +226,7 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert capabilities["resource_limits"]["process_count"] is False
 
         await _call(session, trace, "project_initialize", project=PROJECT)
-        initial = _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        initial = _main_head(await _call(session, trace, "branch_list", project=PROJECT))
         program = await _call(
             session,
             trace,
@@ -266,9 +264,7 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             max_file_bytes=4_096,
             expected_revision_id=target["revision_id"],
         )
-        head_before_run = _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        head_before_run = _main_head(await _call(session, trace, "branch_list", project=PROJECT))
         assert head_before_run == passing_definition["revision_id"]
 
         passed = await _call(
@@ -285,9 +281,10 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert passed["definition_hash"] == passing_definition["definition_hash"]
         assert passed["sandbox"]["policy_hash"] == capabilities["policy_hash"]
         assert "artifact_paths" not in passed
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == head_before_run
+        assert (
+            _main_head(await _call(session, trace, "branch_list", project=PROJECT))
+            == head_before_run
+        )
 
         resolved = await _call(
             session,
@@ -339,9 +336,7 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert failed["assertions"]["exit_code"] is True
         assert "artifact_paths" not in failed
 
-        head_before_batch = _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        head_before_batch = _main_head(await _call(session, trace, "branch_list", project=PROJECT))
         assert head_before_batch == failing_definition["revision_id"]
         batch = await _call(
             session,
@@ -364,9 +359,10 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert batch["failed_test_count"] == 1
         assert batch["error_test_count"] == 0
         assert batch["sandbox"]["policy_hash"] == capabilities["policy_hash"]
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == head_before_batch
+        assert (
+            _main_head(await _call(session, trace, "branch_list", project=PROJECT))
+            == head_before_batch
+        )
 
         resolved_batch = await _call(
             session,
@@ -389,9 +385,10 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             expected_revision_id=head_before_batch,
         )
         target_revision = imported["revision_id"]
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == target_revision
+        assert (
+            _main_head(await _call(session, trace, "branch_list", project=PROJECT))
+            == target_revision
+        )
 
         impact = await _call(
             session,
@@ -414,10 +411,7 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             "failing",
             "passing",
         ]
-        assert all(
-            item["reasons"] == ["source_changed"]
-            for item in impact["impacted_tests"]
-        )
+        assert all(item["reasons"] == ["source_changed"] for item in impact["impacted_tests"])
         assert impact["complete_selection"] is True
         assert impact["interpretation"]["executes_tests"] is False
         assert impact["test_batch_run"] == {
@@ -429,9 +423,10 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
                 "revision_id": target_revision,
             },
         }
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == target_revision
+        assert (
+            _main_head(await _call(session, trace, "branch_list", project=PROJECT))
+            == target_revision
+        )
 
         impact_batch = await _call(
             session,
@@ -448,12 +443,11 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             "test_batch_get",
             batch_id=impact_batch["batch_id"],
         )
-        assert resolved_impact_batch["manifest_sha256"] == impact_batch[
-            "manifest_sha256"
-        ]
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == target_revision
+        assert resolved_impact_batch["manifest_sha256"] == impact_batch["manifest_sha256"]
+        assert (
+            _main_head(await _call(session, trace, "branch_list", project=PROJECT))
+            == target_revision
+        )
 
     return trace
 
@@ -461,17 +455,13 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
 def _verify_retained_evidence(tmp_path: Path) -> None:
     run_root = tmp_path / "runs"
     run_directories = sorted(
-        path
-        for path in run_root.iterdir()
-        if path.is_dir() and RUN_ID.fullmatch(path.name)
+        path for path in run_root.iterdir() if path.is_dir() and RUN_ID.fullmatch(path.name)
     )
     assert len(run_directories) == 6
     statuses: list[str] = []
     run_ids: set[str] = set()
     for directory in run_directories:
-        manifest = json.loads(
-            (directory / "run-manifest.json").read_text(encoding="utf-8")
-        )
+        manifest = json.loads((directory / "run-manifest.json").read_text(encoding="utf-8"))
         assert manifest["run_id"] == directory.name
         assert manifest["format"] == "weave-test-run-manifest-v1"
         assert (directory / "stdout.bin").read_bytes() == b"done\n"
@@ -512,10 +502,7 @@ def test_real_mcp_runs_behavioral_tests_in_strict_sandbox(tmp_path: Path) -> Non
         entry
         for entry in trace
         if entry["tool"] in {"test_batch_run", "test_batch_get"}
-        or (
-            entry["tool"] == "weave_help"
-            and entry["arguments"].get("topic") == "test_batches"
-        )
+        or (entry["tool"] == "weave_help" and entry["arguments"].get("topic") == "test_batches")
     ]
     (tmp_path / "test-batches-trace.json").write_text(
         json.dumps(batch_trace, indent=2, sort_keys=True) + "\n",
@@ -525,10 +512,7 @@ def test_real_mcp_runs_behavioral_tests_in_strict_sandbox(tmp_path: Path) -> Non
         entry
         for entry in trace
         if entry["tool"] in {"program_import", "test_impact_plan"}
-        or (
-            entry["tool"] == "weave_help"
-            and entry["arguments"].get("topic") == "test_impact"
-        )
+        or (entry["tool"] == "weave_help" and entry["arguments"].get("topic") == "test_impact")
         or entry["tool"] in {"test_batch_run", "test_batch_get"}
     ]
     (tmp_path / "test-impact-trace.json").write_text(

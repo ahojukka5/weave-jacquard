@@ -26,7 +26,4 @@ def test_help_is_derived_from_weavec_surface_examples(tmp_path):
     assert help_result["found"] is True
     assert help_result["observed_arities"] == [4]
     assert help_result["examples"][0]["source"].endswith("sample.weave")
-    assert any(
-        item["form"] == "fn"
-        for item in child_result["observed_child_forms"]
-    )
+    assert any(item["form"] == "fn" for item in child_result["observed_child_forms"])

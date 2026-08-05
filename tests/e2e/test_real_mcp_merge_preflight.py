@@ -289,9 +289,10 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             **ready["publication_arguments"],
         )
         assert merged["affected_validation_enforced"] is True
-        assert merged["merge_validation_set"]["validation_set_id"] == ready[
-            "validation_set"
-        ]["validation_set_id"]
+        assert (
+            merged["merge_validation_set"]["validation_set_id"]
+            == ready["validation_set"]["validation_set_id"]
+        )
 
         built = await _call(
             session,
@@ -417,9 +418,10 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             **allowed["publication_arguments"],
         )
         assert allowed_merge["allow_uncovered_documents"] is True
-        assert allowed_merge["merge_validation_set"]["validation_set_id"] == allowed[
-            "validation_set"
-        ]["validation_set_id"]
+        assert (
+            allowed_merge["merge_validation_set"]["validation_set_id"]
+            == allowed["validation_set"]["validation_set_id"]
+        )
 
     (tmp_path / "merge-preflight-trace.json").write_text(
         json.dumps(trace, indent=2, sort_keys=True) + "\n",
@@ -441,7 +443,5 @@ def test_real_mcp_composes_and_repeats_merge_preflight(tmp_path: Path) -> None:
     assert len(preflights) == 4
     assert preflights[0]["payload"]["result"]["ready_for_publication"] is True
     assert preflights[1]["payload"]["result"]["ready_for_publication"] is False
-    assert preflights[2]["payload"]["result"]["validation_set"][
-        "coverage_passed"
-    ] is False
+    assert preflights[2]["payload"]["result"]["validation_set"]["coverage_passed"] is False
     assert preflights[3]["payload"]["result"]["allow_uncovered_documents"] is True

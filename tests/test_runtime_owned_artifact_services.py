@@ -141,27 +141,18 @@ def test_artifact_services_are_runtime_owned(
         reconciliation = artifact_module.artifact_reconciliation()
         quota = artifact_module.artifact_quota()
 
-        expected_roots = {
-            name: path.resolve() for name, path in roots.items()
-        }
+        expected_roots = {name: path.resolve() for name, path in roots.items()}
         assert storage.roots == expected_roots
-        assert {
-            family.name: family.root for family in inventory.families
-        } == expected_roots
+        assert {family.name: family.root for family in inventory.families} == expected_roots
         assert reconciliation.database is workspace.db
         assert reconciliation.inventory is inventory
         assert quota.accounting is storage
-        assert quota.lock_path == (
-            tmp_path / ".weave-artifact-quota.lock"
-        ).resolve()
+        assert quota.lock_path == (tmp_path / ".weave-artifact-quota.lock").resolve()
         assert quota.max_bytes == 1234
         for publisher in publishers:
             assert publisher.artifact_quota is quota
 
-        entries = {
-            item["name"]: item
-            for item in runtime.service_manifest()["services"]
-        }
+        entries = {item["name"]: item for item in runtime.service_manifest()["services"]}
         expected_dependencies = [
             "compiler_bridge",
             "database_backups",

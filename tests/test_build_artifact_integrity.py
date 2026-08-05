@@ -40,9 +40,7 @@ def _write_build(
         "protocol_errors": [],
         "entries": [],
     }
-    (directory / "diagnostics.json").write_text(
-        json.dumps(diagnostics) + "\n", encoding="utf-8"
-    )
+    (directory / "diagnostics.json").write_text(json.dumps(diagnostics) + "\n", encoding="utf-8")
     (directory / "compiler-manifest.json").write_text("{}\n", encoding="utf-8")
     (directory / "compiler-diagnostics.json").write_text("{}\n", encoding="utf-8")
     if succeeded:
@@ -105,9 +103,7 @@ def _write_build(
         "compiler_diagnostics_protocol_valid": True,
         "compiler_manifest_protocol_valid": True,
         "artifacts": artifacts,
-        "artifact_sha256": {
-            relative: _sha(directory / relative) for relative in references
-        },
+        "artifact_sha256": {relative: _sha(directory / relative) for relative in references},
     }
     (directory / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     return resolved_build_id
@@ -158,14 +154,11 @@ def test_cache_rejects_missing_malformed_or_wrong_hashes(
     assert CompilerBridge._read_successful_manifest(build) is None
 
 
-
 def test_cache_binds_manifest_id_to_final_directory(tmp_path: Path) -> None:
     build = tmp_path / ("e" * 32)
     _write_build(build, succeeded=True, build_id="f" * 32)
 
-    assert CompilerBridge._read_successful_manifest(
-        build, expected_build_id=build.name
-    ) is None
+    assert CompilerBridge._read_successful_manifest(build, expected_build_id=build.name) is None
 
     class _DB:
         path = tmp_path / "weave.db"
@@ -177,6 +170,7 @@ def test_cache_binds_manifest_id_to_final_directory(tmp_path: Path) -> None:
     with pytest.raises(ValidationError) as mismatch:
         bridge.get(build.name)
     assert mismatch.value.code == "INVALID_BUILD_MANIFEST"
+
 
 def test_public_get_rejects_escape_and_checksum_mismatch(tmp_path: Path) -> None:
     build_root = tmp_path / "builds"

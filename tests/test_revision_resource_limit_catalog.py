@@ -33,19 +33,10 @@ from weave_frontend.test_resume_snapshot import MAX_RESUME_TEST_TARGETS
 
 def test_checkpoint_and_agent_status_limits_match_the_central_catalog() -> None:
     assert MAX_CHECKPOINT_PAGE == revision_limits.MAX_CHECKPOINT_TIMELINE_PAGE
-    assert (
-        MAX_CHECKPOINT_REVISION_SCAN
-        == revision_limits.MAX_CHECKPOINT_REVISION_SCAN
-    )
+    assert MAX_CHECKPOINT_REVISION_SCAN == revision_limits.MAX_CHECKPOINT_REVISION_SCAN
     assert MAX_AGENT_STATUS_PAGE == revision_limits.MAX_AGENT_STATUS_PAGE
-    assert (
-        MAX_AGENT_STATUS_BRANCH_CATALOG
-        == revision_limits.MAX_AGENT_STATUS_BRANCH_CATALOG
-    )
-    assert (
-        MAX_AGENT_STATUS_CHECKPOINT_SCAN
-        == revision_limits.MAX_AGENT_STATUS_CHECKPOINT_SCAN
-    )
+    assert MAX_AGENT_STATUS_BRANCH_CATALOG == revision_limits.MAX_AGENT_STATUS_BRANCH_CATALOG
+    assert MAX_AGENT_STATUS_CHECKPOINT_SCAN == revision_limits.MAX_AGENT_STATUS_CHECKPOINT_SCAN
 
 
 def test_resume_limits_match_the_central_catalog() -> None:
@@ -61,17 +52,10 @@ def test_resume_limits_match_the_central_catalog() -> None:
 
 
 def test_queue_and_preflight_limits_match_the_central_catalog() -> None:
+    assert MAX_AFFECTED_TARGET_VALIDATIONS == revision_limits.MAX_AFFECTED_TARGET_VALIDATIONS
+    assert MAX_SELECTED_MERGE_TRAIN_SOURCES == revision_limits.MAX_SELECTED_MERGE_TRAIN_SOURCES
     assert (
-        MAX_AFFECTED_TARGET_VALIDATIONS
-        == revision_limits.MAX_AFFECTED_TARGET_VALIDATIONS
-    )
-    assert (
-        MAX_SELECTED_MERGE_TRAIN_SOURCES
-        == revision_limits.MAX_SELECTED_MERGE_TRAIN_SOURCES
-    )
-    assert (
-        MAX_SELECTED_MERGE_PREFLIGHT_SOURCES
-        == revision_limits.MAX_SELECTED_MERGE_PREFLIGHT_SOURCES
+        MAX_SELECTED_MERGE_PREFLIGHT_SOURCES == revision_limits.MAX_SELECTED_MERGE_PREFLIGHT_SOURCES
     )
     assert (
         MAX_SELECTED_MERGE_PREFLIGHT_DOCUMENTS

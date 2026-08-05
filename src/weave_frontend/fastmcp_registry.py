@@ -29,10 +29,7 @@ class FastMCPRegistryAdapter:
         """Return caller-visible contracts from one captured registry snapshot."""
 
         registry = self._snapshot()
-        return tuple(
-            self._tool_contract(name, registry[name])
-            for name in sorted(registry)
-        )
+        return tuple(self._tool_contract(name, registry[name]) for name in sorted(registry))
 
     def tool_objects(self) -> Mapping[str, Any]:
         """Return an immutable exact-object snapshot of the registered tools."""
@@ -60,8 +57,7 @@ class FastMCPRegistryAdapter:
                 f"FastMCP source registry is missing selected tools {missing!r}"
             )
         source_contracts = tuple(
-            self._tool_contract(name, source_snapshot[name])
-            for name in selected
+            self._tool_contract(name, source_snapshot[name]) for name in selected
         )
         replacement = {
             name: (
@@ -72,8 +68,7 @@ class FastMCPRegistryAdapter:
             for name in selected
         }
         replacement_contracts = tuple(
-            self._tool_contract(name, replacement[name])
-            for name in selected
+            self._tool_contract(name, replacement[name]) for name in selected
         )
         if replacement_contracts != source_contracts:
             raise FastMCPRegistryError(
@@ -100,8 +95,7 @@ class FastMCPRegistryAdapter:
                         "FastMCP staged installation changed an unrelated tool object"
                     )
             installed_contracts = tuple(
-                self._tool_contract(name, installed[name])
-                for name in selected
+                self._tool_contract(name, installed[name]) for name in selected
             )
             if installed_contracts != source_contracts:
                 raise FastMCPRegistryError(
@@ -133,9 +127,7 @@ class FastMCPRegistryAdapter:
                     "FastMCP target registry did not preserve the retained tool set"
                 )
             if any(installed[name] is not replacement[name] for name in selected):
-                raise FastMCPRegistryError(
-                    "FastMCP target registry changed a retained tool object"
-                )
+                raise FastMCPRegistryError("FastMCP target registry changed a retained tool object")
         except Exception as exc:
             self._rollback(target_registry, previous, exc)
         return selected
@@ -162,8 +154,7 @@ class FastMCPRegistryAdapter:
             for name in names
         }
         replacement_contracts = tuple(
-            self._tool_contract(name, replacement[name])
-            for name in names
+            self._tool_contract(name, replacement[name]) for name in names
         )
         if replacement_contracts != source_contracts:
             raise FastMCPRegistryError(
@@ -188,8 +179,7 @@ class FastMCPRegistryAdapter:
                     "FastMCP target registry did not preserve replacement tool objects"
                 )
             installed_contracts = tuple(
-                self._tool_contract(name, installed[name])
-                for name in names
+                self._tool_contract(name, installed[name]) for name in names
             )
             if installed_contracts != source_contracts:
                 raise FastMCPRegistryError(
@@ -220,8 +210,7 @@ class FastMCPRegistryAdapter:
         registry = self._registry()
         if not isinstance(registry, MutableMapping):
             raise FastMCPRegistryError(
-                "FastMCP target tool registry must be mutable for application "
-                "registration"
+                "FastMCP target tool registry must be mutable for application registration"
             )
         return registry
 
@@ -245,9 +234,7 @@ class FastMCPRegistryAdapter:
     def _selected_names(names: Iterable[str]) -> tuple[str, ...]:
         selected = tuple(names)
         if any(not isinstance(name, str) or not name for name in selected):
-            raise FastMCPRegistryError(
-                "selected FastMCP tool names must be non-empty strings"
-            )
+            raise FastMCPRegistryError("selected FastMCP tool names must be non-empty strings")
         if len(set(selected)) != len(selected):
             raise FastMCPRegistryError("selected FastMCP tool names must be unique")
         return tuple(sorted(selected))
@@ -274,8 +261,7 @@ class FastMCPRegistryAdapter:
         declared_name = getattr(tool, "name", registry_name)
         if declared_name != registry_name:
             raise FastMCPRegistryError(
-                f"registered tool name {registry_name!r} disagrees with metadata "
-                f"{declared_name!r}"
+                f"registered tool name {registry_name!r} disagrees with metadata {declared_name!r}"
             )
 
         parameters = getattr(tool, "parameters", None)

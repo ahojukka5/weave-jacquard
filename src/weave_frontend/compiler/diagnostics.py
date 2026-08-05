@@ -148,9 +148,7 @@ def _validate_document(
 ) -> list[str]:
     errors: list[str] = []
     if document.get("format") != COMPILER_DIAGNOSTICS_FORMAT:
-        errors.append(
-            f"unsupported compiler diagnostics format: {document.get('format')!r}"
-        )
+        errors.append(f"unsupported compiler diagnostics format: {document.get('format')!r}")
 
     status = document.get("status")
     if status not in {"succeeded", "failed"}:
@@ -166,9 +164,7 @@ def _validate_document(
     if not _is_int(raw_exit_code):
         errors.append("compiler diagnostics raw_exit_code must be an integer")
     if returncode is not None and exit_code != returncode:
-        errors.append(
-            "compiler diagnostics exit_code does not match process return code"
-        )
+        errors.append("compiler diagnostics exit_code does not match process return code")
     if _is_int(exit_code) and status in {"succeeded", "failed"}:
         expected_status = "succeeded" if exit_code == 0 else "failed"
         if status != expected_status:
@@ -217,18 +213,20 @@ def _validate_entry(value: Any, *, index: int) -> list[str]:
 
     span_origin = value.get("span_origin")
     if span_origin not in SPAN_ORIGINS:
-        errors.append(
-            f"{prefix} span_origin must be one of {sorted(SPAN_ORIGINS)}"
-        )
+        errors.append(f"{prefix} span_origin must be one of {sorted(SPAN_ORIGINS)}")
 
     span = value.get("span")
     if span_origin == "none" and span is not None:
         errors.append(f"{prefix} span must be null when span_origin is 'none'")
-    if span_origin in {
-        "compiler-preflight",
-        "propagated-wir-location",
-        "inferred-unique-token",
-    } and span is None:
+    if (
+        span_origin
+        in {
+            "compiler-preflight",
+            "propagated-wir-location",
+            "inferred-unique-token",
+        }
+        and span is None
+    ):
         errors.append(f"{prefix} span is required for span_origin {span_origin!r}")
 
     if span is not None:
@@ -249,12 +247,15 @@ def _validate_entry(value: Any, *, index: int) -> list[str]:
             if all(_is_int(span.get(key)) for key in required):
                 if span["start_byte"] < 0 or span["end_byte"] < span["start_byte"]:
                     errors.append(f"{prefix} span has invalid byte bounds")
-                if min(
-                    span["start_line"],
-                    span["start_column"],
-                    span["end_line"],
-                    span["end_column"],
-                ) < 1:
+                if (
+                    min(
+                        span["start_line"],
+                        span["start_column"],
+                        span["end_line"],
+                        span["end_column"],
+                    )
+                    < 1
+                ):
                     errors.append(f"{prefix} span line and column values are one-based")
     return errors
 

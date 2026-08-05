@@ -196,10 +196,7 @@ def test_all_build_errors_publish_verified_artifact_free_aggregate(
     assert repeated["manifest_sha256"] == result["manifest_sha256"]
 
     manifest_path = (
-        tmp_path
-        / "candidate-runs"
-        / result["qualification_id"]
-        / "qualification-manifest.json"
+        tmp_path / "candidate-runs" / result["qualification_id"] / "qualification-manifest.json"
     )
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["artifact_sha256"] = {"invented.bin": "0" * 64}

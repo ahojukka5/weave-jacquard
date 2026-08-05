@@ -123,9 +123,7 @@ class AgentCheckpointTimelineService:
             "project": project,
             "base": self._comparison_endpoint(base_revision, base),
             "target": self._comparison_endpoint(target_revision, target),
-            "program_state_changed": (
-                base_revision["root_hash"] != target_revision["root_hash"]
-            ),
+            "program_state_changed": (base_revision["root_hash"] != target_revision["root_hash"]),
             "status": {
                 "base": base_checkpoint["status"],
                 "target": target_checkpoint["status"],
@@ -134,9 +132,7 @@ class AgentCheckpointTimelineService:
             "objective": {
                 "base": base_checkpoint["objective"],
                 "target": target_checkpoint["objective"],
-                "changed": (
-                    base_checkpoint["objective"] != target_checkpoint["objective"]
-                ),
+                "changed": (base_checkpoint["objective"] != target_checkpoint["objective"]),
             },
             "summary": {
                 "base_sha256": self._text_hash(base_checkpoint["summary"]),
@@ -159,9 +155,7 @@ class AgentCheckpointTimelineService:
                 "added and removed items are structural differences only; removal does "
                 "not prove completion, resolution, or invalidation"
             ),
-            "ordering_note": (
-                "the comparison does not imply that base is an ancestor of target"
-            ),
+            "ordering_note": ("the comparison does not imply that base is an ancestor of target"),
         }
         result["comparison_id"] = self.workspace.db.hash_value(result)
         return result
@@ -219,17 +213,11 @@ class AgentCheckpointTimelineService:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
         return {
             "id": str(row["id"]),
-            "parent1_id": (
-                str(row["parent1_id"]) if row["parent1_id"] is not None else None
-            ),
-            "parent2_id": (
-                str(row["parent2_id"]) if row["parent2_id"] is not None else None
-            ),
+            "parent1_id": (str(row["parent1_id"]) if row["parent1_id"] is not None else None),
+            "parent2_id": (str(row["parent2_id"]) if row["parent2_id"] is not None else None),
             "message": str(row["message"]),
             "author": str(row["author"]),
             "root_hash": str(row["root_hash"]),
@@ -321,12 +309,7 @@ class AgentCheckpointTimelineService:
 
     @staticmethod
     def _validate_limit(name: str, value: Any, maximum: int) -> None:
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or value < 1
-            or value > maximum
-        ):
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > maximum:
             raise ValidationError(
                 "INVALID_CHECKPOINT_TIMELINE_LIMIT",
                 f"{name} must be an integer between 1 and {maximum}",

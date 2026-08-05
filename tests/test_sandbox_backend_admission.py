@@ -20,9 +20,7 @@ def test_missing_prlimit_reports_unavailable(tmp_path: Path) -> None:
     capabilities = sandbox.capabilities()
 
     assert capabilities["available"] is False
-    assert capabilities["probe_error"] == (
-        "configured prlimit path is not an executable file"
-    )
+    assert capabilities["probe_error"] == ("configured prlimit path is not an executable file")
     assert capabilities["resource_limits"]["process_count"] is True
     assert capabilities["resource_limits"]["aggregate_memory"] is False
     assert capabilities["policy"]["process_creation"] == "deny"

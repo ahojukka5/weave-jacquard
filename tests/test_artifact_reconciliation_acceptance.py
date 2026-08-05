@@ -58,9 +58,7 @@ def test_inventory_distinguishes_named_corruption_and_internal_examples(
             )
         return {"artifact_id": artifact_id}
 
-    report = RetainedArtifactInventoryService(
-        [_family(root, verify)]
-    ).report()
+    report = RetainedArtifactInventoryService([_family(root, verify)]).report()
 
     family = report["families"][0]
     assert family["counts"] == {
@@ -72,10 +70,7 @@ def test_inventory_distinguishes_named_corruption_and_internal_examples(
         "unknown": 1,
     }
     assert calls == [wrong_hash_id, corrupt_manifest_id]
-    assert {
-        example["error_code"]
-        for example in family["examples"]["corrupt"]
-    } == {
+    assert {example["error_code"] for example in family["examples"]["corrupt"]} == {
         "ARTIFACT_INTEGRITY_ERROR",
         "ARTIFACT_MANIFEST_INVALID",
     }
@@ -127,9 +122,7 @@ def test_inventory_is_deterministic_across_enumeration_orders(
         "scandir",
         alternating_scandir,
     )
-    service = RetainedArtifactInventoryService(
-        [_family(root, lambda _artifact_id: {})]
-    )
+    service = RetainedArtifactInventoryService([_family(root, lambda _artifact_id: {})])
 
     first = service.report()
     second = service.report()

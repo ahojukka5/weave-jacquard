@@ -80,9 +80,7 @@ def test_batch_commits_one_revision_with_ordered_audit_rows(sexpr_workspace):
     assert result["aliases"]["entry"].startswith("n_")
     assert len(result["operation_results"]) == 9
     assert len(sexpr_workspace.list_history("sexpr-demo", limit=10)) == 3
-    assert "(return (const_i32 42))" in sexpr_workspace.render(
-        "sexpr-demo", "main", "main.weave"
-    )
+    assert "(return (const_i32 42))" in sexpr_workspace.render("sexpr-demo", "main", "main.weave")
 
     rows = sexpr_workspace.db.connection.execute(
         """SELECT sequence_number, operation_kind, payload_json
@@ -101,9 +99,7 @@ def test_batch_commits_one_revision_with_ordered_audit_rows(sexpr_workspace):
         "create_form",
         "add_atom",
     ]
-    assert [json.loads(row["payload_json"])["batch_index"] for row in rows] == list(
-        range(9)
-    )
+    assert [json.loads(row["payload_json"])["batch_index"] for row in rows] == list(range(9))
 
 
 def test_batch_supports_set_wrap_move_and_delete(sexpr_workspace):
@@ -201,9 +197,7 @@ def test_batch_failure_rolls_back_all_prior_operations(sexpr_workspace):
     assert error.operation_index == 1
     assert error.operation == "add_atom"
     assert sexpr_workspace.branch_head("sexpr-demo", "main") == before
-    assert "(entry" not in sexpr_workspace.render(
-        "sexpr-demo", "main", "main.weave"
-    )
+    assert "(entry" not in sexpr_workspace.render("sexpr-demo", "main", "main.weave")
 
 
 def test_batch_rejects_stale_expected_revision(sexpr_workspace):

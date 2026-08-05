@@ -9,12 +9,8 @@ from typing import Any
 
 SERVICE_GRAPH_FORMAT = "weave-jacquard-runtime-service-graph-v1"
 RUNTIME_IDENTITY_FORMAT = "weave-jacquard-runtime-identity-v1"
-SERVICE_GRAPH_COMPATIBILITY_DIFF_FORMAT = (
-    "weave-jacquard-service-graph-compatibility-diff-v1"
-)
-RUNTIME_IDENTITY_COMPATIBILITY_DIFF_FORMAT = (
-    "weave-jacquard-runtime-identity-compatibility-diff-v1"
-)
+SERVICE_GRAPH_COMPATIBILITY_DIFF_FORMAT = "weave-jacquard-service-graph-compatibility-diff-v1"
+RUNTIME_IDENTITY_COMPATIBILITY_DIFF_FORMAT = "weave-jacquard-runtime-identity-compatibility-diff-v1"
 _CLASSIFICATION_ORDER = {
     "identity-only": 0,
     "behavior-review-required": 1,
@@ -97,9 +93,7 @@ def _require_string_list(
         raise RuntimeEvidenceCompatibilityError(f"{label} must be a list")
     items = tuple(value)
     if any(not isinstance(item, str) or not item for item in items):
-        raise RuntimeEvidenceCompatibilityError(
-            f"{label} must contain non-empty strings"
-        )
+        raise RuntimeEvidenceCompatibilityError(f"{label} must contain non-empty strings")
     if len(items) != len(set(items)):
         raise RuntimeEvidenceCompatibilityError(f"{label} must not contain duplicates")
     if sorted_unique and items != tuple(sorted(items)):
@@ -119,9 +113,7 @@ def _require_exact_fields(
 
 def _require_non_negative_int(value: Any, *, label: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise RuntimeEvidenceCompatibilityError(
-            f"{label} must be a non-negative integer"
-        )
+        raise RuntimeEvidenceCompatibilityError(f"{label} must be a non-negative integer")
     return value
 
 
@@ -134,9 +126,7 @@ def _require_service_graph(
     optional = {"initialized_service_count", "initialized_services"}
     fields = set(document)
     if not required <= fields or fields - required - optional:
-        raise RuntimeEvidenceCompatibilityError(
-            f"{label} service graph has invalid fields"
-        )
+        raise RuntimeEvidenceCompatibilityError(f"{label} service graph has invalid fields")
     if document.get("format") != SERVICE_GRAPH_FORMAT:
         raise RuntimeEvidenceCompatibilityError(
             f"unsupported {label} evidence format {document.get('format')!r}"
@@ -146,9 +136,7 @@ def _require_service_graph(
         services,
         (str, bytes, bytearray),
     ):
-        raise RuntimeEvidenceCompatibilityError(
-            f"{label} service graph services must be a list"
-        )
+        raise RuntimeEvidenceCompatibilityError(f"{label} service graph services must be a list")
 
     names: list[str] = []
     service_map: dict[str, Mapping[str, Any]] = {}
@@ -189,9 +177,7 @@ def _require_service_graph(
         }
 
     if names != sorted(names):
-        raise RuntimeEvidenceCompatibilityError(
-            f"{label} service graph services must be sorted"
-        )
+        raise RuntimeEvidenceCompatibilityError(f"{label} service graph services must be sorted")
     if _require_non_negative_int(
         document.get("service_count"),
         label=f"{label} service graph service_count",
@@ -380,9 +366,7 @@ def _require_runtime_identity(
     mcp = document["mcp"]
     _require_exact_fields(mcp, {"version"}, label=f"{label} runtime identity mcp")
     if mcp.get("version") is not None and not isinstance(mcp["version"], str):
-        raise RuntimeEvidenceCompatibilityError(
-            f"{label} runtime identity mcp version is invalid"
-        )
+        raise RuntimeEvidenceCompatibilityError(f"{label} runtime identity mcp version is invalid")
 
     database = document["database"]
     _require_exact_fields(
@@ -459,9 +443,7 @@ def _require_runtime_identity(
             f"{label} runtime identity value_ids contains an invalid identity"
         )
     if configuration.get("values_redacted") is not True:
-        raise RuntimeEvidenceCompatibilityError(
-            f"{label} runtime identity values must be redacted"
-        )
+        raise RuntimeEvidenceCompatibilityError(f"{label} runtime identity values must be redacted")
 
     if not _valid_sha256(document.get("runtime_id")):
         raise RuntimeEvidenceCompatibilityError(
@@ -578,9 +560,7 @@ def compare_runtime_evidence(
                 f"unsupported new evidence format {new_format!r}"
             )
         return compare_runtime_identities(old_document, new_document)
-    raise RuntimeEvidenceCompatibilityError(
-        f"unsupported old evidence format {old_format!r}"
-    )
+    raise RuntimeEvidenceCompatibilityError(f"unsupported old evidence format {old_format!r}")
 
 
 __all__ = [

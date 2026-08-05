@@ -81,9 +81,7 @@ def test_resume_snapshot_identity_includes_checkpoint(tmp_path: Path) -> None:
         assert after["revision_id"] == checkpoint["revision_id"]
         assert after["agent_checkpoint"]["checkpoint_id"] == checkpoint["checkpoint_id"]
         assert after["agent_checkpoint"]["checkpoint_is_selected_revision"] is True
-        assert after["agent_checkpoint"]["checkpoint"]["objective"] == (
-            "Prepare the handoff"
-        )
+        assert after["agent_checkpoint"]["checkpoint"]["objective"] == ("Prepare the handoff")
 
 
 def test_later_snapshot_keeps_checkpoint_resume_pinned_to_checkpoint_revision(
@@ -120,16 +118,13 @@ def test_later_snapshot_keeps_checkpoint_resume_pinned_to_checkpoint_revision(
         )
 
         assert current["revision_id"] == advanced["revision_id"]
-        assert current["agent_checkpoint"]["checkpoint_revision_id"] == first[
-            "revision_id"
-        ]
+        assert current["agent_checkpoint"]["checkpoint_revision_id"] == first["revision_id"]
         assert current["agent_checkpoint"]["checkpoint_is_selected_revision"] is False
-        assert current["agent_checkpoint"]["resume"]["arguments"]["revision_id"] == (
-            first["revision_id"]
+        assert (
+            current["agent_checkpoint"]["resume"]["arguments"]["revision_id"]
+            == (first["revision_id"])
         )
-        assert historical["agent_checkpoint"]["checkpoint_id"] == first[
-            "checkpoint_id"
-        ]
+        assert historical["agent_checkpoint"]["checkpoint_id"] == first["checkpoint_id"]
         assert historical["agent_checkpoint"]["checkpoint_is_selected_revision"] is True
 
 
@@ -170,15 +165,7 @@ def test_historical_snapshot_does_not_borrow_later_checkpoint(tmp_path: Path) ->
         )
         second_snapshot = service.snapshot("demo", "main")
 
-        assert first_snapshot["agent_checkpoint"]["checkpoint_id"] == first[
-            "checkpoint_id"
-        ]
-        assert first_snapshot["agent_checkpoint"]["checkpoint"]["objective"] == (
-            "First handoff"
-        )
-        assert second_snapshot["agent_checkpoint"]["checkpoint_id"] == second[
-            "checkpoint_id"
-        ]
-        assert second_snapshot["agent_checkpoint"]["checkpoint"]["status"] == (
-            "ready_for_review"
-        )
+        assert first_snapshot["agent_checkpoint"]["checkpoint_id"] == first["checkpoint_id"]
+        assert first_snapshot["agent_checkpoint"]["checkpoint"]["objective"] == ("First handoff")
+        assert second_snapshot["agent_checkpoint"]["checkpoint_id"] == second["checkpoint_id"]
+        assert second_snapshot["agent_checkpoint"]["checkpoint"]["status"] == ("ready_for_review")

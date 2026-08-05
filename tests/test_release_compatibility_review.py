@@ -123,9 +123,7 @@ def _write_evidence(
         "status": "passed",
         "git_sha": git_sha,
     }
-    (root / "qualification-complete.json").write_bytes(
-        _canonical_bytes(completion)
-    )
+    (root / "qualification-complete.json").write_bytes(_canonical_bytes(completion))
     index = {
         "format": "weave-jacquard-release-manifest-index-v1",
         "qualification_git_sha": git_sha,
@@ -214,9 +212,7 @@ def test_changed_release_requires_exact_reviewed_policy(tmp_path: Path) -> None:
     assert accepted["status"] == "accepted"
     assert accepted["policy"]["reviewed_by"] == "release-reviewer"
     assert len(accepted["policy"]["sha256"]) == 64
-    changed = [
-        item for item in accepted["decisions"] if item["change_count"] != 0
-    ]
+    changed = [item for item in accepted["decisions"] if item["change_count"] != 0]
     assert changed
     assert {item["decision"] for item in changed} == {"accepted"}
 
@@ -245,9 +241,7 @@ def test_stale_policy_does_not_approve_changed_release(tmp_path: Path) -> None:
     )
 
     assert reviewed["status"] == "review-required"
-    assert "review-required" in {
-        item["decision"] for item in reviewed["decisions"]
-    }
+    assert "review-required" in {item["decision"] for item in reviewed["decisions"]}
 
 
 def test_tampered_retained_manifest_fails_closed(tmp_path: Path) -> None:
@@ -291,9 +285,7 @@ def test_review_report_is_immutable_canonical_json(tmp_path: Path) -> None:
 
 
 def test_release_qualification_retains_review_before_checksums() -> None:
-    source = (ROOT / "scripts" / "qualify-release.sh").read_text(
-        encoding="utf-8"
-    )
+    source = (ROOT / "scripts" / "qualify-release.sh").read_text(encoding="utf-8")
 
     assert "WEAVE_PREVIOUS_RELEASE_EVIDENCE" in source
     assert "WEAVE_COMPATIBILITY_POLICY" in source

@@ -60,9 +60,7 @@ def test_criss_cross_history_is_rejected_in_stable_order() -> None:
     for candidate in (workspace, reversed_workspace):
         with pytest.raises(ConflictError) as raised:
             candidate._common_ancestor("left", "right")
-        assert raised.value.conflicts == [
-            "branches have multiple best common ancestors: a, b"
-        ]
+        assert raised.value.conflicts == ["branches have multiple best common ancestors: a, b"]
 
 
 @pytest.mark.parametrize(

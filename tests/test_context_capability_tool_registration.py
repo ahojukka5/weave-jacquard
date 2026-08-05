@@ -101,9 +101,7 @@ def _tool(
 
 def _runtime(tmp_path: Path, name: str) -> RuntimeServices:
     return RuntimeServices(
-        RuntimeConfig.from_environ(
-            {"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")}
-        )
+        RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")})
     )
 
 

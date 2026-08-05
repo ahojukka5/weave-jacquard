@@ -136,9 +136,7 @@ def test_optional_parameter_addition_is_additive() -> None:
 
     assert report["classification"] == "additive-compatible"
     assert report["changes"][0]["kind"] == "parameter-added"
-    assert report["changes"][0]["pointer"] == (
-        "/tools/alpha/parameters/properties/limit"
-    )
+    assert report["changes"][0]["pointer"] == ("/tools/alpha/parameters/properties/limit")
 
 
 def test_required_parameter_addition_is_breaking() -> None:
@@ -227,9 +225,7 @@ def test_current_tool_manifest_shape_is_checked() -> None:
 
 def test_application_manifest_configuration_addition_is_additive() -> None:
     old = _application_manifest(configuration_variables=["WEAVE_DB"])
-    new = _application_manifest(
-        configuration_variables=["WEAVE_DB", "WEAVE_ROOT"]
-    )
+    new = _application_manifest(configuration_variables=["WEAVE_DB", "WEAVE_ROOT"])
 
     report = compare_application_manifests(old, new)
 

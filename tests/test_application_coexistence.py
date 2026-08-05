@@ -87,9 +87,7 @@ def test_two_complete_applications_coexist_and_close_independently(
     assert left_runtime.config.database_path != right_runtime.config.database_path
     assert left_runtime.config.build_root != right_runtime.config.build_root
     assert left_runtime.config.test_run_root != right_runtime.config.test_run_root
-    assert left_runtime.config.database_backup_root != (
-        right_runtime.config.database_backup_root
-    )
+    assert left_runtime.config.database_backup_root != (right_runtime.config.database_backup_root)
 
     async def exercise() -> None:
         left_initialize, right_initialize = await asyncio.gather(
@@ -132,9 +130,7 @@ def test_two_complete_applications_coexist_and_close_independently(
         )
         right_after_close_payload = _structured(right_after_left_close)
         assert right_after_close_payload["ok"] is True
-        assert [
-            branch["name"] for branch in right_after_close_payload["result"]
-        ] == ["main"]
+        assert [branch["name"] for branch in right_after_close_payload["result"]] == ["main"]
 
     try:
         asyncio.run(exercise())

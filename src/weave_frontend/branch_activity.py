@@ -76,9 +76,7 @@ class BranchActivityService:
             raise NotFoundError(f"revision {start!r} not found")
 
         page_rows = rows[:effective_limit]
-        operation_map = self._operations_for_revisions(
-            [str(row["id"]) for row in page_rows]
-        )
+        operation_map = self._operations_for_revisions([str(row["id"]) for row in page_rows])
         revisions: list[dict[str, Any]] = []
         for row in page_rows:
             revision_id = str(row["id"])
@@ -98,11 +96,7 @@ class BranchActivityService:
                 }
             )
 
-        next_revision_id = (
-            str(rows[effective_limit]["id"])
-            if len(rows) > effective_limit
-            else None
-        )
+        next_revision_id = str(rows[effective_limit]["id"]) if len(rows) > effective_limit else None
         truncated = next_revision_id is not None
         return {
             "project": project,
@@ -153,9 +147,7 @@ class BranchActivityService:
             (revision_id, project_id),
         ).fetchone()
         if revision is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} not found in project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} not found in project {project!r}")
 
         total_row = self.workspace.db.connection.execute(
             "SELECT COUNT(*) AS count FROM operations WHERE revision_id = ?",
@@ -183,9 +175,7 @@ class BranchActivityService:
             for row in page_rows
         ]
         next_sequence_number = (
-            int(rows[effective_limit]["sequence_number"])
-            if len(rows) > effective_limit
-            else None
+            int(rows[effective_limit]["sequence_number"]) if len(rows) > effective_limit else None
         )
         truncated = next_sequence_number is not None
         return {
@@ -295,25 +285,15 @@ class BranchActivityService:
             "head_revision_id": branch_head,
             "revision_count": len(rows),
             "first_parent_edge_count": max(0, len(rows) - 1),
-            "merge_revision_count": sum(
-                1 for row in rows if row["parent2_id"] is not None
-            ),
+            "merge_revision_count": sum(1 for row in rows if row["parent2_id"] is not None),
             "operation_count": total_operations,
             "mutation_revision_count": mutation_revision_count,
-            "zero_operation_revision_count": sum(
-                1 for count in operation_counts if count == 0
-            ),
-            "single_operation_revision_count": sum(
-                1 for count in operation_counts if count == 1
-            ),
-            "multi_operation_revision_count": sum(
-                1 for count in operation_counts if count > 1
-            ),
+            "zero_operation_revision_count": sum(1 for count in operation_counts if count == 0),
+            "single_operation_revision_count": sum(1 for count in operation_counts if count == 1),
+            "multi_operation_revision_count": sum(1 for count in operation_counts if count > 1),
             "max_operations_per_revision": max(operation_counts, default=0),
             "average_operations_per_mutation_revision": (
-                total_operations / mutation_revision_count
-                if mutation_revision_count
-                else 0.0
+                total_operations / mutation_revision_count if mutation_revision_count else 0.0
             ),
             "revision_count_avoided_by_grouping": sum(
                 max(0, count - 1) for count in operation_counts

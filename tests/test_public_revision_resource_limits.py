@@ -224,9 +224,7 @@ def test_first_parent_reachability_fails_closed_at_internal_limit(
 ) -> None:
     monkeypatch.setattr(branch_activity_module, "MAX_BRANCH_ACTIVITY_REVISIONS", 2)
     workspace = SimpleNamespace(
-        db=SimpleNamespace(
-            connection=_ParentConnection({"c": "b", "b": "a", "a": None})
-        )
+        db=SimpleNamespace(connection=_ParentConnection({"c": "b", "b": "a", "a": None}))
     )
     service = BranchActivityService(workspace)
 
@@ -310,15 +308,9 @@ def test_preflight_identity_binds_effective_impact_limit(
 def test_central_limit_manifest_contains_public_revision_boundaries() -> None:
     assert REVISION_RESOURCE_LIMITS["node_find_results"] == MAX_NODE_FIND_RESULTS
     assert REVISION_RESOURCE_LIMITS["node_inspect_depth"] == MAX_NODE_INSPECT_DEPTH
-    assert (
-        REVISION_RESOURCE_LIMITS["revision_diff_page_size"]
-        == MAX_REVISION_DIFF_PAGE_SIZE
-    )
+    assert REVISION_RESOURCE_LIMITS["revision_diff_page_size"] == MAX_REVISION_DIFF_PAGE_SIZE
     assert (
         REVISION_RESOURCE_LIMITS["merge_target_impact_page_size"]
         == MAX_MERGE_TARGET_IMPACT_PAGE_SIZE
     )
-    assert (
-        REVISION_RESOURCE_LIMITS["branch_activity_revisions"]
-        == MAX_BRANCH_ACTIVITY_REVISIONS
-    )
+    assert REVISION_RESOURCE_LIMITS["branch_activity_revisions"] == MAX_BRANCH_ACTIVITY_REVISIONS

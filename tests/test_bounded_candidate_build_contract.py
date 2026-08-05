@@ -79,9 +79,7 @@ def test_candidate_limit_and_termination_tampering_is_rejected(tmp_path: Path) -
         "application",
         preview_id=preview["preview_id"],
     )
-    manifest_path = (
-        Path(result["build_directory"]) / "manifest.json"
-    )
+    manifest_path = Path(result["build_directory"]) / "manifest.json"
     original = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     tampered = dict(original)

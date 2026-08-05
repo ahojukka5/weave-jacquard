@@ -55,8 +55,7 @@ def package_inventory() -> list[str]:
     """Return a stable installed-distribution inventory without requiring pip."""
 
     entries = {
-        f"{distribution.metadata.get('Name') or distribution.name}"
-        f"=={distribution.version}"
+        f"{distribution.metadata.get('Name') or distribution.name}=={distribution.version}"
         for distribution in importlib.metadata.distributions()
     }
     return sorted(entries, key=str.casefold)
@@ -78,9 +77,7 @@ def command_version(executable: Path) -> str:
             f"compiler version output exceeds {MAX_VERSION_OUTPUT_BYTES} bytes"
         )
     if returncode != 0:
-        raise QualificationError(
-            f"compiler --version exited {returncode}: {text or 'no output'}"
-        )
+        raise QualificationError(f"compiler --version exited {returncode}: {text or 'no output'}")
     if not text:
         raise QualificationError("compiler --version returned no identity")
     return " ".join(text.splitlines())
@@ -156,8 +153,7 @@ def collect_traces(
         size = path.stat().st_size
         if size > MAX_TRACE_BYTES:
             raise QualificationError(
-                f"qualification trace {path.name} is {size} bytes; "
-                f"limit is {MAX_TRACE_BYTES}"
+                f"qualification trace {path.name} is {size} bytes; limit is {MAX_TRACE_BYTES}"
             )
         total_bytes += size
         if total_bytes > MAX_TOTAL_TRACE_BYTES:
@@ -296,10 +292,7 @@ def _run_bounded_command(
                 continue
             events = selector.select(timeout=min(remaining, 0.1))
             if not events and process.poll() is not None:
-                events = [
-                    (key, selectors.EVENT_READ)
-                    for key in list(selector.get_map().values())
-                ]
+                events = [(key, selectors.EVENT_READ) for key in list(selector.get_map().values())]
             for key, _ in events:
                 try:
                     chunk = os.read(key.fileobj.fileno(), 65_536)

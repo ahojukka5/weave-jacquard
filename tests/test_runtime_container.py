@@ -96,9 +96,7 @@ def test_runtime_config_is_canonical_immutable_snapshot(tmp_path: Path) -> None:
     config = RuntimeConfig.from_environ(source)
     source["WEAVE_DB_PATH"] = "/changed-after-startup.db"
 
-    assert tuple(
-        sorted(PUBLIC_CONFIGURATION_VARIABLES)
-    ) == PUBLIC_CONFIGURATION_VARIABLES
+    assert tuple(sorted(PUBLIC_CONFIGURATION_VARIABLES)) == PUBLIC_CONFIGURATION_VARIABLES
     assert config.configuration_variables == PUBLIC_CONFIGURATION_VARIABLES
     assert config.database_path == tmp_path / "workspace.db"
     assert config.artifact_max_bytes == 4096
@@ -110,9 +108,7 @@ def test_runtime_config_is_canonical_immutable_snapshot(tmp_path: Path) -> None:
     assert config.test_batch_root == Path("/artifacts/batches")
     assert config.test_run_root == Path("/artifacts/runs")
     assert config.configured_variables == PUBLIC_CONFIGURATION_VARIABLES
-    assert config.configured_environment["WEAVE_DB_PATH"] == str(
-        tmp_path / "workspace.db"
-    )
+    assert config.configured_environment["WEAVE_DB_PATH"] == str(tmp_path / "workspace.db")
     with pytest.raises(TypeError):
         cast(dict[str, str], config.configured_environment)["WEAVE_DB_PATH"] = "x"
 
@@ -236,9 +232,7 @@ def test_foundational_capability_exports_runtime_backed_production_factories() -
     assert server_module.workspace is concurrent_nodes.workspace
     assert build_module.workspace is concurrent_nodes.workspace
     assert build_module.compiler_bridge is concurrent_nodes.compiler_bridge
-    assert application_module.PUBLIC_CONFIGURATION_VARIABLES == (
-        PUBLIC_CONFIGURATION_VARIABLES
-    )
+    assert application_module.PUBLIC_CONFIGURATION_VARIABLES == (PUBLIC_CONFIGURATION_VARIABLES)
 
 
 def test_production_runtime_owns_race_safe_workspace_and_quota_bridge(

@@ -32,6 +32,4 @@ def test_read_help_adds_impact_tool_without_mutating_base_topics() -> None:
     read_tools = weave_help("read")["help"]["tools"]
 
     assert "test_impact_plan" in read_tools
-    assert weave_help("test_batches") == mcp_test_batch_guidance.weave_help(
-        "test_batches"
-    )
+    assert weave_help("test_batches") == mcp_test_batch_guidance.weave_help("test_batches")

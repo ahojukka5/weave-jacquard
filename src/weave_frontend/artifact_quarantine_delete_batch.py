@@ -9,9 +9,7 @@ from .artifact_quarantine_delete import ArtifactQuarantineDeleteService
 from .artifact_retention_policy import hash_json, is_sha256
 from .errors import ValidationError, WeaveFrontendError
 
-ARTIFACT_QUARANTINE_DELETE_BATCH_FORMAT = (
-    "weave-artifact-quarantine-delete-batch-v1"
-)
+ARTIFACT_QUARANTINE_DELETE_BATCH_FORMAT = "weave-artifact-quarantine-delete-batch-v1"
 MAX_ARTIFACT_QUARANTINE_DELETE_BATCH_ENTRIES = 100
 _REQUIRED_ENTRY_KEYS = {
     "quarantine_id",

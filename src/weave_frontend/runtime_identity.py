@@ -49,9 +49,7 @@ class RuntimeIdentityService:
         application = self._application_identity()
         configuration_variables = application["configuration_variables"]
         configured_variables = [
-            name
-            for name in configuration_variables
-            if bool(self.environ.get(name))
+            name for name in configuration_variables if bool(self.environ.get(name))
         ]
         payload = {
             "format": RUNTIME_IDENTITY_FORMAT,
@@ -65,9 +63,7 @@ class RuntimeIdentityService:
             "python": {
                 "implementation": platform.python_implementation(),
                 "version": platform.python_version(),
-                "executable_sha256": self._optional_binary_sha256(
-                    Path(sys.executable).resolve()
-                ),
+                "executable_sha256": self._optional_binary_sha256(Path(sys.executable).resolve()),
             },
             "mcp": {
                 "version": self._distribution_version("mcp"),
@@ -76,14 +72,10 @@ class RuntimeIdentityService:
                 "schema_version": SCHEMA_VERSION,
                 "busy_timeout_ms": int(self.workspace.db.busy_timeout_ms),
                 "journal_mode": str(
-                    self.workspace.db.connection.execute(
-                        "PRAGMA journal_mode"
-                    ).fetchone()[0]
+                    self.workspace.db.connection.execute("PRAGMA journal_mode").fetchone()[0]
                 ).lower(),
                 "foreign_keys": bool(
-                    self.workspace.db.connection.execute(
-                        "PRAGMA foreign_keys"
-                    ).fetchone()[0]
+                    self.workspace.db.connection.execute("PRAGMA foreign_keys").fetchone()[0]
                 ),
                 "location_id": self._opaque_value_id(
                     "database_path",
@@ -120,19 +112,13 @@ class RuntimeIdentityService:
         if not isinstance(variables, list) or not all(
             isinstance(item, str) and item for item in variables
         ):
-            raise RuntimeError(
-                "application manifest configuration variables are invalid"
-            )
+            raise RuntimeError("application manifest configuration variables are invalid")
         for field in ("application_id", "tool_manifest_id"):
             value = manifest.get(field)
             if not self._valid_sha256(value):
                 raise RuntimeError(f"application manifest {field} is invalid")
         tool_count = manifest.get("tool_count")
-        if (
-            isinstance(tool_count, bool)
-            or not isinstance(tool_count, int)
-            or tool_count <= 0
-        ):
+        if isinstance(tool_count, bool) or not isinstance(tool_count, int) or tool_count <= 0:
             raise RuntimeError("application manifest tool_count is invalid")
         return {
             "application_id": manifest["application_id"],
@@ -165,26 +151,18 @@ class RuntimeIdentityService:
         except (OSError, ValueError):
             return self._compiler_identity_failure()
 
-        output = "\n".join(
-            part.strip()
-            for part in (result.stdout, result.stderr)
-            if part.strip()
-        )
+        output = "\n".join(part.strip() for part in (result.stdout, result.stderr) if part.strip())
         version = " ".join(output.splitlines()) or None
         if result.timed_out:
             error = {
                 "code": "WEAVEC_VERSION_TIMEOUT",
-                "message": (
-                    "weavec --version exceeded "
-                    f"{RUNTIME_VERSION_TIMEOUT_SECONDS} seconds"
-                ),
+                "message": (f"weavec --version exceeded {RUNTIME_VERSION_TIMEOUT_SECONDS} seconds"),
             }
         elif result.output_limited:
             error = {
                 "code": "WEAVEC_VERSION_OUTPUT_LIMIT",
                 "message": (
-                    "weavec --version exceeded "
-                    f"{MAX_RUNTIME_VERSION_BYTES} captured bytes"
+                    f"weavec --version exceeded {MAX_RUNTIME_VERSION_BYTES} captured bytes"
                 ),
             }
         elif result.returncode != 0:

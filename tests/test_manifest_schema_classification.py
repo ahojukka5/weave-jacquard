@@ -127,20 +127,8 @@ def test_enum_set_changes_have_conservative_explicit_classification(
     kind: str,
 ) -> None:
     report = compare_tool_manifests(
-        _manifest(
-            _tool(
-                schema=_parameter_schema(
-                    {"type": "string", "enum": old_enum}
-                )
-            )
-        ),
-        _manifest(
-            _tool(
-                schema=_parameter_schema(
-                    {"type": "string", "enum": new_enum}
-                )
-            )
-        ),
+        _manifest(_tool(schema=_parameter_schema({"type": "string", "enum": old_enum}))),
+        _manifest(_tool(schema=_parameter_schema({"type": "string", "enum": new_enum}))),
     )
 
     assert report["classification"] == classification
@@ -156,15 +144,9 @@ def test_enum_set_changes_have_conservative_explicit_classification(
 
 
 def test_adding_and_removing_enum_constraints_are_distinguished() -> None:
-    unconstrained = _manifest(
-        _tool(schema=_parameter_schema({"type": "string"}))
-    )
+    unconstrained = _manifest(_tool(schema=_parameter_schema({"type": "string"})))
     constrained = _manifest(
-        _tool(
-            schema=_parameter_schema(
-                {"type": "string", "enum": ["alpha", "beta"]}
-            )
-        )
+        _tool(schema=_parameter_schema({"type": "string", "enum": ["alpha", "beta"]}))
     )
 
     added = compare_tool_manifests(unconstrained, constrained)
@@ -177,20 +159,8 @@ def test_adding_and_removing_enum_constraints_are_distinguished() -> None:
 
 
 def test_enum_order_does_not_create_a_semantic_change() -> None:
-    old = _manifest(
-        _tool(
-            schema=_parameter_schema(
-                {"type": "string", "enum": ["alpha", "beta"]}
-            )
-        )
-    )
-    new = _manifest(
-        _tool(
-            schema=_parameter_schema(
-                {"type": "string", "enum": ["beta", "alpha"]}
-            )
-        )
-    )
+    old = _manifest(_tool(schema=_parameter_schema({"type": "string", "enum": ["alpha", "beta"]})))
+    new = _manifest(_tool(schema=_parameter_schema({"type": "string", "enum": ["beta", "alpha"]})))
 
     report = compare_tool_manifests(old, new)
 
@@ -223,14 +193,8 @@ def test_nested_defaults_and_enums_use_exact_json_pointers() -> None:
 
     assert report["classification"] == "breaking"
     assert [change["pointer"] for change in report["changes"]] == [
-        (
-            "/tools/tool~1name~0raw/parameters/properties/mode/properties/"
-            "choice~1value~0raw/default"
-        ),
-        (
-            "/tools/tool~1name~0raw/parameters/properties/mode/properties/"
-            "choice~1value~0raw/enum"
-        ),
+        ("/tools/tool~1name~0raw/parameters/properties/mode/properties/choice~1value~0raw/default"),
+        ("/tools/tool~1name~0raw/parameters/properties/mode/properties/choice~1value~0raw/enum"),
     ]
     assert [change["kind"] for change in report["changes"]] == [
         "parameter-default-changed",
@@ -240,19 +204,9 @@ def test_nested_defaults_and_enums_use_exact_json_pointers() -> None:
 
 def test_duplicate_enum_values_fail_closed() -> None:
     invalid = _manifest(
-        _tool(
-            schema=_parameter_schema(
-                {"type": "string", "enum": ["alpha", "alpha"]}
-            )
-        )
+        _tool(schema=_parameter_schema({"type": "string", "enum": ["alpha", "alpha"]}))
     )
-    valid = _manifest(
-        _tool(
-            schema=_parameter_schema(
-                {"type": "string", "enum": ["alpha"]}
-            )
-        )
-    )
+    valid = _manifest(_tool(schema=_parameter_schema({"type": "string", "enum": ["alpha"]})))
 
     with pytest.raises(ManifestCompatibilityError, match="duplicates"):
         compare_tool_manifests(invalid, valid)

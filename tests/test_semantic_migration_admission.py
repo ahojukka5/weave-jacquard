@@ -109,13 +109,19 @@ def test_legacy_ast_hash_corruption_blocks_schema_migration(tmp_path: Path) -> N
     connection = sqlite3.connect(path)
     try:
         assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
-        assert connection.execute(
-            """SELECT type FROM sqlite_master
+        assert (
+            connection.execute(
+                """SELECT type FROM sqlite_master
                WHERE name = 'module_snapshots'"""
-        ).fetchone()[0] == "table"
-        assert connection.execute(
-            """SELECT 1 FROM sqlite_master
+            ).fetchone()[0]
+            == "table"
+        )
+        assert (
+            connection.execute(
+                """SELECT 1 FROM sqlite_master
                WHERE name = 'module_snapshots_compressed'"""
-        ).fetchone() is None
+            ).fetchone()
+            is None
+        )
     finally:
         connection.close()

@@ -170,9 +170,7 @@ _CHECKPOINT_TIMELINE_TOPIC: dict[str, Any] = {
         "Deltas are structural only. Removal does not prove completion, resolution, or "
         "invalidation, and base/target naming does not establish ancestry."
     ),
-    "identity": (
-        "page_id and comparison_id hash the complete deterministic returned evidence."
-    ),
+    "identity": ("page_id and comparison_id hash the complete deterministic returned evidence."),
 }
 
 _AGENT_STATUS_TOPIC: dict[str, Any] = {
@@ -238,9 +236,7 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
     elif topic == "read":
         help_value["tools"]["branch_resume_snapshot"] = _RESUME_READ_DESCRIPTION
         help_value["tools"]["branch_checkpoint_get"] = _CHECKPOINT_READ_DESCRIPTION
-        help_value["tools"][
-            "branch_checkpoint_history_page"
-        ] = _CHECKPOINT_HISTORY_DESCRIPTION
+        help_value["tools"]["branch_checkpoint_history_page"] = _CHECKPOINT_HISTORY_DESCRIPTION
         help_value["tools"]["branch_checkpoint_compare"] = _CHECKPOINT_COMPARE_DESCRIPTION
         help_value["tools"]["project_agent_status_page"] = _PROJECT_AGENT_STATUS_DESCRIPTION
     elif topic == "write":

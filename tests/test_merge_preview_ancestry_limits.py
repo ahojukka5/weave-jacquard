@@ -59,9 +59,7 @@ def test_preview_identity_binds_complete_ancestry_evidence(tmp_path: Path) -> No
             "nodes": MAX_REVISION_DAG_NODES,
             "edges": MAX_REVISION_DAG_EDGES,
         }
-        assert preview["ancestry"]["best_common_ancestors"] == [
-            preview["base_revision_id"]
-        ]
+        assert preview["ancestry"]["best_common_ancestors"] == [preview["base_revision_id"]]
         assert workspace.db.hash_value(payload) == preview["preview_id"]
 
         changed = dict(payload)

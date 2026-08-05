@@ -66,8 +66,7 @@ class ProjectMergeCatalogService:
         if len(rows) > MAX_AGENT_STATUS_BRANCH_CATALOG:
             raise ValidationError(
                 "MERGE_QUEUE_BRANCH_FANOUT_EXCEEDED",
-                "project merge queue supports at most "
-                f"{MAX_AGENT_STATUS_BRANCH_CATALOG} branches",
+                f"project merge queue supports at most {MAX_AGENT_STATUS_BRANCH_CATALOG} branches",
             )
         return [
             {

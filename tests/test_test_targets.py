@@ -110,9 +110,7 @@ def test_set_update_and_historical_reads_preserve_identity(tmp_path: Path) -> No
 
 
 def test_stale_writes_and_delete_are_atomic(tmp_path: Path) -> None:
-    workspace, _, tests, base_revision = _workspace_with_target(
-        tmp_path / "test-stale.db"
-    )
+    workspace, _, tests, base_revision = _workspace_with_target(tmp_path / "test-stale.db")
     with workspace:
         created = tests.set(
             "demo",
@@ -143,17 +141,18 @@ def test_stale_writes_and_delete_are_atomic(tmp_path: Path) -> None:
         )
         assert deleted["base_revision_id"] == created["revision_id"]
         assert tests.list("demo") == []
-        assert tests.get(
-            "demo",
-            "smoke",
-            revision_id=created["revision_id"],
-        )["name"] == "smoke"
+        assert (
+            tests.get(
+                "demo",
+                "smoke",
+                revision_id=created["revision_id"],
+            )["name"]
+            == "smoke"
+        )
 
 
 def test_test_definition_validation_is_bounded(tmp_path: Path) -> None:
-    workspace, _, tests, base_revision = _workspace_with_target(
-        tmp_path / "test-validation.db"
-    )
+    workspace, _, tests, base_revision = _workspace_with_target(tmp_path / "test-validation.db")
     with workspace:
         with pytest.raises(NotFoundError, match="build target"):
             tests.set("demo", "main", "missing", "does-not-exist")
@@ -190,9 +189,7 @@ def test_test_definition_validation_is_bounded(tmp_path: Path) -> None:
 
 
 def test_reserved_test_metadata_never_enters_build_source_sets(tmp_path: Path) -> None:
-    workspace, targets, tests, base_revision = _workspace_with_target(
-        tmp_path / "test-sources.db"
-    )
+    workspace, targets, tests, base_revision = _workspace_with_target(tmp_path / "test-sources.db")
     with workspace:
         test = tests.set(
             "demo",

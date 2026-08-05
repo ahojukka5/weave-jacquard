@@ -21,12 +21,8 @@ from .artifact_retention_policy import (
 from .errors import ValidationError
 
 ARTIFACT_QUARANTINE_RESTORE_FORMAT = "weave-artifact-quarantine-restore-v1"
-ARTIFACT_QUARANTINE_RESTORE_INTENT_FORMAT = (
-    "weave-artifact-quarantine-restore-intent-v1"
-)
-ARTIFACT_QUARANTINE_RESTORE_RESULT_FORMAT = (
-    "weave-artifact-quarantine-restore-result-v1"
-)
+ARTIFACT_QUARANTINE_RESTORE_INTENT_FORMAT = "weave-artifact-quarantine-restore-intent-v1"
+ARTIFACT_QUARANTINE_RESTORE_RESULT_FORMAT = "weave-artifact-quarantine-restore-result-v1"
 
 _QUARANTINE_INTENT_KEYS = {
     "format",
@@ -182,10 +178,8 @@ def validate_stored_quarantine_intent(
     if (
         entry.get("family") != family
         or entry.get("entry_id") != original_identity.get("entry_id")
-        or entry.get("classification")
-        not in RETENTION_SELECTABLE_CLASSIFICATIONS
-        or entry.get("entry_type")
-        not in {"directory", "regular_file", "symlink", "special"}
+        or entry.get("classification") not in RETENTION_SELECTABLE_CLASSIFICATIONS
+        or entry.get("entry_type") not in {"directory", "regular_file", "symlink", "special"}
     ):
         _metadata_error("quarantine plan entry does not match stored state")
     _require_sha256("original_entry_id", entry.get("entry_id"), metadata=True)
@@ -236,12 +230,8 @@ def validate_stored_manifest(
         "original_entry_type": entry["entry_type"],
         "payload": "payload",
         "quarantined_at_unix_ns": intent["quarantined_at_unix_ns"],
-        "source_entry_snapshot_id": intent["source_capture"][
-            "entry_snapshot_id"
-        ],
-        "source_relocation_snapshot_id": intent["source_capture"][
-            "relocation_snapshot_id"
-        ],
+        "source_entry_snapshot_id": intent["source_capture"]["entry_snapshot_id"],
+        "source_relocation_snapshot_id": intent["source_capture"]["relocation_snapshot_id"],
     }
     if any(manifest.get(name) != item for name, item in expected.items()):
         _metadata_error("quarantine manifest does not match its journal")
@@ -295,9 +285,7 @@ def validate_restore_intent(
     if not isinstance(value, Mapping) or set(value) != _RESTORE_INTENT_KEYS:
         _restore_error("restore intent has invalid or missing fields")
     intent = dict(value)
-    identity = {
-        key: item for key, item in intent.items() if key != "restore_intent_id"
-    }
+    identity = {key: item for key, item in intent.items() if key != "restore_intent_id"}
     if intent["restore_intent_id"] != hash_json(identity):
         _restore_error("restore intent identity is invalid")
     expected = build_restore_intent(
@@ -354,9 +342,7 @@ def validate_restore_result(
     if not isinstance(value, Mapping) or set(value) != _RESTORE_RESULT_KEYS:
         _restore_error("restore result has invalid or missing fields")
     result = dict(value)
-    identity = {
-        key: item for key, item in result.items() if key != "restore_result_id"
-    }
+    identity = {key: item for key, item in result.items() if key != "restore_result_id"}
     if result["restore_result_id"] != hash_json(identity):
         _restore_error("restore result identity is invalid")
     expected = build_restore_result(restore_intent, result["payload"])
@@ -414,12 +400,7 @@ def _validate_limits(value: Any) -> None:
 
 
 def _require_basename(name: str, value: Any) -> None:
-    if (
-        not isinstance(value, str)
-        or not value
-        or value in {".", ".."}
-        or Path(value).name != value
-    ):
+    if not isinstance(value, str) or not value or value in {".", ".."} or Path(value).name != value:
         _metadata_error(f"{name} must be one safe path component")
 
 
@@ -444,11 +425,7 @@ def _require_unix_ns(
     *,
     metadata: bool = False,
 ) -> None:
-    invalid = (
-        isinstance(value, bool)
-        or not isinstance(value, int)
-        or not 0 <= value <= 2**63 - 1
-    )
+    invalid = isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 2**63 - 1
     if invalid:
         if metadata:
             _metadata_error(f"{name} must be a non-negative signed 64-bit integer")

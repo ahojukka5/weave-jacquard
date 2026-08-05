@@ -82,9 +82,7 @@ class MergeCandidateBuildService(_BaseMergeCandidateBuildService):
             cached["cached"] = True
             return cached
 
-        temporary_directory = Path(
-            tempfile.mkdtemp(prefix=f".{build_id}-", dir=self.build_root)
-        )
+        temporary_directory = Path(tempfile.mkdtemp(prefix=f".{build_id}-", dir=self.build_root))
         try:
             self._execute(
                 subject=subject,
@@ -143,9 +141,7 @@ class MergeCandidateBuildService(_BaseMergeCandidateBuildService):
         process = self.compiler._run_compiler(command)
         diagnostics, diagnostics_valid = collect_build_diagnostics(
             compiler_diagnostics_path,
-            canonical_sources=[
-                (item.source_path, item.node_map) for item in materialized
-            ],
+            canonical_sources=[(item.source_path, item.node_map) for item in materialized],
             returncode=process.returncode,
             timed_out=process.timed_out,
             output_limited=process.output_limited,
@@ -155,9 +151,7 @@ class MergeCandidateBuildService(_BaseMergeCandidateBuildService):
         )
         compiler_summary = diagnostics.get("compiler")
         diagnostics_status = (
-            compiler_summary.get("status")
-            if isinstance(compiler_summary, dict)
-            else None
+            compiler_summary.get("status") if isinstance(compiler_summary, dict) else None
         )
         compiler_manifest, compiler_manifest_errors = validate_compiler_manifest(
             compiler_manifest_path,
@@ -213,9 +207,7 @@ class MergeCandidateBuildService(_BaseMergeCandidateBuildService):
                 "compiler-manifest.json" if compiler_manifest_path.is_file() else None
             ),
             "compiler_diagnostics": (
-                "compiler-diagnostics.json"
-                if compiler_diagnostics_path.is_file()
-                else None
+                "compiler-diagnostics.json" if compiler_diagnostics_path.is_file() else None
             ),
             "executable": "program" if executable_path.is_file() else None,
         }
@@ -284,18 +276,10 @@ class MergeCandidateBuildService(_BaseMergeCandidateBuildService):
             raise ArtifactIntegrityError("merge candidate build key format is invalid")
         for field in ("timed_out", "output_limited"):
             if not isinstance(manifest.get(field), bool):
-                raise ArtifactIntegrityError(
-                    f"merge candidate build {field} flag is invalid"
-                )
+                raise ArtifactIntegrityError(f"merge candidate build {field} flag is invalid")
         output_limit = manifest.get("compiler_output_limit_bytes")
-        if (
-            isinstance(output_limit, bool)
-            or not isinstance(output_limit, int)
-            or output_limit <= 0
-        ):
-            raise ArtifactIntegrityError(
-                "merge candidate compiler output limit is invalid"
-            )
+        if isinstance(output_limit, bool) or not isinstance(output_limit, int) or output_limit <= 0:
+            raise ArtifactIntegrityError("merge candidate compiler output limit is invalid")
 
         subject = manifest.get("subject")
         if not isinstance(subject, dict):
@@ -327,13 +311,17 @@ class MergeCandidateBuildService(_BaseMergeCandidateBuildService):
             for item in rendered
         ]
         recorded_sources = manifest.get("sources")
-        if not isinstance(recorded_sources, list) or [
-            {
-                "document": item.get("document"),
-                "source_sha256": item.get("source_sha256"),
-            }
-            for item in recorded_sources
-        ] != expected_sources:
+        if (
+            not isinstance(recorded_sources, list)
+            or [
+                {
+                    "document": item.get("document"),
+                    "source_sha256": item.get("source_sha256"),
+                }
+                for item in recorded_sources
+            ]
+            != expected_sources
+        ):
             raise ArtifactIntegrityError("merge candidate build source evidence is invalid")
         input_document = {
             "format": MERGE_CANDIDATE_BUILD_KEY_FORMAT,
@@ -356,25 +344,17 @@ class MergeCandidateBuildService(_BaseMergeCandidateBuildService):
         artifacts = manifest.get("artifacts", {})
         if manifest["status"] == "succeeded":
             if manifest.get("returncode") != 0:
-                raise ArtifactIntegrityError(
-                    "successful candidate build return code is invalid"
-                )
+                raise ArtifactIntegrityError("successful candidate build return code is invalid")
             if manifest["timed_out"] is not False:
-                raise ArtifactIntegrityError(
-                    "successful candidate build timeout flag is invalid"
-                )
+                raise ArtifactIntegrityError("successful candidate build timeout flag is invalid")
             if manifest["output_limited"] is not False:
                 raise ArtifactIntegrityError(
                     "successful candidate build output-limit flag is invalid"
                 )
             if manifest.get("compiler_diagnostics_protocol_valid") is not True:
-                raise ArtifactIntegrityError(
-                    "successful candidate diagnostics are invalid"
-                )
+                raise ArtifactIntegrityError("successful candidate diagnostics are invalid")
             if manifest.get("compiler_manifest_protocol_valid") is not True:
-                raise ArtifactIntegrityError(
-                    "successful candidate compiler manifest is invalid"
-                )
+                raise ArtifactIntegrityError("successful candidate compiler manifest is invalid")
             if artifacts.get("executable") != "program":
                 raise ArtifactIntegrityError("successful candidate executable is missing")
 
@@ -392,9 +372,7 @@ class MergeCandidateBuildService(_BaseMergeCandidateBuildService):
                 f"cannot read merge candidate build manifest: {exc}"
             ) from exc
         if not isinstance(value, dict):
-            raise ArtifactIntegrityError(
-                "merge candidate build manifest root must be an object"
-            )
+            raise ArtifactIntegrityError("merge candidate build manifest root must be an object")
         return value
 
 

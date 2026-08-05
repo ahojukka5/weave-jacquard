@@ -69,10 +69,7 @@ def test_database_change_produces_new_backup_identity(tmp_path: Path) -> None:
         second = service.create()
 
         assert second["backup_id"] != first["backup_id"]
-        assert (
-            second["artifact_sha256"]["database"]
-            != first["artifact_sha256"]["database"]
-        )
+        assert second["artifact_sha256"]["database"] != first["artifact_sha256"]["database"]
 
 
 def test_backup_refuses_active_source_transaction(tmp_path: Path) -> None:
@@ -103,9 +100,7 @@ def test_backup_detects_database_artifact_corruption(tmp_path: Path) -> None:
     with _initialized_database(tmp_path / "source.db") as database:
         service = DatabaseBackupService(database, backup_root=tmp_path / "backups")
         backup = service.create()
-        database_path = (
-            service.backup_root / backup["backup_id"] / "database.sqlite3"
-        )
+        database_path = service.backup_root / backup["backup_id"] / "database.sqlite3"
         payload = bytearray(database_path.read_bytes())
         payload[-1] ^= 0xFF
         database_path.write_bytes(payload)
@@ -118,9 +113,7 @@ def test_backup_detects_manifest_cache_state_tampering(tmp_path: Path) -> None:
     with _initialized_database(tmp_path / "source.db") as database:
         service = DatabaseBackupService(database, backup_root=tmp_path / "backups")
         backup = service.create()
-        manifest_path = (
-            service.backup_root / backup["backup_id"] / "backup-manifest.json"
-        )
+        manifest_path = service.backup_root / backup["backup_id"] / "backup-manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest["cached"] = True
         manifest_path.write_text(
@@ -177,9 +170,7 @@ def test_restore_publishes_new_valid_offline_database(tmp_path: Path) -> None:
     assert restored["integrity_valid"] is True
     assert inspect_database(destination)["valid"] is True
     with Database(destination) as database:
-        projects = database.connection.execute(
-            "SELECT name FROM projects ORDER BY name"
-        ).fetchall()
+        projects = database.connection.execute("SELECT name FROM projects ORDER BY name").fetchall()
     assert [row["name"] for row in projects] == ["demo"]
 
 

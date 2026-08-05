@@ -511,8 +511,7 @@ async def _run_agent_workflows(tmp_path: Path) -> list[dict[str, Any]]:
 def test_real_stdio_mcp_agent_workflows(tmp_path: Path) -> None:
     trace = asyncio.run(_run_agent_workflows(tmp_path))
     assert any(
-        entry["tool"] == "node_move" and entry["payload"].get("ok") is False
-        for entry in trace
+        entry["tool"] == "node_move" and entry["payload"].get("ok") is False for entry in trace
     )
     assert [entry["tool"] for entry in trace].count("branch_merge") == 2
     assert any(entry["tool"] == "build_target_set" for entry in trace)

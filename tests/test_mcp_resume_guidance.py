@@ -146,12 +146,8 @@ def test_workflow_read_and_write_help_add_handoff_without_changing_other_topics(
     write_tools = weave_help("write")["help"]["tools"]
     merge = weave_help("merge")
 
-    assert workflow["steps"][0] == (
-        "branch_resume_snapshot first when resuming existing work"
-    )
-    assert workflow["steps"][-1] == (
-        "branch_checkpoint_create before handoff or stopping"
-    )
+    assert workflow["steps"][0] == ("branch_resume_snapshot first when resuming existing work")
+    assert workflow["steps"][-1] == ("branch_checkpoint_create before handoff or stopping")
     assert "branch_resume_snapshot" in read_tools
     assert "one immutable revision" in read_tools["branch_resume_snapshot"]
     assert "branch_checkpoint_get" in read_tools

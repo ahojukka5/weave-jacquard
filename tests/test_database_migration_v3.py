@@ -81,8 +81,11 @@ def test_missing_core_table_blocks_migration(tmp_path: Path) -> None:
     connection = sqlite3.connect(path)
     try:
         assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
-        assert connection.execute(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'operations'"
-        ).fetchone() is None
+        assert (
+            connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'operations'"
+            ).fetchone()
+            is None
+        )
     finally:
         connection.close()

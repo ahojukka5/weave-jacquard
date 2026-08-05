@@ -113,9 +113,7 @@ def branch_merge_preview(
 ) -> dict[str, object]:
     """Preview a stable-ID merge without advancing either branch."""
 
-    return _result(
-        lambda: merge_previews().preview(project, target_branch, source_branch)
-    )
+    return _result(lambda: merge_previews().preview(project, target_branch, source_branch))
 
 
 @mcp.tool()

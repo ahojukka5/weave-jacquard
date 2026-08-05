@@ -37,9 +37,7 @@ def _isolated_process_runtime() -> Iterator[None]:
 
 
 def _config(tmp_path: Path) -> RuntimeConfig:
-    return RuntimeConfig.from_environ(
-        {"WEAVE_DB_PATH": str(tmp_path / "runtime.db")}
-    )
+    return RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / "runtime.db")})
 
 
 def test_project_merge_workflows_are_runtime_owned(
@@ -109,10 +107,7 @@ def test_project_merge_workflows_are_runtime_owned(
         assert preflight_batches.catalogs is queues.catalogs
         assert preflight_batches.preflights is preflights
 
-        entries = {
-            item["name"]: item
-            for item in runtime.service_manifest()["services"]
-        }
+        entries = {item["name"]: item for item in runtime.service_manifest()["services"]}
         assert entries["project_merge_queues"]["depends_on"] == [
             "merge_previews",
             "project_agent_statuses",
@@ -122,9 +117,7 @@ def test_project_merge_workflows_are_runtime_owned(
             "merge_policies",
             "project_merge_queues",
         ]
-        assert entries["selected_merge_train_previews"]["depends_on"] == [
-            "project_merge_queues"
-        ]
+        assert entries["selected_merge_train_previews"]["depends_on"] == ["project_merge_queues"]
         assert entries["selected_merge_preflight_batches"]["depends_on"] == [
             "merge_preflights",
             "project_merge_queues",

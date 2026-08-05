@@ -70,9 +70,7 @@ def test_verified_reads_and_writes_return_deterministic_definition_hash(
 
         assert created["definition_hash"] == resolved["definition_hash"]
         assert listed[0]["definition_hash"] == created["definition_hash"]
-        root = workspace._state_at_revision(created["revision_id"])[
-            "@test-target/smoke"
-        ]
+        root = workspace._state_at_revision(created["revision_id"])["@test-target/smoke"]
         assert created["definition_hash"] == workspace.db.hash_value(root)
 
 

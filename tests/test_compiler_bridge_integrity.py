@@ -88,7 +88,7 @@ def _collect(path: Path, **kwargs: Any):
 
 def _fake_compiler(path: Path, mode: str, counter: Path) -> Path:
     path.write_text(
-        f'''#!/usr/bin/env python3
+        f"""#!/usr/bin/env python3
 from __future__ import annotations
 
 import json
@@ -166,7 +166,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-''',
+""",
         encoding="utf-8",
     )
     path.chmod(0o755)

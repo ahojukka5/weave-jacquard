@@ -58,9 +58,7 @@ def test_production_wrappers_preserve_base_service_contracts() -> None:
         BaseTestedMergeAttestationService,
     )
     assert MergeCandidateBuildService.__name__ == "MergeCandidateBuildService"
-    assert MergeCandidateTestBatchService.__name__ == (
-        "MergeCandidateTestBatchService"
-    )
+    assert MergeCandidateTestBatchService.__name__ == ("MergeCandidateTestBatchService")
 
 
 class _ParentPublication:

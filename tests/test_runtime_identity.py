@@ -170,10 +170,7 @@ def test_runtime_identity_changes_with_redacted_configuration_value() -> None:
             environ={"WEAVEC_BIN": "/second/compiler"},
         ).report()
 
-        assert (
-            first["configuration"]["value_ids"]
-            != second["configuration"]["value_ids"]
-        )
+        assert first["configuration"]["value_ids"] != second["configuration"]["value_ids"]
         assert first["runtime_id"] != second["runtime_id"]
     finally:
         first_workspace.db.connection.close()
@@ -226,11 +223,7 @@ def test_public_application_manifest_contains_runtime_identity() -> None:
     )
 
     assert "runtime_identity" in PUBLIC_TOOL_MANIFEST["tool_names"]
+    assert PUBLIC_APPLICATION_MANIFEST["tool_count"] == len(PUBLIC_TOOL_MANIFEST["tool_names"])
     assert (
-        PUBLIC_APPLICATION_MANIFEST["tool_count"]
-        == len(PUBLIC_TOOL_MANIFEST["tool_names"])
-    )
-    assert (
-        PUBLIC_APPLICATION_MANIFEST["tool_manifest_id"]
-        == PUBLIC_TOOL_MANIFEST["tool_manifest_id"]
+        PUBLIC_APPLICATION_MANIFEST["tool_manifest_id"] == PUBLIC_TOOL_MANIFEST["tool_manifest_id"]
     )

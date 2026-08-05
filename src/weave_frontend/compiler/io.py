@@ -12,8 +12,7 @@ class CompilerFileTooLarge(ValueError):
 
     def __init__(self, path: Path, *, limit: int, observed: int) -> None:
         super().__init__(
-            f"compiler file {path.name!r} exceeds {limit} bytes "
-            f"(observed at least {observed})"
+            f"compiler file {path.name!r} exceeds {limit} bytes (observed at least {observed})"
         )
         self.path = path
         self.limit = limit

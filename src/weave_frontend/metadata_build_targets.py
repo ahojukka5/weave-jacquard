@@ -63,9 +63,7 @@ class BuildTargetRegistry(_BaseBuildTargetRegistry):
             state,
             message=f"delete build target {target_name}",
             author=author,
-            operations=[
-                ("delete_build_target", storage_document, {"name": target_name})
-            ],
+            operations=[("delete_build_target", storage_document, {"name": target_name})],
             expected_branch_heads={branch: base_revision_id},
             stale_error_code="STALE_BRANCH_HEAD",
         )

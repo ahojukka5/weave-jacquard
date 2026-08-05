@@ -168,9 +168,7 @@ def test_restore_is_verified_path_redacted_and_idempotent(tmp_path: Path) -> Non
     assert (restored / "payload.bin").read_bytes() == b"payload"
     assert (restored / "external-link").is_symlink()
     assert external.read_bytes() == b"outside"
-    assert not os.path.lexists(
-        root / f".quarantine-{quarantine['quarantine_entry_id']}"
-    )
+    assert not os.path.lexists(root / f".quarantine-{quarantine['quarantine_entry_id']}")
     assert report["aggregate"]["counts"]["orphaned"] == 1
     assert report["aggregate"]["counts"]["quarantined"] == 0
     assert str(tmp_path) not in str(first)
@@ -191,13 +189,9 @@ def test_restore_rejects_live_destination_conflict(tmp_path: Path) -> None:
                 manifest_id=quarantine["manifest_id"],
                 restored_at_unix_ns=40,
             )
-        assert captured.value.code == (
-            "ARTIFACT_QUARANTINE_RESTORE_DESTINATION_EXISTS"
-        )
+        assert captured.value.code == ("ARTIFACT_QUARANTINE_RESTORE_DESTINATION_EXISTS")
         assert conflict.is_dir()
-        assert (
-            root / f".quarantine-{quarantine['quarantine_entry_id']}"
-        ).is_dir()
+        assert (root / f".quarantine-{quarantine['quarantine_entry_id']}").is_dir()
     finally:
         database.close()
 
@@ -217,9 +211,7 @@ def test_restore_rejects_changed_quarantined_payload(tmp_path: Path) -> None:
                 manifest_id=quarantine["manifest_id"],
                 restored_at_unix_ns=50,
             )
-        assert captured.value.code == (
-            "ARTIFACT_QUARANTINE_RESTORE_METADATA_INVALID"
-        )
+        assert captured.value.code == ("ARTIFACT_QUARANTINE_RESTORE_METADATA_INVALID")
         assert not os.path.lexists(root / artifact_id)
         assert capsule.is_dir()
     finally:

@@ -32,9 +32,7 @@ class _Closeable:
 
 
 def _config(tmp_path: Path) -> RuntimeConfig:
-    return RuntimeConfig.from_environ(
-        {"WEAVE_DB_PATH": str(tmp_path / "runtime.db")}
-    )
+    return RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / "runtime.db")})
 
 
 @contextmanager
@@ -203,8 +201,9 @@ def test_two_containers_supply_isolated_named_services(tmp_path: Path) -> None:
     second_value = second.service("example", example)
 
     assert first_value is not second_value
-    assert first.service_manifest(include_state=False)["service_graph_id"] == (
-        second.service_manifest(include_state=False)["service_graph_id"]
+    assert (
+        first.service_manifest(include_state=False)["service_graph_id"]
+        == (second.service_manifest(include_state=False)["service_graph_id"])
     )
     first.close()
     second.close()
@@ -240,9 +239,7 @@ def test_foundational_build_services_are_runtime_owned(tmp_path: Path) -> None:
             assert build_module.merge_previews().workspace is workspace
             assert build_module.build_targets().workspace is workspace
 
-            names = {
-                item["name"] for item in services.service_manifest()["services"]
-            }
+            names = {item["name"] for item in services.service_manifest()["services"]}
             assert {
                 "workspace",
                 "edit_batches",

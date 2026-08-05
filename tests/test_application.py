@@ -157,9 +157,7 @@ def test_application_composes_capabilities_and_tools_deterministically() -> None
     assert len(app.tool_manifest["tool_manifest_id"]) == 64
     assert all(len(tool["tool_contract_id"]) == 64 for tool in app.tool_manifest["tools"])
     assert app.application_manifest["format"] == APPLICATION_MANIFEST_FORMAT
-    assert app.application_manifest["tool_manifest_id"] == app.tool_manifest[
-        "tool_manifest_id"
-    ]
+    assert app.application_manifest["tool_manifest_id"] == app.tool_manifest["tool_manifest_id"]
     assert app.application_manifest["capabilities"] == list(app.capability_manifest)
     assert app.application_manifest["configuration_variables"] == list(
         PUBLIC_CONFIGURATION_VARIABLES
@@ -217,9 +215,7 @@ def test_registered_contract_reads_fastmcp_metadata() -> None:
             "sample": _tool(
                 "sample",
                 title="Sample title",
-                annotations=SimpleNamespace(
-                    model_dump=lambda **_: {"readOnlyHint": True}
-                ),
+                annotations=SimpleNamespace(model_dump=lambda **_: {"readOnlyHint": True}),
                 icons=[{"src": "https://example.invalid/icon.png"}],
                 meta={"version": 2},
             )

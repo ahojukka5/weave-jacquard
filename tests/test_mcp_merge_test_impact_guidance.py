@@ -32,6 +32,4 @@ def test_read_help_adds_merge_impact_tool_without_mutating_base_topics() -> None
     read_tools = weave_help("read")["help"]["tools"]
 
     assert "branch_merge_test_impact" in read_tools
-    assert weave_help("test_impact") == mcp_test_impact_guidance.weave_help(
-        "test_impact"
-    )
+    assert weave_help("test_impact") == mcp_test_impact_guidance.weave_help("test_impact")

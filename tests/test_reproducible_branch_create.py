@@ -101,9 +101,7 @@ def test_unprepared_branch_create_rejects_mid_call_source_advance(
             workspace.create_branch("demo", "lost", from_branch="main")
 
         assert raised.value.code == "STALE_BRANCH_HEAD"
-        assert _heads(workspace, "demo") == {
-            "main": competitor_revision["revision_id"]
-        }
+        assert _heads(workspace, "demo") == {"main": competitor_revision["revision_id"]}
 
 
 def test_branch_create_at_revision_forks_exact_historical_state(tmp_path: Path) -> None:
@@ -136,20 +134,26 @@ def test_branch_create_at_revision_forks_exact_historical_state(tmp_path: Path) 
             "historical": program["revision_id"],
             "main": advanced["revision_id"],
         }
-        assert workspace.find_nodes(
-            "demo",
-            "historical",
-            "main.weave",
-            head="advanced",
-        ) == []
-        assert len(
+        assert (
             workspace.find_nodes(
                 "demo",
-                "main",
+                "historical",
                 "main.weave",
                 head="advanced",
             )
-        ) == 1
+            == []
+        )
+        assert (
+            len(
+                workspace.find_nodes(
+                    "demo",
+                    "main",
+                    "main.weave",
+                    head="advanced",
+                )
+            )
+            == 1
+        )
 
 
 def test_branch_create_at_revision_requires_project_ownership(tmp_path: Path) -> None:

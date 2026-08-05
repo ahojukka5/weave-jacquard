@@ -177,18 +177,14 @@ def _manifest_contract(contract: Mapping[str, Any]) -> dict[str, Any]:
         raise ApplicationCompositionError("tool contract keys must be strings")
     unknown = sorted(set(keys).difference(_TOOL_CONTRACT_FIELDS))
     if unknown:
-        raise ApplicationCompositionError(
-            f"tool contract contains unsupported fields {unknown!r}"
-        )
+        raise ApplicationCompositionError(f"tool contract contains unsupported fields {unknown!r}")
 
     name = contract.get("name")
     if not isinstance(name, str) or not name:
         raise ApplicationCompositionError("tool contract name must be a non-empty string")
     input_schema = contract.get("input_schema")
     if not isinstance(input_schema, Mapping):
-        raise ApplicationCompositionError(
-            f"tool contract {name!r} requires a mapping input_schema"
-        )
+        raise ApplicationCompositionError(f"tool contract {name!r} requires a mapping input_schema")
     output_schema = contract.get("output_schema")
     if output_schema is not None and not isinstance(output_schema, Mapping):
         raise ApplicationCompositionError(
@@ -224,9 +220,7 @@ def _manifest_contract(contract: Mapping[str, Any]) -> dict[str, Any]:
 def _optional_string(value: Any, *, field: str, tool: str) -> str | None:
     if value is None or isinstance(value, str):
         return value
-    raise ApplicationCompositionError(
-        f"tool contract {tool!r} {field} must be a string or null"
-    )
+    raise ApplicationCompositionError(f"tool contract {tool!r} {field} must be a string or null")
 
 
 def _json_ready(value: Any, *, path: str) -> Any:
@@ -253,18 +247,10 @@ def _json_ready(value: Any, *, path: str) -> Any:
     if isinstance(value, Mapping):
         keys = tuple(value.keys())
         if any(not isinstance(key, str) for key in keys):
-            raise ApplicationCompositionError(
-                f"non-string mapping key in tool contract at {path}"
-            )
-        return {
-            key: _json_ready(value[key], path=f"{path}.{key}")
-            for key in sorted(keys)
-        }
+            raise ApplicationCompositionError(f"non-string mapping key in tool contract at {path}")
+        return {key: _json_ready(value[key], path=f"{path}.{key}") for key in sorted(keys)}
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return [
-            _json_ready(item, path=f"{path}[{index}]")
-            for index, item in enumerate(value)
-        ]
+        return [_json_ready(item, path=f"{path}[{index}]") for index, item in enumerate(value)]
     raise ApplicationCompositionError(
         f"unsupported tool contract value {type(value).__name__} at {path}"
     )
@@ -273,9 +259,7 @@ def _json_ready(value: Any, *, path: str) -> Any:
 def _canonical_names(values: Iterable[str], *, subject: str) -> tuple[str, ...]:
     raw = tuple(values)
     if not raw or any(not isinstance(value, str) or not value for value in raw):
-        raise ApplicationCompositionError(
-            f"{subject} names must be non-empty strings"
-        )
+        raise ApplicationCompositionError(f"{subject} names must be non-empty strings")
     names = tuple(sorted(raw))
     if len(names) != len(set(names)):
         raise ApplicationCompositionError(f"{subject} names must be unique")

@@ -124,9 +124,7 @@ class MergeCandidateBuildService(CompilerArtifactMixin):
             cached["cached"] = True
             return cached
 
-        temporary_directory = Path(
-            tempfile.mkdtemp(prefix=f".{build_id}-", dir=self.build_root)
-        )
+        temporary_directory = Path(tempfile.mkdtemp(prefix=f".{build_id}-", dir=self.build_root))
         try:
             self._execute(
                 subject=subject,
@@ -149,9 +147,7 @@ class MergeCandidateBuildService(CompilerArtifactMixin):
     def get(self, build_id: str) -> dict[str, Any]:
         """Read and verify one retained virtual-candidate build artifact."""
 
-        if not isinstance(build_id, str) or not MERGE_CANDIDATE_BUILD_ID.fullmatch(
-            build_id
-        ):
+        if not isinstance(build_id, str) or not MERGE_CANDIDATE_BUILD_ID.fullmatch(build_id):
             raise ValidationError(
                 "INVALID_MERGE_CANDIDATE_BUILD_ID",
                 "build_id must be 32 lowercase hexadecimal characters",
@@ -167,9 +163,7 @@ class MergeCandidateBuildService(CompilerArtifactMixin):
         manifest = self._read_manifest(directory / "manifest.json")
         self._verify_manifest(manifest, directory, expected_build_id=build_id)
         result = dict(manifest)
-        result["artifact_paths"] = self._resolve_artifact_value(
-            manifest["artifacts"], directory
-        )
+        result["artifact_paths"] = self._resolve_artifact_value(manifest["artifacts"], directory)
         result["build_directory"] = str(directory)
         result["manifest_sha256"] = self._sha256_file(directory / "manifest.json")
         return result
@@ -213,9 +207,7 @@ class MergeCandidateBuildService(CompilerArtifactMixin):
         returncode, timed_out, stdout, stderr = self.compiler._run_compiler(command)
         diagnostics, diagnostics_valid = collect_build_diagnostics(
             compiler_diagnostics_path,
-            canonical_sources=[
-                (item.source_path, item.node_map) for item in materialized
-            ],
+            canonical_sources=[(item.source_path, item.node_map) for item in materialized],
             returncode=returncode,
             timed_out=timed_out,
             stdout=stdout,
@@ -223,9 +215,7 @@ class MergeCandidateBuildService(CompilerArtifactMixin):
         )
         compiler_summary = diagnostics.get("compiler")
         diagnostics_status = (
-            compiler_summary.get("status")
-            if isinstance(compiler_summary, dict)
-            else None
+            compiler_summary.get("status") if isinstance(compiler_summary, dict) else None
         )
         compiler_manifest, compiler_manifest_errors = validate_compiler_manifest(
             compiler_manifest_path,
@@ -276,9 +266,7 @@ class MergeCandidateBuildService(CompilerArtifactMixin):
                 "compiler-manifest.json" if compiler_manifest_path.is_file() else None
             ),
             "compiler_diagnostics": (
-                "compiler-diagnostics.json"
-                if compiler_diagnostics_path.is_file()
-                else None
+                "compiler-diagnostics.json" if compiler_diagnostics_path.is_file() else None
             ),
             "executable": "program" if executable_path.is_file() else None,
         }
@@ -370,13 +358,17 @@ class MergeCandidateBuildService(CompilerArtifactMixin):
             for item in rendered
         ]
         recorded_sources = manifest.get("sources")
-        if not isinstance(recorded_sources, list) or [
-            {
-                "document": item.get("document"),
-                "source_sha256": item.get("source_sha256"),
-            }
-            for item in recorded_sources
-        ] != expected_sources:
+        if (
+            not isinstance(recorded_sources, list)
+            or [
+                {
+                    "document": item.get("document"),
+                    "source_sha256": item.get("source_sha256"),
+                }
+                for item in recorded_sources
+            ]
+            != expected_sources
+        ):
             raise ArtifactIntegrityError("merge candidate build source evidence is invalid")
         input_document = {
             "format": MERGE_CANDIDATE_BUILD_KEY_FORMAT,
@@ -530,9 +522,7 @@ class MergeCandidateBuildService(CompilerArtifactMixin):
             try:
                 root = state[document]
             except KeyError as exc:
-                raise NotFoundError(
-                    f"document {document!r} not found in merge candidate"
-                ) from exc
+                raise NotFoundError(f"document {document!r} not found in merge candidate") from exc
             source, node_map = render_with_node_map(
                 root,
                 revision_id=f"virtual-merge:{subject['preview_id']}",
@@ -587,9 +577,7 @@ class MergeCandidateBuildService(CompilerArtifactMixin):
                 f"cannot read merge candidate build manifest: {exc}"
             ) from exc
         if not isinstance(value, dict):
-            raise ArtifactIntegrityError(
-                "merge candidate build manifest root must be an object"
-            )
+            raise ArtifactIntegrityError("merge candidate build manifest root must be an object")
         return value
 
     @staticmethod

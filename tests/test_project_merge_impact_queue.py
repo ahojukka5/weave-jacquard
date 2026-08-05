@@ -244,9 +244,7 @@ def test_project_merge_impact_queue_composes_exact_policy_and_coverage_evidence(
         assert "do not prove compiler correctness" in first["readiness_note"]
 
         conflict = first["sources"][0]
-        assert conflict["source_head_revision_id"] == state["conflict_head"][
-            "revision_id"
-        ]
+        assert conflict["source_head_revision_id"] == state["conflict_head"]["revision_id"]
         assert conflict["impact_classification"] == "conflicted"
         assert conflict["impact"] is None
         assert conflict["coverage_gate"] is None
@@ -257,9 +255,7 @@ def test_project_merge_impact_queue_composes_exact_policy_and_coverage_evidence(
         assert conflict["merge_policy"]["source_policy_ignored"] is False
 
         covered = first["sources"][1]
-        assert covered["source_head_revision_id"] == state["covered_checkpoint"][
-            "revision_id"
-        ]
+        assert covered["source_head_revision_id"] == state["covered_checkpoint"]["revision_id"]
         assert covered["impact_classification"] == "covered_program_changes"
         impact = covered["impact"]
         assert impact["changed_program_document_count"] == 2
@@ -281,12 +277,11 @@ def test_project_merge_impact_queue_composes_exact_policy_and_coverage_evidence(
         }
         assert covered["source_checkpoint"]["checkpoint_state"] == "head"
         assert covered["merge_policy"]["source_policy_ignored"] is True
-        assert covered["merge_policy"]["source"]["policy_hash"] == state[
-            "covered_policy"
-        ]["policy_hash"]
-        assert covered["merge_policy"]["target"]["policy_hash"] == target_policy[
-            "policy_hash"
-        ]
+        assert (
+            covered["merge_policy"]["source"]["policy_hash"]
+            == state["covered_policy"]["policy_hash"]
+        )
+        assert covered["merge_policy"]["target"]["policy_hash"] == target_policy["policy_hash"]
         assert covered["impact_call"] == {
             "tool": "branch_merge_impact",
             "arguments": {
@@ -298,9 +293,7 @@ def test_project_merge_impact_queue_composes_exact_policy_and_coverage_evidence(
                 "limit": 1,
             },
         }
-        assert covered["preflight"]["arguments"]["preview_id"] == covered[
-            "preview_id"
-        ]
+        assert covered["preflight"]["arguments"]["preview_id"] == covered["preview_id"]
 
         noop = first["sources"][2]
         assert noop["impact_classification"] == "no_changes"
@@ -327,28 +320,18 @@ def test_project_merge_impact_queue_composes_exact_policy_and_coverage_evidence(
         ]
 
         target_only = second["sources"][0]
-        assert target_only["source_head_revision_id"] == state["target_only"][
-            "revision_id"
-        ]
-        assert target_only["impact_classification"] == (
-            "target_definition_changes_only"
-        )
+        assert target_only["source_head_revision_id"] == state["target_only"]["revision_id"]
+        assert target_only["impact_classification"] == ("target_definition_changes_only")
         assert target_only["impact"]["changed_program_document_count"] == 0
         assert target_only["impact"]["changed_target_document_count"] == 1
-        assert target_only["impact"]["changed_target_documents"] == [
-            "@build-target/application"
-        ]
+        assert target_only["impact"]["changed_target_documents"] == ["@build-target/application"]
         assert target_only["impact"]["total_affected_target_count"] == 1
 
         uncovered = second["sources"][1]
-        assert uncovered["source_head_revision_id"] == state["uncovered_head"][
-            "revision_id"
-        ]
+        assert uncovered["source_head_revision_id"] == state["uncovered_head"]["revision_id"]
         assert uncovered["impact_classification"] == "uncovered_program_changes"
         assert uncovered["impact"]["uncovered_changed_document_count"] == 1
-        assert uncovered["impact"]["uncovered_changed_documents"] == [
-            "orphan.weave"
-        ]
+        assert uncovered["impact"]["uncovered_changed_documents"] == ["orphan.weave"]
         assert uncovered["coverage_gate"] == {
             "uncovered_documents_present": True,
             "target_allows_uncovered_documents": False,

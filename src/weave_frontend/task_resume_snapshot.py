@@ -98,9 +98,7 @@ class TaskResumeSnapshotService(TestResumeSnapshotService):
     ) -> None:
         excluded = self._metadata_prefixes()
         for document in documents:
-            if document not in modules or any(
-                document.startswith(prefix) for prefix in excluded
-            ):
+            if document not in modules or any(document.startswith(prefix) for prefix in excluded):
                 raise NotFoundError(f"program document {document!r} not found")
 
     def _metadata_prefixes(self) -> tuple[str, ...]:
@@ -115,9 +113,7 @@ class TaskResumeSnapshotService(TestResumeSnapshotService):
         limit: int,
     ) -> tuple[list[dict[str, Any]], int]:
         modules = self._revision_modules(revision_id)
-        names = sorted(
-            name for name in modules if name.startswith(TASK_CONTRACT_PREFIX)
-        )
+        names = sorted(name for name in modules if name.startswith(TASK_CONTRACT_PREFIX))
         page = names[:limit]
         result = []
         for storage_document in page:

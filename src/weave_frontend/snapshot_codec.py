@@ -392,10 +392,7 @@ def inspect_revision_state(
 
     if not errors:
         observed_root_hash = hash_value(modules)
-        if (
-            not _valid_sha256(expected_root_hash)
-            or observed_root_hash != expected_root_hash
-        ):
+        if not _valid_sha256(expected_root_hash) or observed_root_hash != expected_root_hash:
             errors.append(
                 SnapshotIntegrityError(
                     "REVISION_ROOT_HASH_MISMATCH",
@@ -473,9 +470,7 @@ def _bounded_zlib_decompress(payload: bytes) -> bytes:
             "snapshot zlib output exceeds the decompressed-byte limit",
         )
     try:
-        raw += decompressor.flush(
-            MAX_SNAPSHOT_DECOMPRESSED_BYTES + 1 - len(raw)
-        )
+        raw += decompressor.flush(MAX_SNAPSHOT_DECOMPRESSED_BYTES + 1 - len(raw))
     except zlib.error as exc:
         raise SnapshotIntegrityError(
             "SNAPSHOT_COMPRESSION_INVALID",

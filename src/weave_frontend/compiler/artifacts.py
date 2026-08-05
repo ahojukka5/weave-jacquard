@@ -39,21 +39,13 @@ class CompilerArtifactMixin:
     ) -> dict[str, str]:
         hashes: dict[str, str] = {}
         for item in sources:
-            hashes[str(item.source_path.relative_to(base))] = cls._sha256_file(
-                item.source_path
-            )
-            hashes[str(item.map_path.relative_to(base))] = cls._sha256_file(
-                item.map_path
-            )
+            hashes[str(item.source_path.relative_to(base))] = cls._sha256_file(item.source_path)
+            hashes[str(item.map_path.relative_to(base))] = cls._sha256_file(item.map_path)
         hashes["diagnostics.json"] = cls._sha256_file(diagnostics_path)
         if compiler_manifest_path.is_file():
-            hashes["compiler-manifest.json"] = cls._sha256_file(
-                compiler_manifest_path
-            )
+            hashes["compiler-manifest.json"] = cls._sha256_file(compiler_manifest_path)
         if compiler_diagnostics_path.is_file():
-            hashes["compiler-diagnostics.json"] = cls._sha256_file(
-                compiler_diagnostics_path
-            )
+            hashes["compiler-diagnostics.json"] = cls._sha256_file(compiler_diagnostics_path)
         if executable_path.is_file():
             hashes["program"] = cls._sha256_file(executable_path)
         return hashes
@@ -86,10 +78,7 @@ class CompilerArtifactMixin:
         if isinstance(value, list):
             return [cls._relativize_value(item, base) for item in value]
         if isinstance(value, dict):
-            return {
-                key: cls._relativize_value(item, base)
-                for key, item in value.items()
-            }
+            return {key: cls._relativize_value(item, base) for key, item in value.items()}
         return value
 
     @classmethod
@@ -125,8 +114,7 @@ class CompilerArtifactMixin:
             return [cls._resolve_artifact_value(item, directory) for item in value]
         if isinstance(value, dict):
             return {
-                key: cls._resolve_artifact_value(item, directory)
-                for key, item in value.items()
+                key: cls._resolve_artifact_value(item, directory) for key, item in value.items()
             }
         raise TypeError(f"unsupported artifact manifest value: {type(value).__name__}")
 
@@ -293,9 +281,7 @@ class CompilerArtifactMixin:
                 "compiler diagnostics protocol validity must be boolean",
             )
         compiler_manifest_valid = manifest.get("compiler_manifest_protocol_valid")
-        if build_key_format == BUILD_KEY_FORMAT and not isinstance(
-            compiler_manifest_valid, bool
-        ):
+        if build_key_format == BUILD_KEY_FORMAT and not isinstance(compiler_manifest_valid, bool):
             raise ValidationError(
                 "INVALID_BUILD_MANIFEST",
                 "compiler manifest protocol validity must be boolean",
@@ -371,10 +357,13 @@ class CompilerArtifactMixin:
             expected_build_id=final.name,
         )
         with cls._publication_lock(final):
-            if cls._read_successful_manifest(
-                final,
-                expected_build_id=final.name,
-            ) is not None:
+            if (
+                cls._read_successful_manifest(
+                    final,
+                    expected_build_id=final.name,
+                )
+                is not None
+            ):
                 cls._remove_path(temporary)
                 return
 

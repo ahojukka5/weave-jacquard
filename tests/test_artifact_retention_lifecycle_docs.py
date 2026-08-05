@@ -6,9 +6,7 @@ ROOT = Path(__file__).parents[1]
 
 
 def test_retention_lifecycle_runbook_covers_operator_and_recovery_contracts() -> None:
-    document = (ROOT / "docs/artifact-retention-lifecycle.md").read_text(
-        encoding="utf-8"
-    )
+    document = (ROOT / "docs/artifact-retention-lifecycle.md").read_text(encoding="utf-8")
 
     for command in (
         "weave-artifact-reconcile",

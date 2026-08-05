@@ -37,22 +37,14 @@ def _write_cached_build(
         "protocol_errors": [],
         "entries": [],
     }
-    (directory / "diagnostics.json").write_text(
-        json.dumps(diagnostics) + "\n", encoding="utf-8"
-    )
+    (directory / "diagnostics.json").write_text(json.dumps(diagnostics) + "\n", encoding="utf-8")
     artifacts: dict[str, object] = {
         "source": "sources/000-main.weave" if include_sources else None,
-        "node_map": (
-            "source-maps/000-main.weave.map.json" if include_sources else None
-        ),
+        "node_map": ("source-maps/000-main.weave.map.json" if include_sources else None),
         "sources": ["sources/000-main.weave"] if include_sources else [],
-        "node_maps": (
-            ["source-maps/000-main.weave.map.json"] if include_sources else []
-        ),
+        "node_maps": (["source-maps/000-main.weave.map.json"] if include_sources else []),
         "diagnostics": "diagnostics.json",
-        "compiler_manifest": (
-            "compiler-manifest.json" if include_compiler_manifest else None
-        ),
+        "compiler_manifest": ("compiler-manifest.json" if include_compiler_manifest else None),
         "compiler_diagnostics": (
             "compiler-diagnostics.json" if include_compiler_diagnostics else None
         ),
@@ -72,9 +64,7 @@ def _write_cached_build(
         (directory / "sources").mkdir()
         (directory / "source-maps").mkdir()
         source_text = "(program)\n"
-        (directory / "sources/000-main.weave").write_text(
-            source_text, encoding="utf-8"
-        )
+        (directory / "sources/000-main.weave").write_text(source_text, encoding="utf-8")
         (directory / "source-maps/000-main.weave.map.json").write_text(
             '{"format":"weave-node-map-v1"}\n', encoding="utf-8"
         )
@@ -127,13 +117,9 @@ def _write_cached_build(
         "compiler_diagnostics_protocol_valid": diagnostics_valid,
         "compiler_manifest_protocol_valid": manifest_valid,
         "artifacts": artifacts,
-        "artifact_sha256": {
-            relative: _sha(directory / relative) for relative in references
-        },
+        "artifact_sha256": {relative: _sha(directory / relative) for relative in references},
     }
-    (directory / "manifest.json").write_text(
-        json.dumps(manifest) + "\n", encoding="utf-8"
-    )
+    (directory / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
 
 
 def test_cache_rejects_previous_build_key_contract(tmp_path: Path) -> None:
@@ -190,10 +176,6 @@ def test_cache_accepts_current_verified_contract(tmp_path: Path) -> None:
 
     assert manifest is not None
     assert manifest["build_key_format"] == BUILD_KEY_FORMAT
-    assert manifest["artifact_paths"]["compiler_manifest"].endswith(
-        "compiler-manifest.json"
-    )
-    assert manifest["artifact_paths"]["compiler_diagnostics"].endswith(
-        "compiler-diagnostics.json"
-    )
+    assert manifest["artifact_paths"]["compiler_manifest"].endswith("compiler-manifest.json")
+    assert manifest["artifact_paths"]["compiler_diagnostics"].endswith("compiler-diagnostics.json")
     assert manifest["artifact_paths"]["sources"][0].endswith("000-main.weave")

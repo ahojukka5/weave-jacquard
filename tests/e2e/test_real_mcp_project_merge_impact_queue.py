@@ -388,9 +388,7 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
             "covered",
             "noop",
         ]
-        assert first["target_merge_policy"]["policy_hash"] == target_policy[
-            "policy_hash"
-        ]
+        assert first["target_merge_policy"]["policy_hash"] == target_policy["policy_hash"]
         assert "no compiler or build validation was run" in first["compiler_note"]
 
         conflict = first["sources"][0]
@@ -406,9 +404,7 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         assert covered["impact"]["total_affected_target_count"] == 2
         assert covered["impact"]["affected_targets_truncated"] is True
         assert covered["merge_policy"]["source_policy_ignored"] is True
-        assert covered["merge_policy"]["source"]["policy_hash"] == covered_policy[
-            "policy_hash"
-        ]
+        assert covered["merge_policy"]["source"]["policy_hash"] == covered_policy["policy_hash"]
         assert covered["source_checkpoint"]["checkpoint_state"] == "head"
         assert covered["source_head_revision_id"] == covered_checkpoint["revision_id"]
 
@@ -420,9 +416,7 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         )
         assert replayed_impact["preview_id"] == covered["preview_id"]
         assert replayed_impact["target_head_revision_id"] == target_head["revision_id"]
-        assert replayed_impact["source_head_revision_id"] == covered_checkpoint[
-            "revision_id"
-        ]
+        assert replayed_impact["source_head_revision_id"] == covered_checkpoint["revision_id"]
         assert replayed_impact["uncovered_changed_documents"] == []
 
         noop = first["sources"][2]
@@ -449,20 +443,14 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
             "uncovered",
         ]
         target_only_entry = second["sources"][0]
-        assert target_only_entry["source_head_revision_id"] == target_only[
-            "revision_id"
-        ]
-        assert target_only_entry["impact_classification"] == (
-            "target_definition_changes_only"
-        )
+        assert target_only_entry["source_head_revision_id"] == target_only["revision_id"]
+        assert target_only_entry["impact_classification"] == ("target_definition_changes_only")
         assert target_only_entry["impact"]["changed_target_document_count"] == 1
 
         uncovered = second["sources"][1]
         assert uncovered["source_head_revision_id"] == uncovered_head["revision_id"]
         assert uncovered["impact_classification"] == "uncovered_program_changes"
-        assert uncovered["impact"]["uncovered_changed_documents"] == [
-            "orphan.weave"
-        ]
+        assert uncovered["impact"]["uncovered_changed_documents"] == ["orphan.weave"]
         assert uncovered["coverage_gate"] == {
             "uncovered_documents_present": True,
             "target_allows_uncovered_documents": False,
@@ -514,12 +502,8 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         refreshed_covered = [
             item for item in refreshed["sources"] if item["source_branch"] == "covered"
         ][0]
-        assert refreshed_covered["source_head_revision_id"] == later_covered[
-            "revision_id"
-        ]
-        assert refreshed_covered["source_checkpoint"]["checkpoint_state"] == (
-            "behind_head"
-        )
+        assert refreshed_covered["source_head_revision_id"] == later_covered["revision_id"]
+        assert refreshed_covered["source_checkpoint"]["checkpoint_state"] == ("behind_head")
         assert refreshed_covered["source_checkpoint"]["revisions_since_checkpoint"] == 1
 
     return trace, {
@@ -547,9 +531,9 @@ def _verify_read_only_database(tmp_path: Path) -> None:
             "SELECT COUNT(*) AS count FROM revisions WHERE parent2_id IS NOT NULL"
         ).fetchone()["count"]
         assert merge_revisions == 0
-        branch_count = connection.execute(
-            "SELECT COUNT(*) AS count FROM branches"
-        ).fetchone()["count"]
+        branch_count = connection.execute("SELECT COUNT(*) AS count FROM branches").fetchone()[
+            "count"
+        ]
         assert branch_count == 6
     finally:
         connection.close()
@@ -567,7 +551,5 @@ def test_real_mcp_pages_project_merge_impact_queue(tmp_path: Path) -> None:
     assert len(reads) == 4
     assert sum(entry["payload"]["ok"] is True for entry in reads) == 3
     assert [
-        entry["payload"]["error"]["code"]
-        for entry in reads
-        if entry["payload"]["ok"] is False
+        entry["payload"]["error"]["code"] for entry in reads if entry["payload"]["ok"] is False
     ] == ["STALE_PROJECT_MERGE_QUEUE_CATALOG"]

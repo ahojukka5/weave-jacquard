@@ -17,9 +17,7 @@ from weave_frontend.errors import ValidationError
 
 def _accountant(**kwargs: int) -> ArtifactRetentionAccountant:
     return ArtifactRetentionAccountant(
-        RetainedArtifactInventoryService.__new__(
-            RetainedArtifactInventoryService
-        ),
+        RetainedArtifactInventoryService.__new__(RetainedArtifactInventoryService),
         max_scan_entries=100,
         **kwargs,
     )

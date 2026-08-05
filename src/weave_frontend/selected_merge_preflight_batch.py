@@ -73,8 +73,7 @@ class SelectedMergePreflightBatchService:
         if missing:
             raise ValidationError(
                 "INVALID_SELECTED_PREFLIGHT_SOURCE",
-                "selected sources are not source branches in the catalog: "
-                + ", ".join(missing),
+                "selected sources are not source branches in the catalog: " + ", ".join(missing),
             )
 
         entries = [
@@ -247,43 +246,29 @@ class SelectedMergePreflightBatchService:
             "base_revision_id": preflight["base_revision_id"],
             "merged_root_hash": preflight["merged_root_hash"],
             "ready_for_publication": preflight["ready_for_publication"],
-            "changed_program_document_count": len(
-                impact["changed_program_documents"]
-            ),
-            "changed_program_documents": impact["changed_program_documents"][
-                :document_limit
-            ],
+            "changed_program_document_count": len(impact["changed_program_documents"]),
+            "changed_program_documents": impact["changed_program_documents"][:document_limit],
             "changed_program_documents_truncated": (
                 len(impact["changed_program_documents"]) > document_limit
             ),
-            "uncovered_changed_document_count": len(
-                impact["uncovered_changed_documents"]
-            ),
-            "uncovered_changed_documents": impact["uncovered_changed_documents"][
-                :document_limit
-            ],
+            "uncovered_changed_document_count": len(impact["uncovered_changed_documents"]),
+            "uncovered_changed_documents": impact["uncovered_changed_documents"][:document_limit],
             "uncovered_changed_documents_truncated": (
                 len(impact["uncovered_changed_documents"]) > document_limit
             ),
             "impact_affected_target_count": impact["total_affected_target_count"],
             "impact_targets_truncated": preflight["impact_targets_truncated"],
             "coverage_passed": validation["coverage_passed"],
-            "affected_surviving_target_count": validation[
-                "affected_surviving_target_count"
-            ],
+            "affected_surviving_target_count": validation["affected_surviving_target_count"],
             "validated_target_count": validation["validated_target_count"],
             "passed_target_count": validation["passed_target_count"],
             "failed_target_count": validation["failed_target_count"],
             "unavailable_target_count": validation["unavailable_target_count"],
             "passed_targets": validation["passed_targets"][:validation_result_limit],
             "failed_targets": validation["failed_targets"][:validation_result_limit],
-            "unavailable_targets": validation["unavailable_targets"][
-                :validation_result_limit
-            ],
+            "unavailable_targets": validation["unavailable_targets"][:validation_result_limit],
             "returned_target_validation_count": len(compact_validations),
-            "target_validations_truncated": (
-                len(target_validations) > validation_result_limit
-            ),
+            "target_validations_truncated": (len(target_validations) > validation_result_limit),
             "target_validations": compact_validations,
             "target_merge_policy": preflight.get("target_merge_policy"),
             "source_merge_policy": preflight.get("source_merge_policy"),
@@ -350,8 +335,7 @@ class SelectedMergePreflightBatchService:
         if len(sources) > MAX_SELECTED_MERGE_PREFLIGHT_SOURCES:
             raise ValidationError(
                 "INVALID_SELECTED_PREFLIGHT_SOURCES",
-                "sources may contain at most "
-                f"{MAX_SELECTED_MERGE_PREFLIGHT_SOURCES} branches",
+                f"sources may contain at most {MAX_SELECTED_MERGE_PREFLIGHT_SOURCES} branches",
             )
         result: list[str] = []
         for source in sources:
@@ -407,12 +391,7 @@ class SelectedMergePreflightBatchService:
 
     @staticmethod
     def _validate_limit(name: str, value: Any, maximum: int) -> None:
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or value < 1
-            or value > maximum
-        ):
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > maximum:
             raise ValidationError(
                 "INVALID_SELECTED_PREFLIGHT_LIMIT",
                 f"{name} must be an integer between 1 and {maximum}",

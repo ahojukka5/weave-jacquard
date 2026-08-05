@@ -73,9 +73,7 @@ class RevisionReadService:
         selection, root = self._document(project, branch, document, revision_id)
         matches: list[dict[str, Any]] = []
         total_match_count = 0
-        stack: list[tuple[dict[str, Any], str | None, int | None]] = [
-            (root, None, None)
-        ]
+        stack: list[tuple[dict[str, Any], str | None, int | None]] = [(root, None, None)]
         while stack:
             node, parent_id, position = stack.pop()
             matches_filter = (
@@ -154,6 +152,4 @@ class RevisionReadService:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")

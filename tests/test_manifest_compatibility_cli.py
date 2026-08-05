@@ -137,9 +137,7 @@ def test_manifest_diff_cli_compares_installed_application(
     monkeypatch.setattr(
         cli,
         "_installed_manifest",
-        lambda kind: _application_manifest(
-            variables=["WEAVE_DB", "WEAVE_ROOT"]
-        ),
+        lambda kind: _application_manifest(variables=["WEAVE_DB", "WEAVE_ROOT"]),
     )
     monkeypatch.setattr(
         sys,

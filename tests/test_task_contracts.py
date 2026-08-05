@@ -29,9 +29,7 @@ def _workspace(path: Path) -> tuple[SExpressionWorkspace, str]:
         program_name="other",
         expected_revision_id=str(main["revision_id"]),
     )
-    documents = {
-        item["document"]: item for item in workspace.list_documents("demo", "main")
-    }
+    documents = {item["document"]: item for item in workspace.list_documents("demo", "main")}
     return workspace, str(documents["main.weave"]["root_node_id"])
 
 

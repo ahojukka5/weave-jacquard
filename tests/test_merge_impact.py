@@ -19,9 +19,7 @@ def _service(sexpr_workspace) -> MergeTargetImpactService:
 
 
 def _program_with_atom(sexpr_workspace, document: str, value: str) -> dict[str, str]:
-    created = sexpr_workspace.create_program(
-        "sexpr-demo", "main", document, program_name=document
-    )
+    created = sexpr_workspace.create_program("sexpr-demo", "main", document, program_name=document)
     atom = sexpr_workspace.add_atom(
         "sexpr-demo", "main", document, created["node_id"], "string", value
     )
@@ -81,9 +79,7 @@ def test_impact_maps_source_merge_changes_and_uncovered_documents(
         "source-orphan",
     )["revision_id"]
 
-    result = _service(sexpr_workspace).page(
-        "sexpr-demo", "target", "source", limit=10
-    )
+    result = _service(sexpr_workspace).page("sexpr-demo", "target", "source", limit=10)
 
     assert result["format"] == MERGE_TARGET_IMPACT_FORMAT
     assert result["target_head_revision_id"] == target_head
@@ -132,9 +128,7 @@ def test_impact_reports_added_removed_and_modified_targets(sexpr_workspace) -> N
     )
     targets.set("sexpr-demo", "source", "added", "lib.weave")
 
-    result = _service(sexpr_workspace).page(
-        "sexpr-demo", "target", "source", limit=10
-    )
+    result = _service(sexpr_workspace).page("sexpr-demo", "target", "source", limit=10)
     by_name = {item["name"]: item for item in result["affected_targets"]}
 
     assert list(by_name) == ["added", "modified", "removed"]
@@ -145,9 +139,7 @@ def test_impact_reports_added_removed_and_modified_targets(sexpr_workspace) -> N
     assert by_name["removed"]["affected_reasons"] == ["target_removed"]
     assert by_name["removed"]["after"] is None
     assert by_name["modified"]["status"] == "modified"
-    assert by_name["modified"]["affected_reasons"] == [
-        "target_definition_changed"
-    ]
+    assert by_name["modified"]["affected_reasons"] == ["target_definition_changed"]
     assert by_name["modified"]["after"]["additional_documents"] == ["lib.weave"]
     assert result["changed_target_documents"] == [
         "@build-target/added",
@@ -164,9 +156,7 @@ def test_impact_paginates_deterministically(sexpr_workspace) -> None:
         targets.set("sexpr-demo", "main", name, "main.weave")
     sexpr_workspace.create_branch("sexpr-demo", "target", from_branch="main")
     sexpr_workspace.create_branch("sexpr-demo", "source", from_branch="main")
-    sexpr_workspace.set_atom(
-        "sexpr-demo", "source", "main.weave", doc["atom_id"], "changed"
-    )
+    sexpr_workspace.set_atom("sexpr-demo", "source", "main.weave", doc["atom_id"], "changed")
     service = _service(sexpr_workspace)
 
     first = service.page("sexpr-demo", "target", "source", limit=2)
@@ -196,17 +186,11 @@ def test_impact_paginates_deterministically(sexpr_workspace) -> None:
 
 def test_impact_rejects_stale_preview(sexpr_workspace) -> None:
     doc = _program_with_atom(sexpr_workspace, "main.weave", "main")
-    BuildTargetRegistry(sexpr_workspace).set(
-        "sexpr-demo", "main", "application", "main.weave"
-    )
+    BuildTargetRegistry(sexpr_workspace).set("sexpr-demo", "main", "application", "main.weave")
     sexpr_workspace.create_branch("sexpr-demo", "target", from_branch="main")
     sexpr_workspace.create_branch("sexpr-demo", "source", from_branch="main")
-    preview = MergePreviewService(sexpr_workspace).preview(
-        "sexpr-demo", "target", "source"
-    )
-    sexpr_workspace.set_atom(
-        "sexpr-demo", "source", "main.weave", doc["atom_id"], "advanced"
-    )
+    preview = MergePreviewService(sexpr_workspace).preview("sexpr-demo", "target", "source")
+    sexpr_workspace.set_atom("sexpr-demo", "source", "main.weave", doc["atom_id"], "advanced")
 
     with pytest.raises(ValidationError) as raised:
         _service(sexpr_workspace).page(
@@ -220,9 +204,7 @@ def test_impact_rejects_stale_preview(sexpr_workspace) -> None:
 
 def test_impact_rejects_conflict_without_mutation(sexpr_workspace) -> None:
     doc = _program_with_atom(sexpr_workspace, "main.weave", "base")
-    BuildTargetRegistry(sexpr_workspace).set(
-        "sexpr-demo", "main", "application", "main.weave"
-    )
+    BuildTargetRegistry(sexpr_workspace).set("sexpr-demo", "main", "application", "main.weave")
     sexpr_workspace.create_branch("sexpr-demo", "target", from_branch="main")
     sexpr_workspace.create_branch("sexpr-demo", "source", from_branch="main")
     target_head = sexpr_workspace.set_atom(

@@ -287,10 +287,7 @@ class RevisionWorkspace:
             "SELECT qualified_name, ast_json FROM module_snapshots WHERE revision_id = ?",
             (revision_id,),
         ).fetchall()
-        return {
-            str(row["qualified_name"]): json.loads(row["ast_json"])
-            for row in rows
-        }
+        return {str(row["qualified_name"]): json.loads(row["ast_json"]) for row in rows}
 
     def _commit(
         self,
@@ -317,9 +314,7 @@ class RevisionWorkspace:
         root_hash = self.db.hash_value(modules)
         with self.db.transaction() as connection:
             if expected_branch_heads is not None:
-                for expected_branch, expected_head in sorted(
-                    expected_branch_heads.items()
-                ):
+                for expected_branch, expected_head in sorted(expected_branch_heads.items()):
                     row = connection.execute(
                         """SELECT head_revision_id FROM branches
                            WHERE project_id = ? AND name = ?""",

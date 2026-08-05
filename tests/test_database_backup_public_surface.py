@@ -27,10 +27,5 @@ def test_public_application_manifest_contains_backup_contract() -> None:
     assert "database_backup_create" in tool_names
     assert "database_backup_get" in tool_names
     assert "database_restore" not in tool_names
-    assert DATABASE_BACKUP_ROOT_ENV in PUBLIC_APPLICATION_MANIFEST[
-        "configuration_variables"
-    ]
-    assert (
-        PUBLIC_APPLICATION_MANIFEST["tool_count"]
-        == len(PUBLIC_TOOL_MANIFEST["tool_names"])
-    )
+    assert DATABASE_BACKUP_ROOT_ENV in PUBLIC_APPLICATION_MANIFEST["configuration_variables"]
+    assert PUBLIC_APPLICATION_MANIFEST["tool_count"] == len(PUBLIC_TOOL_MANIFEST["tool_names"])

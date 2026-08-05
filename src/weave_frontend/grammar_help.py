@@ -134,9 +134,7 @@ class GrammarIndex:
             if size > MAX_GRAMMAR_SOURCE_BYTES:
                 self._record_failure(
                     path,
-                    ValueError(
-                        f"grammar source exceeds {MAX_GRAMMAR_SOURCE_BYTES} bytes"
-                    ),
+                    ValueError(f"grammar source exceeds {MAX_GRAMMAR_SOURCE_BYTES} bytes"),
                 )
                 continue
 
@@ -276,10 +274,7 @@ class GrammarIndex:
                 info.examples_truncated = True
                 self.examples_truncated = True
                 continue
-            if (
-                self.example_bytes_retained + example_bytes
-                > MAX_GRAMMAR_EXAMPLE_TOTAL_BYTES
-            ):
+            if self.example_bytes_retained + example_bytes > MAX_GRAMMAR_EXAMPLE_TOTAL_BYTES:
                 info.examples_truncated = True
                 self.examples_truncated = True
                 continue
@@ -299,10 +294,7 @@ class GrammarIndex:
         while stack:
             node, depth = stack.pop()
             node_count += 1
-            if (
-                node_count > MAX_GRAMMAR_EXAMPLE_NODES
-                or depth > MAX_GRAMMAR_EXAMPLE_DEPTH
-            ):
+            if node_count > MAX_GRAMMAR_EXAMPLE_NODES or depth > MAX_GRAMMAR_EXAMPLE_DEPTH:
                 return False
 
             if node.get("kind") == "list":
@@ -356,9 +348,7 @@ class GrammarIndex:
 
         if parent_form:
             children = [
-                info.as_dict(limit=2)
-                for info in self.forms.values()
-                if parent_form in info.parents
+                info.as_dict(limit=2) for info in self.forms.values() if parent_form in info.parents
             ]
             children.sort(key=lambda item: item["form"])
             return {
@@ -397,10 +387,7 @@ class GrammarIndex:
             for name, info in self.forms.items()
             if needle in name.casefold()
             or any(needle in parent.casefold() for parent in info.parents)
-            or any(
-                needle in example["sexpr"].casefold()
-                for example in info.examples
-            )
+            or any(needle in example["sexpr"].casefold() for example in info.examples)
         ]
         matches.sort(
             key=lambda item: (

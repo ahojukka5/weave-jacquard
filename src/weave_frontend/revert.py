@@ -83,9 +83,7 @@ class RevertService:
                         "format": REVERT_PREVIEW_FORMAT,
                         "preview_id": preview_id,
                         "reverted_revision_id": revision_id,
-                        "reverted_parent_revision_id": snapshot[
-                            "reverted_parent_revision_id"
-                        ],
+                        "reverted_parent_revision_id": snapshot["reverted_parent_revision_id"],
                         "reviewed_branch_head_revision_id": current_head,
                         "prospective_root_hash": snapshot["prospective_root_hash"],
                         "changed_documents": snapshot["changed_documents"],
@@ -213,9 +211,7 @@ class RevertService:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
         return {
             "revision_id": str(row["id"]),
             "parent1_revision_id": (

@@ -100,11 +100,14 @@ def test_project_merge_consumers_share_one_catalog_service(tmp_path: Path) -> No
         assert queue.catalogs is catalogs
         assert selected.catalogs is catalogs
         assert train.catalogs is catalogs
-        assert queue.page("demo", limit=1)["catalog_id"] == catalogs.capture(
-            "demo",
-            "main",
-            invalid_target_code="INVALID_MERGE_QUEUE_TARGET",
-        )["catalog_id"]
+        assert (
+            queue.page("demo", limit=1)["catalog_id"]
+            == catalogs.capture(
+                "demo",
+                "main",
+                invalid_target_code="INVALID_MERGE_QUEUE_TARGET",
+            )["catalog_id"]
+        )
 
 
 def test_project_merge_catalog_rejects_unbounded_fanout(tmp_path: Path) -> None:

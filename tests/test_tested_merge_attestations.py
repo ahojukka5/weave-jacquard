@@ -177,10 +177,7 @@ def test_attestation_rejects_nonmatching_merge_revision(
     try:
         with pytest.raises(ValidationError) as raised:
             service.attest(QUALIFICATION_ID, MERGED)
-        assert (
-            raised.value.code
-            == "MERGED_REVISION_DOES_NOT_MATCH_QUALIFIED_CANDIDATE"
-        )
+        assert raised.value.code == "MERGED_REVISION_DOES_NOT_MATCH_QUALIFIED_CANDIDATE"
     finally:
         workspace.close()
 
@@ -195,12 +192,7 @@ def test_attestation_rejects_tampered_manifest_and_qualification(tmp_path: Path)
     )
     try:
         result = service.attest(QUALIFICATION_ID, MERGED)
-        path = (
-            tmp_path
-            / "attestations"
-            / result["attestation_id"]
-            / "attestation.json"
-        )
+        path = tmp_path / "attestations" / result["attestation_id"] / "attestation.json"
         manifest = json.loads(path.read_text(encoding="utf-8"))
         manifest["all_selected_tests_passed"] = False
         path.write_text(json.dumps(manifest), encoding="utf-8")

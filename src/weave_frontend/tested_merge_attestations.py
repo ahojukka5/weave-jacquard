@@ -216,9 +216,7 @@ class TestedMergeAttestationService(CompilerArtifactMixin):
             "parent2_revision_id": subject["source_head_revision_id"],
             "root_hash": subject["merged_root_hash"],
         }
-        mismatches = [
-            field for field, value in expected.items() if revision.get(field) != value
-        ]
+        mismatches = [field for field, value in expected.items() if revision.get(field) != value]
         if mismatches:
             raise ValidationError(
                 "MERGED_REVISION_DOES_NOT_MATCH_QUALIFIED_CANDIDATE",
@@ -296,9 +294,7 @@ class TestedMergeAttestationService(CompilerArtifactMixin):
                 max_bytes=MAX_TESTED_MERGE_ATTESTATION_BYTES,
             )
         except RetainedArtifactReadError as exc:
-            raise ArtifactIntegrityError(
-                f"cannot read tested merge attestation: {exc}"
-            ) from exc
+            raise ArtifactIntegrityError(f"cannot read tested merge attestation: {exc}") from exc
         if not isinstance(value, dict):
             raise ArtifactIntegrityError("tested merge attestation root must be an object")
         return value

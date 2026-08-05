@@ -61,9 +61,7 @@ def test_revert_preserves_independent_later_edits_and_writes_new_history(
         assert preview["branch_head_revision_id"] == current_head
         assert preview["reverted_parent_revision_id"] == program_revision
         assert preview["changed_documents"] == ["main.weave"]
-        assert [item["document"] for item in preview["document_changes"]] == [
-            "main.weave"
-        ]
+        assert [item["document"] for item in preview["document_changes"]] == ["main.weave"]
         assert workspace.branch_head("demo", "main") == current_head
 
         result = service.revert(
@@ -76,15 +74,11 @@ def test_revert_preserves_independent_later_edits_and_writes_new_history(
         assert result["parent_revision_id"] == current_head
         assert result["history_rewritten"] is False
         assert workspace.branch_head("demo", "main") == result["revision_id"]
-        document_names = {
-            item["document"] for item in workspace.list_documents("demo", "main")
-        }
+        document_names = {item["document"] for item in workspace.list_documents("demo", "main")}
         assert document_names == {"main.weave", "other.weave"}
         state = workspace._state_at_revision(result["revision_id"])
         assert set(state) == {"main.weave", "other.weave"}
-        assert "do" not in {
-            head_symbol(node) for node in walk_nodes(state["main.weave"])
-        }
+        assert "do" not in {head_symbol(node) for node in walk_nodes(state["main.weave"])}
         assert any(
             node.get("kind") == "string" and node.get("value") == "independent"
             for node in walk_nodes(state["other.weave"])

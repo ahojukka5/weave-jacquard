@@ -14,9 +14,7 @@ def test_program_can_be_built_one_form_and_atom_at_a_time(sexpr_workspace):
     )
     root = created["node_id"]
 
-    entry = sexpr_workspace.create_form(
-        "sexpr-demo", "main", "fib.weave", root, "entry"
-    )
+    entry = sexpr_workspace.create_form("sexpr-demo", "main", "fib.weave", root, "entry")
     sexpr_workspace.add_atom(
         "sexpr-demo",
         "main",
@@ -26,19 +24,11 @@ def test_program_can_be_built_one_form_and_atom_at_a_time(sexpr_workspace):
         "main",
     )
 
-    function = sexpr_workspace.create_form(
-        "sexpr-demo", "main", "fib.weave", root, "fn"
-    )
+    function = sexpr_workspace.create_form("sexpr-demo", "main", "fib.weave", root, "fn")
     fn_id = function["node_id"]
-    sexpr_workspace.add_atom(
-        "sexpr-demo", "main", "fib.weave", fn_id, "symbol", "main"
-    )
-    params = sexpr_workspace.create_form(
-        "sexpr-demo", "main", "fib.weave", fn_id, "params"
-    )
-    returns = sexpr_workspace.create_form(
-        "sexpr-demo", "main", "fib.weave", fn_id, "returns"
-    )
+    sexpr_workspace.add_atom("sexpr-demo", "main", "fib.weave", fn_id, "symbol", "main")
+    params = sexpr_workspace.create_form("sexpr-demo", "main", "fib.weave", fn_id, "params")
+    returns = sexpr_workspace.create_form("sexpr-demo", "main", "fib.weave", fn_id, "returns")
     sexpr_workspace.add_atom(
         "sexpr-demo",
         "main",
@@ -47,12 +37,8 @@ def test_program_can_be_built_one_form_and_atom_at_a_time(sexpr_workspace):
         "symbol",
         "i32",
     )
-    body = sexpr_workspace.create_form(
-        "sexpr-demo", "main", "fib.weave", fn_id, "do"
-    )
-    ret = sexpr_workspace.create_form(
-        "sexpr-demo", "main", "fib.weave", body["node_id"], "return"
-    )
+    body = sexpr_workspace.create_form("sexpr-demo", "main", "fib.weave", fn_id, "do")
+    ret = sexpr_workspace.create_form("sexpr-demo", "main", "fib.weave", body["node_id"], "return")
     const = sexpr_workspace.create_form(
         "sexpr-demo", "main", "fib.weave", ret["node_id"], "const_i32"
     )

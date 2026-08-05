@@ -122,9 +122,9 @@ def test_resume_snapshot_composes_one_exact_reviewed_state(tmp_path: Path) -> No
         assert snapshot["merge_policy"]["max_affected_targets"] == 5
         assert snapshot["merge_policy"]["revision_id"] == reviewed_revision
         assert snapshot["context_count"] == 2
-        long_context = [
-            item for item in snapshot["contexts"] if item["title"] == "Long invariant"
-        ][0]
+        long_context = [item for item in snapshot["contexts"] if item["title"] == "Long invariant"][
+            0
+        ]
         assert len(long_context["body_preview"]) == MAX_CONTEXT_PREVIEW_CHARS
         assert long_context["body_truncated"] is True
         assert snapshot["operations"][0]["operation_kind"] == "set_merge_policy"

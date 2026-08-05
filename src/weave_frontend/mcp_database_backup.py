@@ -28,9 +28,7 @@ def database_backup_create(
 ) -> dict[str, Any]:
     """Create and verify one immutable online SQLite backup."""
 
-    return _result(
-        lambda: database_backups().create(timeout_seconds=timeout_seconds)
-    )
+    return _result(lambda: database_backups().create(timeout_seconds=timeout_seconds))
 
 
 @mcp.tool()

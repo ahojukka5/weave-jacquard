@@ -73,9 +73,7 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
         tools["sandbox_capabilities"] = (
             "Probe strict sandbox availability and inspect the exact enforced policy."
         )
-        tools["test_run_get"] = (
-            "Read and verify one immutable sandboxed test-run manifest."
-        )
+        tools["test_run_get"] = "Read and verify one immutable sandboxed test-run manifest."
         tools["test_run_output_page"] = (
             "Read verified bounded stdout or stderr bytes from one retained run."
         )

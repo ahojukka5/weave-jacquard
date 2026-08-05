@@ -48,12 +48,15 @@ def test_storage_report_accounts_nested_roots_once(tmp_path: Path) -> None:
     assert by_family["candidate_builds"]["logical_bytes"] == 5
     assert by_family["candidate_builds"]["nested_roots"] == []
     assert len(report["storage_snapshot_id"]) == 64
-    assert report == ArtifactStorageService(
-        {
-            "committed_builds": builds,
-            "candidate_builds": candidates,
-        }
-    ).report()
+    assert (
+        report
+        == ArtifactStorageService(
+            {
+                "committed_builds": builds,
+                "candidate_builds": candidates,
+            }
+        ).report()
+    )
 
 
 def test_storage_report_redacts_root_paths(tmp_path: Path) -> None:
@@ -214,9 +217,7 @@ def test_production_composition_binds_every_artifact_family_verifier(
     )
 
     assert mcp_storage_module._artifact_roots() == roots
-    families = {
-        family.name: family for family in mcp_storage_module._artifact_families()
-    }
+    families = {family.name: family for family in mcp_storage_module._artifact_families()}
     assert tuple(sorted(families)) == RETAINED_ARTIFACT_FAMILIES
     for name, family in families.items():
         expected_length = 64 if name == "database_backups" else 32

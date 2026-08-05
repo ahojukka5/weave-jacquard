@@ -150,9 +150,7 @@ def inspect_connection(
     checked_invariants = ["required_tables", "sqlite_quick_check"]
     skipped_invariants: list[str] = []
 
-    missing_tables = [
-        name for name in _REQUIRED_TABLES if objects.get(name) != "table"
-    ]
+    missing_tables = [name for name in _REQUIRED_TABLES if objects.get(name) != "table"]
     if missing_tables:
         issues.append(
             {
@@ -170,9 +168,7 @@ def inspect_connection(
     if quick_issue is not None:
         issues.append(quick_issue)
 
-    relational_core_present = all(
-        objects.get(name) == "table" for name in _RELATIONAL_TABLES
-    )
+    relational_core_present = all(objects.get(name) == "table" for name in _RELATIONAL_TABLES)
     semantic_metrics = {
         "revisions_checked": 0,
         "modules_checked": 0,
@@ -255,19 +251,13 @@ def require_migration_integrity(connection: sqlite3.Connection) -> None:
             """SELECT 1 FROM sqlite_master
                WHERE type = 'table' AND name = 'module_snapshots'"""
         ).fetchone()
-        allowed = (
-            {"module_snapshots_compressed"}
-            if legacy_snapshot is not None
-            else set()
-        )
+        allowed = {"module_snapshots_compressed"} if legacy_snapshot is not None else set()
         if missing - allowed:
             blocking.append(issue)
 
     if blocking:
         codes = ", ".join(str(issue["code"]) for issue in blocking)
-        raise RuntimeError(
-            "database integrity check failed before schema v3 migration: " + codes
-        )
+        raise RuntimeError("database integrity check failed before schema v3 migration: " + codes)
 
 
 def _snapshot_mode(objects: dict[str, str]) -> str | None:
@@ -285,9 +275,7 @@ def _inspect_revision_states(
     *,
     legacy: bool,
 ) -> None:
-    for row in connection.execute(
-        "SELECT id, root_hash FROM revisions ORDER BY id"
-    ):
+    for row in connection.execute("SELECT id, root_hash FROM revisions ORDER BY id"):
         revision_id = str(row[0])
         metrics["revisions_checked"] += 1
         inspection = inspect_revision_state(
@@ -417,9 +405,7 @@ def _inspect_parent_cycles(
     issues: _Issues,
 ) -> None:
     parents = {
-        str(row[0]): tuple(
-            str(parent) for parent in (row[1], row[2]) if parent is not None
-        )
+        str(row[0]): tuple(str(parent) for parent in (row[1], row[2]) if parent is not None)
         for row in connection.execute(
             "SELECT id, parent1_id, parent2_id FROM revisions ORDER BY id"
         )
@@ -522,9 +508,7 @@ def _project_link_issues(connection: sqlite3.Connection) -> list[dict[str, Any]]
            ORDER BY branch.project_id, branch.name""",
     )
     if cross_project_heads["count"]:
-        issues.append(
-            _issue_from_query("CROSS_PROJECT_BRANCH_HEAD", cross_project_heads)
-        )
+        issues.append(_issue_from_query("CROSS_PROJECT_BRANCH_HEAD", cross_project_heads))
 
     return issues
 
@@ -553,10 +537,7 @@ def _query_examples(
     count = int(connection.execute(count_query).fetchone()[0])
     cursor = connection.execute(f"{query} LIMIT ?", (MAX_INTEGRITY_EXAMPLES,))
     columns = [str(item[0]) for item in cursor.description or ()]
-    rows = [
-        {column: row[index] for index, column in enumerate(columns)}
-        for row in cursor
-    ]
+    rows = [{column: row[index] for index, column in enumerate(columns)} for row in cursor]
     return {
         "count": count,
         "examples": rows,

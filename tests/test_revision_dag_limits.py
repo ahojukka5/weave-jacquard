@@ -115,9 +115,9 @@ def test_union_analysis_fetches_each_revision_once() -> None:
     _revision(connection, "e", "c", "b")
     selects: list[str] = []
     connection.set_trace_callback(
-        lambda statement: selects.append(statement)
-        if statement.startswith("SELECT parent1_id")
-        else None
+        lambda statement: (
+            selects.append(statement) if statement.startswith("SELECT parent1_id") else None
+        )
     )
 
     analysis = analyze_common_ancestors(connection, "d", "e")

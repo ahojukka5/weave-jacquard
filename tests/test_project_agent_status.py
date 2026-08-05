@@ -180,9 +180,9 @@ def test_project_agent_status_pages_stable_catalog_and_branch_evidence(
         assert main["revisions_since_checkpoint"] == 1
         assert main["revisions_scanned"] == 2
         assert main["program_state_changed_since_checkpoint"] is True
-        assert main["checkpoint"]["checkpoint_revision_id"] == state[
-            "main_checkpoint"
-        ]["revision_id"]
+        assert (
+            main["checkpoint"]["checkpoint_revision_id"] == state["main_checkpoint"]["revision_id"]
+        )
         assert main["resume_head"]["arguments"] == {
             "project": "demo",
             "branch": "main",
@@ -214,9 +214,7 @@ def test_project_agent_status_pages_stable_catalog_and_branch_evidence(
         assert sparse["program_state_changed_since_checkpoint"] is None
 
         uncheckpointed = second["branches"][1]
-        assert uncheckpointed["head_revision_id"] == state["uncheckpointed_head"][
-            "revision_id"
-        ]
+        assert uncheckpointed["head_revision_id"] == state["uncheckpointed_head"]["revision_id"]
         assert uncheckpointed["checkpoint_state"] == "not_found_within_scan"
         assert uncheckpointed["checkpoint_scan_limit_reached"] is True
 

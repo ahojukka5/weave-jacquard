@@ -29,9 +29,7 @@ def _changed_workspace(sexpr_workspace):
     )
     base_revision = removed["revision_id"]
 
-    sexpr_workspace.set_atom(
-        "sexpr-demo", "main", "main.weave", number["node_id"], 2
-    )
+    sexpr_workspace.set_atom("sexpr-demo", "main", "main.weave", number["node_id"], 2)
     added = sexpr_workspace.add_atom(
         "sexpr-demo", "main", "main.weave", right["node_id"], "boolean", True
     )
@@ -42,9 +40,7 @@ def _changed_workspace(sexpr_workspace):
         number["node_id"],
         right["node_id"],
     )
-    target = sexpr_workspace.delete_node(
-        "sexpr-demo", "main", "main.weave", removed["node_id"]
-    )
+    target = sexpr_workspace.delete_node("sexpr-demo", "main", "main.weave", removed["node_id"])
     return {
         "base_revision": base_revision,
         "target_revision": target["revision_id"],
@@ -139,9 +135,7 @@ def test_revision_diff_supports_explicit_non_head_target(sexpr_workspace) -> Non
 
 def test_revision_diff_reports_document_addition_and_removal(sexpr_workspace) -> None:
     empty_revision = sexpr_workspace.branch_head("sexpr-demo", "main")
-    created = sexpr_workspace.create_program(
-        "sexpr-demo", "main", "new.weave", program_name="new"
-    )
+    created = sexpr_workspace.create_program("sexpr-demo", "main", "new.weave", program_name="new")
     service = RevisionNodeDiffService(sexpr_workspace)
 
     added = service.page(
@@ -162,15 +156,11 @@ def test_revision_diff_reports_document_addition_and_removal(sexpr_workspace) ->
     assert added["base_document_present"] is False
     assert added["target_document_present"] is True
     assert added["total_change_count"] == added["target_node_count"]
-    assert {kind for change in added["changes"] for kind in change["change_kinds"]} == {
-        "added"
-    }
+    assert {kind for change in added["changes"] for kind in change["change_kinds"]} == {"added"}
     assert removed["base_document_present"] is True
     assert removed["target_document_present"] is False
     assert removed["total_change_count"] == removed["base_node_count"]
-    assert {
-        kind for change in removed["changes"] for kind in change["change_kinds"]
-    } == {"removed"}
+    assert {kind for change in removed["changes"] for kind in change["change_kinds"]} == {"removed"}
 
 
 def test_revision_diff_rejects_foreign_revisions_and_missing_documents(

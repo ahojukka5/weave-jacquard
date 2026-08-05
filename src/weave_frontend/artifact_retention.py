@@ -106,15 +106,11 @@ class ArtifactRetentionPlanner:
         }
         aggregate = {
             "selected_entry_count": len(planned),
-            "projected_logical_bytes": sum(
-                item["logical_bytes"] for item in planned
-            ),
+            "projected_logical_bytes": sum(item["logical_bytes"] for item in planned),
             "regular_files": sum(item["regular_files"] for item in planned),
             "directories": sum(item["directories"] for item in planned),
             "symlinks": sum(item["symlinks"] for item in planned),
-            "special_entries": sum(
-                item["special_entries"] for item in planned
-            ),
+            "special_entries": sum(item["special_entries"] for item in planned),
             "entries_scanned": sum(item["entries_scanned"] for item in planned),
         }
         identity = {
@@ -167,18 +163,14 @@ class ArtifactRetentionPlanner:
                     item["entry_id"],
                 )
             )
-            retained = {
-                item["entry_id"]
-                for item in matching[: rule["minimum_retained_count"]]
-            }
+            retained = {item["entry_id"] for item in matching[: rule["minimum_retained_count"]]}
             protected = set(rule["protected_artifact_ids"])
             chosen = [
                 item
                 for item in matching
                 if item["entry_id"] not in retained
                 and item["artifact_id"] not in protected
-                and as_of_unix_ns - item["mtime_ns"]
-                >= rule["minimum_age_seconds"] * 1_000_000_000
+                and as_of_unix_ns - item["mtime_ns"] >= rule["minimum_age_seconds"] * 1_000_000_000
             ]
             selected.extend((item, rule) for item in chosen)
             reports.append(
@@ -199,13 +191,9 @@ class ArtifactRetentionPlanner:
         return [
             {
                 "family": family,
-                "selected_entry_count": sum(
-                    item["family"] == family for item in entries
-                ),
+                "selected_entry_count": sum(item["family"] == family for item in entries),
                 "projected_logical_bytes": sum(
-                    item["logical_bytes"]
-                    for item in entries
-                    if item["family"] == family
+                    item["logical_bytes"] for item in entries if item["family"] == family
                 ),
             }
             for family in sorted({item["family"] for item in entries})

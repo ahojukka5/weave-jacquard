@@ -110,8 +110,7 @@ class ProjectAgentStatusService:
         if len(rows) > MAX_AGENT_STATUS_BRANCH_CATALOG:
             raise ValidationError(
                 "AGENT_STATUS_BRANCH_FANOUT_EXCEEDED",
-                "project agent status supports at most "
-                f"{MAX_AGENT_STATUS_BRANCH_CATALOG} branches",
+                f"project agent status supports at most {MAX_AGENT_STATUS_BRANCH_CATALOG} branches",
             )
         return [
             {
@@ -156,9 +155,7 @@ class ProjectAgentStatusService:
         complete_history_scanned = checkpoint_view is None and current is None
         if checkpoint_view is None:
             checkpoint_state = (
-                "not_found_within_scan"
-                if scan_limit_reached
-                else "none_in_first_parent_history"
+                "not_found_within_scan" if scan_limit_reached else "none_in_first_parent_history"
             )
             checkpoint_summary = None
             program_state_changed_since_checkpoint = None
@@ -214,12 +211,8 @@ class ProjectAgentStatusService:
             ),
             "checkpoint_scan_limit_reached": scan_limit_reached,
             "complete_first_parent_history_scanned": complete_history_scanned,
-            "checkpoint_lag_lower_bound": (
-                revisions_scanned if scan_limit_reached else None
-            ),
-            "program_state_changed_since_checkpoint": (
-                program_state_changed_since_checkpoint
-            ),
+            "checkpoint_lag_lower_bound": (revisions_scanned if scan_limit_reached else None),
+            "program_state_changed_since_checkpoint": (program_state_changed_since_checkpoint),
             "resume_head": {
                 "tool": "branch_resume_snapshot",
                 "arguments": {
@@ -270,17 +263,11 @@ class ProjectAgentStatusService:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
         return {
             "id": str(row["id"]),
-            "parent1_id": (
-                str(row["parent1_id"]) if row["parent1_id"] is not None else None
-            ),
-            "parent2_id": (
-                str(row["parent2_id"]) if row["parent2_id"] is not None else None
-            ),
+            "parent1_id": (str(row["parent1_id"]) if row["parent1_id"] is not None else None),
+            "parent2_id": (str(row["parent2_id"]) if row["parent2_id"] is not None else None),
             "message": str(row["message"]),
             "author": str(row["author"]),
             "root_hash": str(row["root_hash"]),
@@ -289,12 +276,7 @@ class ProjectAgentStatusService:
 
     @staticmethod
     def _validate_limit(name: str, value: Any, maximum: int) -> None:
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or value < 1
-            or value > maximum
-        ):
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > maximum:
             raise ValidationError(
                 "INVALID_AGENT_STATUS_LIMIT",
                 f"{name} must be an integer between 1 and {maximum}",

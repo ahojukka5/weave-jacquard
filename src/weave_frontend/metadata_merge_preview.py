@@ -39,9 +39,7 @@ class MergePreviewService(_BaseMergePreviewService):
     ) -> dict[str, Any]:
         """Validate metadata and publish against the exact inspected heads."""
 
-        if preview_id is not None and (
-            not isinstance(preview_id, str) or not preview_id
-        ):
+        if preview_id is not None and (not isinstance(preview_id, str) or not preview_id):
             raise ValidationError(
                 "INVALID_MERGE_PREVIEW_ID",
                 "preview_id must be a non-empty string",

@@ -44,12 +44,8 @@ class RecordingValidator:
 
 
 def test_target_validation_uses_pinned_revision_and_source_order(sexpr_workspace):
-    sexpr_workspace.import_program(
-        "sexpr-demo", "main", "main.weave", MAIN_SOURCE
-    )
-    sexpr_workspace.import_program(
-        "sexpr-demo", "main", "lib.weave", LIB_SOURCE
-    )
+    sexpr_workspace.import_program("sexpr-demo", "main", "main.weave", MAIN_SOURCE)
+    sexpr_workspace.import_program("sexpr-demo", "main", "lib.weave", LIB_SOURCE)
 
     registry = BuildTargetRegistry(sexpr_workspace)
     target = registry.set(

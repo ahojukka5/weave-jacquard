@@ -45,9 +45,7 @@ class MergeTargetImpactService(_Base):
         target_state = self.previews.workspace._state_at_revision(
             str(candidate["target_head_revision_id"])
         )
-        changed_documents = {
-            str(change["document"]) for change in candidate["document_changes"]
-        }
+        changed_documents = {str(change["document"]) for change in candidate["document_changes"]}
         changed_program_documents = sorted(
             name for name in changed_documents if not is_project_metadata_document(name)
         )
@@ -72,16 +70,10 @@ class MergeTargetImpactService(_Base):
             str(item["name"]) for item in affected if item["after"] is not None
         }
         candidate_covered_documents = sorted(
-            {
-                document
-                for config in after_targets.values()
-                for document in self._documents(config)
-            }
+            {document for config in after_targets.values() for document in self._documents(config)}
             & set(changed_program_documents)
         )
-        uncovered = sorted(
-            set(changed_program_documents) - set(candidate_covered_documents)
-        )
+        uncovered = sorted(set(changed_program_documents) - set(candidate_covered_documents))
         return {
             "format": MERGE_TARGET_IMPACT_FORMAT,
             "project": project,

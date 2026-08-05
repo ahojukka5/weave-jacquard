@@ -22,9 +22,7 @@ from .sandbox import BubblewrapSandbox, SandboxBackend, SandboxLimits
 from .test_targets import TEST_TARGET_NAME
 
 MERGE_CANDIDATE_TEST_BATCH_FORMAT = "weave-merge-candidate-test-batch-v1"
-MERGE_CANDIDATE_TEST_OUTPUT_PAGE_FORMAT = (
-    "weave-merge-candidate-test-output-page-v1"
-)
+MERGE_CANDIDATE_TEST_OUTPUT_PAGE_FORMAT = "weave-merge-candidate-test-output-page-v1"
 MERGE_CANDIDATE_TEST_BATCH_ID = re.compile(r"^[0-9a-f]{32}$")
 MAX_MERGE_CANDIDATE_TEST_MANIFEST_BYTES = 4 * 1024 * 1024
 MAX_MERGE_CANDIDATE_TESTS = 64
@@ -108,9 +106,7 @@ class MergeCandidateTestBatchService(CompilerArtifactMixin):
         )
         try:
             results: list[dict[str, Any]] = []
-            for index, (name, definition) in enumerate(
-                zip(selected, definitions, strict=True)
-            ):
+            for index, (name, definition) in enumerate(zip(selected, definitions, strict=True)):
                 build = built[str(definition["build_target"])]
                 if build.get("status") != "succeeded":
                     results.append(
@@ -164,14 +160,13 @@ class MergeCandidateTestBatchService(CompilerArtifactMixin):
                 assertions = {
                     "completed_without_timeout": not observed.timed_out,
                     "completed_without_output_limit": not observed.output_limited,
-                    "exit_code": observed.returncode
-                    == int(definition["expected_exit_code"]),
+                    "exit_code": observed.returncode == int(definition["expected_exit_code"]),
                     "stdout": observed.stdout == expected_stdout,
                     "stderr": observed.stderr == expected_stderr,
                 }
                 passed = all(assertions.values())
-                output_directory = temporary_directory / "outputs" / (
-                    f"{index:03d}-{self._safe_name(name)}"
+                output_directory = (
+                    temporary_directory / "outputs" / (f"{index:03d}-{self._safe_name(name)}")
                 )
                 output_directory.mkdir(parents=True)
                 stdout_path = output_directory / "stdout.bin"
@@ -337,9 +332,7 @@ class MergeCandidateTestBatchService(CompilerArtifactMixin):
         self._validate_page_number("start_byte", start_byte, 0, None)
         self._validate_page_number("max_bytes", max_bytes, 1, MAX_OUTPUT_PAGE_BYTES)
         manifest = self.get(qualification_id)
-        result_items = [
-            item for item in manifest["results"] if item["test_target"] == test_target
-        ]
+        result_items = [item for item in manifest["results"] if item["test_target"] == test_target]
         if len(result_items) != 1:
             raise NotFoundError(
                 f"test target {test_target!r} has no retained output in qualification"
@@ -347,9 +340,7 @@ class MergeCandidateTestBatchService(CompilerArtifactMixin):
         result = result_items[0]
         relative = result.get("artifacts", {}).get(stream)
         if not isinstance(relative, str):
-            raise NotFoundError(
-                f"test target {test_target!r} has no retained {stream} output"
-            )
+            raise NotFoundError(f"test target {test_target!r} has no retained {stream} output")
         directory = self._qualification_directory(qualification_id)
         path = self._artifact_path(directory, relative)
         if path is None or not path.is_file():
@@ -414,9 +405,7 @@ class MergeCandidateTestBatchService(CompilerArtifactMixin):
             raise ArtifactIntegrityError("merge candidate definition order is invalid")
         if [item.get("test_target") for item in results] != selected:
             raise ArtifactIntegrityError("merge candidate result order is invalid")
-        expected_definitions = [
-            self._definition_from_state(state, name) for name in selected
-        ]
+        expected_definitions = [self._definition_from_state(state, name) for name in selected]
         expected_bindings = [
             {
                 "test_target": name,
@@ -468,9 +457,7 @@ class MergeCandidateTestBatchService(CompilerArtifactMixin):
             ("error", "error_test_count"),
         ):
             if manifest.get(field) != counts[outcome]:
-                raise ArtifactIntegrityError(
-                    f"merge candidate {outcome} count is invalid"
-                )
+                raise ArtifactIntegrityError(f"merge candidate {outcome} count is invalid")
         if manifest.get("selected_test_count") != len(selected):
             raise ArtifactIntegrityError("merge candidate selected count is invalid")
         expected_status = (
@@ -618,9 +605,7 @@ class MergeCandidateTestBatchService(CompilerArtifactMixin):
                 "qualification_id escapes run root",
             )
         if require_exists and not directory.is_dir():
-            raise NotFoundError(
-                f"merge candidate qualification {qualification_id!r} not found"
-            )
+            raise NotFoundError(f"merge candidate qualification {qualification_id!r} not found")
         return directory
 
     @staticmethod

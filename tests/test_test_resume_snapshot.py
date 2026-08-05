@@ -74,16 +74,12 @@ def test_resume_snapshot_separates_programs_and_bounded_test_summaries(
         assert snapshot["snapshot_id"] == repeated["snapshot_id"]
         assert snapshot["revision_id"] == second["revision_id"]
         assert snapshot["program_document_count"] == 1
-        assert [item["document"] for item in snapshot["program_documents"]] == [
-            "main.weave"
-        ]
+        assert [item["document"] for item in snapshot["program_documents"]] == ["main.weave"]
         assert snapshot["test_target_count"] == 2
         assert snapshot["returned_test_target_count"] == 1
         assert snapshot["test_targets_truncated"] is True
         assert snapshot["limits"]["test_target_limit"] == 1
-        alpha_root = workspace._state_at_revision(second["revision_id"])[
-            "@test-target/alpha"
-        ]
+        alpha_root = workspace._state_at_revision(second["revision_id"])["@test-target/alpha"]
         assert snapshot["test_targets"] == [
             {
                 "name": "alpha",
@@ -113,9 +109,7 @@ def test_resume_snapshot_separates_programs_and_bounded_test_summaries(
                 },
             }
         ]
-        assert snapshot["test_recovery"]["arguments"]["revision_id"] == second[
-            "revision_id"
-        ]
+        assert snapshot["test_recovery"]["arguments"]["revision_id"] == second["revision_id"]
         assert "expected_stdout" not in snapshot["test_targets"][0]
 
         before_tests = service.snapshot(

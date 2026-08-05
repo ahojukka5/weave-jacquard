@@ -130,9 +130,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             assert "expected_revision_id" in properties, (tool_name, properties)
 
         await _call(session, trace, "project_initialize", project=PROJECT)
-        initial = _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        initial = _main_head(await _call(session, trace, "branch_list", project=PROJECT))
 
         program = await _call(
             session,
@@ -206,9 +204,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             expected_revision_id=target["revision_id"],
         )
         assert stale_target["code"] == "STALE_BRANCH_HEAD"
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == head
+        assert _main_head(await _call(session, trace, "branch_list", project=PROJECT)) == head
 
         support = await _call(
             session,
@@ -233,9 +229,10 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             additional_documents=["library.weave", "support.weave"],
         )
         assert unprepared_target["base_revision_id"] == head
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == unprepared_target["revision_id"]
+        assert (
+            _main_head(await _call(session, trace, "branch_list", project=PROJECT))
+            == unprepared_target["revision_id"]
+        )
 
     (tmp_path / "program-target-concurrency-trace.json").write_text(
         json.dumps(trace, indent=2, sort_keys=True) + "\n",
@@ -253,9 +250,5 @@ def test_real_mcp_enforces_program_and_target_concurrency(tmp_path: Path) -> Non
     rejected = [entry for entry in writes if entry["payload"]["ok"] is False]
     assert len(successful) == 6
     assert len(rejected) == 2
-    assert all(
-        "base_revision_id" in entry["payload"]["result"] for entry in successful
-    )
-    assert {entry["payload"]["error"]["code"] for entry in rejected} == {
-        "STALE_BRANCH_HEAD"
-    }
+    assert all("base_revision_id" in entry["payload"]["result"] for entry in successful)
+    assert {entry["payload"]["error"]["code"] for entry in rejected} == {"STALE_BRANCH_HEAD"}

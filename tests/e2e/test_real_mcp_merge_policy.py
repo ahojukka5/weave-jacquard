@@ -288,9 +288,10 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert merged["preflight_id"] == ready["preflight_id"]
         assert merged["merge_policy_enforced"] is True
         assert merged["target_merge_policy"]["policy_hash"] == strict["policy_hash"]
-        assert merged["merge_validation_set"]["validation_set_id"] == ready[
-            "validation_set"
-        ]["validation_set_id"]
+        assert (
+            merged["merge_validation_set"]["validation_set_id"]
+            == ready["validation_set"]["validation_set_id"]
+        )
         await _run_executable(session, trace, branch="target", expected=30)
 
         await _call(
@@ -353,15 +354,13 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             **protected["publication_arguments"],
         )
         assert protected_merge["source_policy_ignored"] is True
-        assert protected_merge["target_merge_policy"]["policy_hash"] == strict[
-            "policy_hash"
-        ]
+        assert protected_merge["target_merge_policy"]["policy_hash"] == strict["policy_hash"]
         await _run_executable(session, trace, branch="target", expected=31)
 
         branches = await _call(session, trace, "branch_list", project=PROJECT)
-        target_before_limit = {
-            item["name"]: item["head_revision_id"] for item in branches
-        }["target"]
+        target_before_limit = {item["name"]: item["head_revision_id"] for item in branches}[
+            "target"
+        ]
         limited = await _call(
             session,
             trace,
@@ -462,9 +461,7 @@ def test_real_mcp_enforces_target_branch_merge_policy(tmp_path: Path) -> None:
     trace = asyncio.run(_run(tmp_path, compiler))
 
     policies = [entry for entry in trace if entry["tool"] == "merge_policy_set"]
-    preflights = [
-        entry for entry in trace if entry["tool"] == "branch_merge_preflight"
-    ]
+    preflights = [entry for entry in trace if entry["tool"] == "branch_merge_preflight"]
     assert len(policies) == 4
     assert len(preflights) == 5
     assert preflights[0]["payload"]["result"]["ready_for_publication"] is True

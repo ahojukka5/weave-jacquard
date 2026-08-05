@@ -33,9 +33,7 @@ class MergeCandidateBuildService(_BoundedMergeCandidateBuildService):
                 f"cannot read merge candidate build manifest: {exc}"
             ) from exc
         if not isinstance(value, dict):
-            raise ArtifactIntegrityError(
-                "merge candidate build manifest root must be an object"
-            )
+            raise ArtifactIntegrityError("merge candidate build manifest root must be an object")
         return value
 
     def _publish(self, temporary: Path, final: Path, build_id: str) -> None:

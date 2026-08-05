@@ -72,9 +72,7 @@ def test_checkpoint_compare_forwards_exact_revisions(monkeypatch) -> None:
 
     assert response["ok"] is True
     assert response["result"]["comparison_id"] == "comparison-1"
-    assert timelines.compare_calls == [
-        (("demo", "checkpoint-a", "checkpoint-b"), {})
-    ]
+    assert timelines.compare_calls == [(("demo", "checkpoint-a", "checkpoint-b"), {})]
 
 
 def test_checkpoint_timeline_factory_uses_shared_registry() -> None:

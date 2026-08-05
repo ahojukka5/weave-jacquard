@@ -111,9 +111,7 @@ class TestResumeSnapshotService(CheckpointResumeSnapshotService):
         limit: int,
     ) -> tuple[list[dict[str, Any]], int]:
         modules = self._revision_modules(revision_id)
-        names = sorted(
-            name for name in modules if name.startswith(TEST_TARGET_PREFIX)
-        )
+        names = sorted(name for name in modules if name.startswith(TEST_TARGET_PREFIX))
         page = names[:limit]
         result: list[dict[str, Any]] = []
         for storage_document in page:
@@ -128,12 +126,8 @@ class TestResumeSnapshotService(CheckpointResumeSnapshotService):
                     "argument_count": len(config["arguments"]),
                     "expected_exit_code": config["expected_exit_code"],
                     "stdin_bytes": len(config["stdin"].encode("utf-8")),
-                    "expected_stdout_bytes": len(
-                        config["expected_stdout"].encode("utf-8")
-                    ),
-                    "expected_stderr_bytes": len(
-                        config["expected_stderr"].encode("utf-8")
-                    ),
+                    "expected_stdout_bytes": len(config["expected_stdout"].encode("utf-8")),
+                    "expected_stderr_bytes": len(config["expected_stderr"].encode("utf-8")),
                     "timeout_ms": config["timeout_ms"],
                     "max_memory_bytes": config["max_memory_bytes"],
                     "max_output_bytes": config["max_output_bytes"],

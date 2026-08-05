@@ -132,17 +132,11 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
         tools["branch_revert_preview"] = (
             "Preview one conflict-aware inverse without moving the branch."
         )
-        tools["branch_revert"] = (
-            "Publish the exact reviewed inverse as a new immutable revision."
-        )
+        tools["branch_revert"] = "Publish the exact reviewed inverse as a new immutable revision."
     if topic in {"workflow", "read"}:
         tools = help_value.setdefault("tools", {})
-        tools["database_backup_create"] = (
-            "Create and verify one immutable online SQLite backup."
-        )
-        tools["database_backup_get"] = (
-            "Read and reverify one immutable database backup."
-        )
+        tools["database_backup_create"] = "Create and verify one immutable online SQLite backup."
+        tools["database_backup_get"] = "Read and reverify one immutable database backup."
         tools["artifact_storage_report"] = (
             "Report bounded retained usage and aggregate publication quota state."
         )

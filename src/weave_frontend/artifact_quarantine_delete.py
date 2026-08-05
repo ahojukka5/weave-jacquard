@@ -18,12 +18,8 @@ from .artifact_retention_policy import hash_json, is_sha256
 from .errors import ValidationError
 
 ARTIFACT_QUARANTINE_DELETE_FORMAT = "weave-artifact-quarantine-delete-v1"
-ARTIFACT_QUARANTINE_DELETE_INTENT_FORMAT = (
-    "weave-artifact-quarantine-delete-intent-v1"
-)
-ARTIFACT_QUARANTINE_DELETE_RESULT_FORMAT = (
-    "weave-artifact-quarantine-delete-result-v1"
-)
+ARTIFACT_QUARANTINE_DELETE_INTENT_FORMAT = "weave-artifact-quarantine-delete-intent-v1"
+ARTIFACT_QUARANTINE_DELETE_RESULT_FORMAT = "weave-artifact-quarantine-delete-result-v1"
 _MAX_UNIX_NS = 2**63 - 1
 
 _DELETE_INTENT_KEYS = {
@@ -82,9 +78,7 @@ class ArtifactQuarantineDeleteService:
 
     def __init__(self, reconciliation: Any) -> None:
         if not hasattr(reconciliation, "inventory"):
-            raise TypeError(
-                "reconciliation must expose its retained artifact inventory"
-            )
+            raise TypeError("reconciliation must expose its retained artifact inventory")
         self.reconciliation = reconciliation
         self.io = ArtifactQuarantineIO(reconciliation)
         self.state = ArtifactQuarantineState(reconciliation)
@@ -170,10 +164,7 @@ class ArtifactQuarantineDeleteService:
                         as_of_unix_ns=as_of_unix_ns,
                     )
                     current = self.state.snapshot()
-                    if (
-                        current["database_snapshot_id"]
-                        != delete_intent["database_snapshot_id"]
-                    ):
+                    if current["database_snapshot_id"] != delete_intent["database_snapshot_id"]:
                         raise ValidationError(
                             "ARTIFACT_QUARANTINE_DELETE_DATABASE_CHANGED",
                             "database changed after permanent-delete intent",
@@ -369,9 +360,7 @@ class ArtifactQuarantineDeleteService:
             "artifact_id": entry.get("artifact_id"),
             "original_classification": entry["classification"],
             "original_entry_type": entry["entry_type"],
-            "minimum_holding_seconds": verification[
-                "minimum_holding_seconds"
-            ],
+            "minimum_holding_seconds": verification["minimum_holding_seconds"],
             "as_of_unix_ns": verification["as_of_unix_ns"],
             "deleted_at_unix_ns": deleted_at_unix_ns,
             "plan_limits": dict(quarantine_intent["plan_limits"]),
@@ -394,11 +383,7 @@ class ArtifactQuarantineDeleteService:
         if not isinstance(value, Mapping) or set(value) != _DELETE_INTENT_KEYS:
             self._metadata_error("delete intent has invalid or missing fields")
         intent = dict(value)
-        identity = {
-            name: item
-            for name, item in intent.items()
-            if name != "delete_intent_id"
-        }
+        identity = {name: item for name, item in intent.items() if name != "delete_intent_id"}
         if intent["delete_intent_id"] != hash_json(identity):
             self._metadata_error("delete intent identity is invalid")
         expected = {
@@ -415,9 +400,8 @@ class ArtifactQuarantineDeleteService:
             "minimum_holding_seconds": minimum_holding_seconds,
             "as_of_unix_ns": as_of_unix_ns,
         }
-        if (
-            intent["format"] != ARTIFACT_QUARANTINE_DELETE_INTENT_FORMAT
-            or any(intent.get(name) != item for name, item in expected.items())
+        if intent["format"] != ARTIFACT_QUARANTINE_DELETE_INTENT_FORMAT or any(
+            intent.get(name) != item for name, item in expected.items()
         ):
             self._metadata_error("delete intent does not match the exact request")
         self._require_unix_ns(
@@ -461,11 +445,7 @@ class ArtifactQuarantineDeleteService:
         if not isinstance(value, Mapping) or set(value) != _DELETE_RESULT_KEYS:
             self._metadata_error("delete result has invalid or missing fields")
         result = dict(value)
-        identity = {
-            name: item
-            for name, item in result.items()
-            if name != "delete_result_id"
-        }
+        identity = {name: item for name, item in result.items() if name != "delete_result_id"}
         if result["delete_result_id"] != hash_json(identity):
             self._metadata_error("delete result identity is invalid")
         if result != self._build_result(delete_intent):

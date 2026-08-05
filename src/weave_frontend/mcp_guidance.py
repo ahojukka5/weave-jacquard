@@ -151,9 +151,7 @@ _TOPICS: dict[str, dict[str, Any]] = {
             ),
             "node_find": "Find stable IDs by form head, atom kind, or value.",
             "program_render": "Render canonical source or an annotated agent view.",
-            "program_source_list": (
-                "List compiler source documents at a branch head or revision."
-            ),
+            "program_source_list": ("List compiler source documents at a branch head or revision."),
             "branch_history_page": (
                 "Read bounded first-parent pages with an explicit continuation."
             ),
@@ -209,8 +207,7 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "and revisions avoided by grouping."
         ),
         "interpretation": (
-            "Metrics are descriptive. Do not maximize batch size merely to reduce "
-            "revision count."
+            "Metrics are descriptive. Do not maximize batch size merely to reduce revision count."
         ),
     },
     "policy": {

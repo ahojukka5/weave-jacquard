@@ -175,9 +175,7 @@ def test_conflict_preview_is_non_mutating_and_publish_returns_conflict(
     target = sexpr_workspace.set_atom(
         "sexpr-demo", "target", "main.weave", atom["node_id"], "target"
     )
-    sexpr_workspace.set_atom(
-        "sexpr-demo", "source", "main.weave", atom["node_id"], "source"
-    )
+    sexpr_workspace.set_atom("sexpr-demo", "source", "main.weave", atom["node_id"], "source")
     service = MergePreviewService(sexpr_workspace)
 
     preview = service.preview("sexpr-demo", "target", "source")

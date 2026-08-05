@@ -171,9 +171,7 @@ def test_integrity_report_streams_and_bounds_foreign_key_examples(
     finally:
         connection.close()
 
-    issue = next(
-        item for item in report["issues"] if item["code"] == "FOREIGN_KEY_VIOLATIONS"
-    )
+    issue = next(item for item in report["issues"] if item["code"] == "FOREIGN_KEY_VIOLATIONS")
     assert issue["count"] == 25
     assert len(issue["examples"]) == 20
     assert issue["examples_truncated"] is True

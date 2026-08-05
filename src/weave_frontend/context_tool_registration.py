@@ -39,9 +39,7 @@ CORE_TOOL_NAMES: tuple[str, ...] = (
 def _clone_tool_model(name: str, tool: Any) -> Any:
     model_copy = getattr(tool, "model_copy", None)
     if not callable(model_copy):
-        raise FastMCPRegistryError(
-            f"foundational MCP tool {name!r} cannot be cloned locally"
-        )
+        raise FastMCPRegistryError(f"foundational MCP tool {name!r} cannot be cloned locally")
     try:
         clone = model_copy(update={})
     except Exception as exc:
@@ -49,13 +47,9 @@ def _clone_tool_model(name: str, tool: Any) -> Any:
             f"foundational MCP tool {name!r} could not be cloned locally"
         ) from exc
     if clone is tool:
-        raise FastMCPRegistryError(
-            f"foundational MCP tool {name!r} reused its shared object"
-        )
+        raise FastMCPRegistryError(f"foundational MCP tool {name!r} reused its shared object")
     if getattr(clone, "fn", None) is not getattr(tool, "fn", None):
-        raise FastMCPRegistryError(
-            f"foundational MCP tool {name!r} changed its canonical callable"
-        )
+        raise FastMCPRegistryError(f"foundational MCP tool {name!r} changed its canonical callable")
     return clone
 
 

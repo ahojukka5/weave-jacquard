@@ -154,9 +154,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         assert "no program execution" in help_payload["help"]["execution"]
 
         await _call(session, trace, "project_initialize", project=PROJECT)
-        initial = _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        initial = _main_head(await _call(session, trace, "branch_list", project=PROJECT))
         program = await _call(
             session,
             trace,
@@ -249,14 +247,10 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             revision_id=created["revision_id"],
             test_target_limit=10,
         )
-        assert [item["document"] for item in snapshot["program_documents"]] == [
-            "main.weave"
-        ]
+        assert [item["document"] for item in snapshot["program_documents"]] == ["main.weave"]
         assert [item["name"] for item in snapshot["test_targets"]] == ["cli-smoke"]
         assert snapshot["test_targets"][0]["expected_stdout_bytes"] == 5
-        assert snapshot["test_targets"][0]["definition_hash"] == created[
-            "definition_hash"
-        ]
+        assert snapshot["test_targets"][0]["definition_hash"] == created["definition_hash"]
 
         stale = await _call_error(
             session,
@@ -296,9 +290,10 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         assert current["arguments"] == ["--count", "4"]
         assert current["expected_stdout"] == "updated\n"
         assert current["definition_hash"] == updated["definition_hash"]
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == updated["revision_id"]
+        assert (
+            _main_head(await _call(session, trace, "branch_list", project=PROJECT))
+            == updated["revision_id"]
+        )
 
     return trace
 
@@ -316,9 +311,7 @@ def _verify_database(tmp_path: Path) -> None:
             "set_test_target",
             "set_test_target",
         ]
-        assert all(
-            str(row["target"]) == "@test-target/cli-smoke" for row in operations
-        )
+        assert all(str(row["target"]) == "@test-target/cli-smoke" for row in operations)
         stale_rows = connection.execute(
             """SELECT COUNT(*) AS count FROM module_snapshots
                WHERE qualified_name = '@test-target/stale'"""
@@ -347,6 +340,4 @@ def test_real_mcp_publishes_revisioned_test_targets(tmp_path: Path) -> None:
     assert len(test_writes) == 3
     assert len([entry for entry in test_writes if entry["payload"]["ok"] is True]) == 2
     rejected = [entry for entry in test_writes if entry["payload"]["ok"] is False]
-    assert [entry["payload"]["error"]["code"] for entry in rejected] == [
-        "STALE_BRANCH_HEAD"
-    ]
+    assert [entry["payload"]["error"]["code"] for entry in rejected] == ["STALE_BRANCH_HEAD"]

@@ -74,9 +74,13 @@ class WeavecValidator:
     def _active_binary(self) -> Path | None:
         """Return a currently executable compiler, re-resolving stale paths."""
 
-        if self.binary is not None and self.binary.is_file() and os.access(
-            self.binary,
-            os.X_OK,
+        if (
+            self.binary is not None
+            and self.binary.is_file()
+            and os.access(
+                self.binary,
+                os.X_OK,
+            )
         ):
             return self.binary
         # Prefer the snapshot/constructor path over env/PATH rediscovery so
@@ -96,9 +100,7 @@ class WeavecValidator:
         if not sources:
             raise ValueError("at least one source document is required")
         if any(
-            not isinstance(document, str)
-            or not document
-            or not isinstance(source, str)
+            not isinstance(document, str) or not document or not isinstance(source, str)
             for document, source in sources
         ):
             raise ValueError("source documents require non-empty names and string content")
@@ -222,9 +224,7 @@ class WeavecValidator:
     def _safe_basename(document: str) -> str:
         basename = document.replace("\\", "/").rsplit("/", 1)[-1]
         safe = "".join(
-            character
-            if character.isalnum() or character in {".", "_", "-"}
-            else "_"
+            character if character.isalnum() or character in {".", "_", "-"} else "_"
             for character in basename
         )
         if not safe:

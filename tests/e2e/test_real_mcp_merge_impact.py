@@ -276,6 +276,4 @@ def test_real_mcp_reports_affected_targets_and_uncovered_documents(tmp_path: Pat
     impacts = [entry for entry in trace if entry["tool"] == "branch_merge_impact"]
     assert len(impacts) == 2
     assert [entry["payload"]["result"]["returned_count"] for entry in impacts] == [1, 1]
-    assert impacts[0]["payload"]["result"]["uncovered_changed_documents"] == [
-        "orphan.weave"
-    ]
+    assert impacts[0]["payload"]["result"]["uncovered_changed_documents"] == ["orphan.weave"]

@@ -55,9 +55,7 @@ class RuntimeIdentityWithServices:
                     "identity": registry["_jacquard_identity"],
                     "error": None,
                 }
-        result["service_graph"] = runtime_services().service_manifest(
-            include_state=False
-        )
+        result["service_graph"] = runtime_services().service_manifest(include_state=False)
         result["runtime_id"] = RuntimeIdentityService._hash_json(result)
         return result
 

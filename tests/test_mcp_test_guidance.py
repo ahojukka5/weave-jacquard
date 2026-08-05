@@ -46,6 +46,4 @@ def test_read_and_write_help_add_test_tools_without_mutating_base_topics() -> No
     assert "test_target_set" in write_tools
     assert "hashed sandbox-ready" in write_tools["test_target_set"]
     assert "test_target_delete" in write_tools
-    assert weave_help("merge_train") == mcp_merge_train_guidance.weave_help(
-        "merge_train"
-    )
+    assert weave_help("merge_train") == mcp_merge_train_guidance.weave_help("merge_train")

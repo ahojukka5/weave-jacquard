@@ -42,9 +42,7 @@ class _FakeFastMCP:
 def test_train_guidance_layers_without_mutating_selected_topics() -> None:
     base_workflow = mcp_selected_preflight_guidance.weave_help("workflow")
     base_read = mcp_selected_preflight_guidance.weave_help("read")
-    base_selected = mcp_selected_preflight_guidance.weave_help(
-        "selected_preflight_batch"
-    )
+    base_selected = mcp_selected_preflight_guidance.weave_help("selected_preflight_batch")
 
     server = _FakeFastMCP()
     install_merge_train_guidance(server)
@@ -55,10 +53,7 @@ def test_train_guidance_layers_without_mutating_selected_topics() -> None:
     assert "merge trains" in server.descriptions["weave_help"]
     assert mcp_selected_preflight_guidance.weave_help("workflow") == base_workflow
     assert mcp_selected_preflight_guidance.weave_help("read") == base_read
-    assert (
-        mcp_selected_preflight_guidance.weave_help("selected_preflight_batch")
-        == base_selected
-    )
+    assert mcp_selected_preflight_guidance.weave_help("selected_preflight_batch") == base_selected
 
 
 def test_train_instructions_explain_order_effects_and_refresh_boundary() -> None:

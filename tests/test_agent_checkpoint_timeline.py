@@ -168,9 +168,9 @@ def test_checkpoint_timeline_pages_first_parent_history_deterministically(
         )
         assert second_page["start_is_branch_head"] is False
         assert second_page["returned_checkpoint_count"] == 1
-        assert second_page["checkpoints"][0]["checkpoint_revision_id"] == state[
-            "first"
-        ]["revision_id"]
+        assert (
+            second_page["checkpoints"][0]["checkpoint_revision_id"] == state["first"]["revision_id"]
+        )
         assert second_page["has_more"] is False
         assert second_page["next_revision_id"] is None
 
@@ -221,16 +221,10 @@ def test_checkpoint_comparison_reports_structural_progress_deltas(tmp_path: Path
         }
         assert result["objective"]["changed"] is True
         assert result["summary"]["changed"] is True
-        assert result["list_deltas"]["completed"]["added"] == [
-            "timeline implementation"
-        ]
+        assert result["list_deltas"]["completed"]["added"] == ["timeline implementation"]
         assert result["list_deltas"]["completed"]["removed"] == []
-        assert result["list_deltas"]["next_steps"]["added"] == [
-            "write documentation"
-        ]
-        assert result["list_deltas"]["next_steps"]["removed"] == [
-            "implement timeline"
-        ]
+        assert result["list_deltas"]["next_steps"]["added"] == ["write documentation"]
+        assert result["list_deltas"]["next_steps"]["removed"] == ["implement timeline"]
         assert result["list_deltas"]["open_questions"]["removed"] == [
             "how should sparse history be bounded?"
         ]
@@ -251,9 +245,7 @@ def test_checkpoint_comparison_of_same_revision_is_unchanged(tmp_path: Path) -> 
         assert result["status"]["changed"] is False
         assert result["objective"]["changed"] is False
         assert result["summary"]["changed"] is False
-        assert all(
-            delta["changed"] is False for delta in result["list_deltas"].values()
-        )
+        assert all(delta["changed"] is False for delta in result["list_deltas"].values())
 
 
 def test_checkpoint_comparison_requires_exact_checkpoint_revisions(tmp_path: Path) -> None:

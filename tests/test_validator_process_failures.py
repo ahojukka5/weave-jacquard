@@ -26,10 +26,7 @@ def test_validator_launch_failure_is_structured(tmp_path: Path) -> None:
 def test_validator_timeout_preserves_partial_output(tmp_path: Path) -> None:
     compiler = tmp_path / "weavec"
     compiler.write_text(
-        "#!/bin/sh\n"
-        "printf 'partial stdout'\n"
-        "printf 'partial stderr' >&2\n"
-        "while :; do :; done\n",
+        "#!/bin/sh\nprintf 'partial stdout'\nprintf 'partial stderr' >&2\nwhile :; do :; done\n",
         encoding="utf-8",
     )
     compiler.chmod(0o755)

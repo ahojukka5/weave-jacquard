@@ -133,9 +133,7 @@ async def _run(tmp_path: Path) -> None:
             "weave_help",
         } <= names
 
-        resume = _payload(
-            await session.call_tool("weave_help", arguments={"topic": "resume"})
-        )
+        resume = _payload(await session.call_tool("weave_help", arguments={"topic": "resume"}))
         assert resume["ok"] is True
         assert resume["help"]["revision"].startswith("Omit revision_id")
         assert "checkpoint_revision_id" in resume["help"]["checkpoint"]
@@ -270,9 +268,7 @@ async def _run(tmp_path: Path) -> None:
         assert "refresh the complete catalog" in train["help"]["publication"]
         assert "can change conflicts and redundancy" in train["help"]["ordering"]
 
-        read = _payload(
-            await session.call_tool("weave_help", arguments={"topic": "read"})
-        )
+        read = _payload(await session.call_tool("weave_help", arguments={"topic": "read"}))
         assert read["ok"] is True
         assert "project_agent_status_page" in read["help"]["tools"]
         assert "project_merge_queue_page" in read["help"]["tools"]
@@ -280,9 +276,7 @@ async def _run(tmp_path: Path) -> None:
         assert "selected_merge_preflight_batch" in read["help"]["tools"]
         assert "selected_merge_train_preview" in read["help"]["tools"]
 
-        workflow = _payload(
-            await session.call_tool("weave_help", arguments={"topic": "workflow"})
-        )
+        workflow = _payload(await session.call_tool("weave_help", arguments={"topic": "workflow"}))
         assert workflow["ok"] is True
         assert workflow["help"]["steps"][0] == (
             "branch_resume_snapshot first when resuming existing work"

@@ -193,9 +193,10 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             preview_id=stale_preview["preview_id"],
         )
         assert stale_error["code"] == "STALE_REVERT_PREVIEW"
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == advanced["revision_id"]
+        assert (
+            _main_head(await _call(session, trace, "branch_list", project=PROJECT))
+            == advanced["revision_id"]
+        )
 
         preview = await _call(
             session,
@@ -220,9 +221,10 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         assert result["parent_revision_id"] == advanced["revision_id"]
         assert result["history_rewritten"] is False
         assert result["changed_documents"] == ["main.weave"]
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == result["revision_id"]
+        assert (
+            _main_head(await _call(session, trace, "branch_list", project=PROJECT))
+            == result["revision_id"]
+        )
 
         main_render = await _call(
             session,

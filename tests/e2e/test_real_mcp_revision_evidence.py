@@ -69,7 +69,7 @@ def _main_head(branches: list[dict[str, Any]]) -> str:
 
 def _fake_compiler(path: Path) -> Path:
     path.write_text(
-        r'''#!/usr/bin/env python3
+        r"""#!/usr/bin/env python3
 from __future__ import annotations
 
 import json
@@ -132,7 +132,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-''',
+""",
         encoding="utf-8",
     )
     path.chmod(0o755)
@@ -200,9 +200,7 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert "retained artifacts" in help_payload["help"]["boundary"]
 
         await _call(session, trace, "project_initialize", project=PROJECT)
-        initial = _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        initial = _main_head(await _call(session, trace, "branch_list", project=PROJECT))
         program = await _call(
             session,
             trace,
@@ -213,9 +211,7 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             program_name="revision-evidence",
             expected_revision_id=initial,
         )
-        head_before_build = _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        head_before_build = _main_head(await _call(session, trace, "branch_list", project=PROJECT))
         assert head_before_build == program["revision_id"]
 
         build = await _call(
@@ -227,9 +223,10 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             revision_id=program["revision_id"],
         )
         assert build["status"] == "succeeded"
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == head_before_build
+        assert (
+            _main_head(await _call(session, trace, "branch_list", project=PROJECT))
+            == head_before_build
+        )
 
         page = await _call(
             session,
@@ -286,9 +283,10 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         )
         assert empty_runs["matched_evidence_count"] == 0
         assert [node["kind"] for node in empty_runs["nodes"]] == ["revision"]
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == head_before_build
+        assert (
+            _main_head(await _call(session, trace, "branch_list", project=PROJECT))
+            == head_before_build
+        )
 
     return trace
 
@@ -301,9 +299,7 @@ def test_real_mcp_recovers_verified_build_evidence_by_revision(tmp_path: Path) -
         json.dumps(trace, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    evidence_calls = [
-        entry for entry in trace if entry["tool"] == "revision_evidence_page"
-    ]
+    evidence_calls = [entry for entry in trace if entry["tool"] == "revision_evidence_page"]
     assert len(evidence_calls) == 3
     assert evidence_calls[0]["payload"]["result"]["matched_evidence_count"] == 1
     assert evidence_calls[-1]["payload"]["result"]["matched_evidence_count"] == 0

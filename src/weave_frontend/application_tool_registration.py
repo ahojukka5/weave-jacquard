@@ -15,9 +15,7 @@ if TYPE_CHECKING:
 
     from .mcp_capabilities import ApplicationContext
 
-_CANONICAL_FUNCTION_ATTRIBUTE = (
-    "__weave_jacquard_canonical_tool_function__"
-)
+_CANONICAL_FUNCTION_ATTRIBUTE = "__weave_jacquard_canonical_tool_function__"
 
 
 async def _call_with_runtime(
@@ -48,9 +46,7 @@ def _bind_tool_to_runtime(
     function = getattr(tool, "fn", None)
     model_copy = getattr(tool, "model_copy", None)
     if not callable(function) or not callable(model_copy):
-        raise FastMCPRegistryError(
-            f"registered tool {name!r} cannot be cloned for runtime binding"
-        )
+        raise FastMCPRegistryError(f"registered tool {name!r} cannot be cloned for runtime binding")
     canonical = _canonical_function(name, function)
 
     @wraps(canonical)
@@ -73,9 +69,7 @@ def _bind_tool_to_runtime(
             f"registered tool {name!r} runtime clone did not retain its wrapper"
         )
     if getattr(clone, "is_async", None) is not True:
-        raise FastMCPRegistryError(
-            f"registered tool {name!r} runtime clone is not asynchronous"
-        )
+        raise FastMCPRegistryError(f"registered tool {name!r} runtime clone is not asynchronous")
     return clone
 
 
@@ -85,9 +79,7 @@ def install_registered_application_tools(
 ) -> tuple[str, ...]:
     """Install exact canonical tool objects onto one application server."""
 
-    return FastMCPRegistryAdapter(context.server).replace_tools_from(
-        registration_server
-    )
+    return FastMCPRegistryAdapter(context.server).replace_tools_from(registration_server)
 
 
 def finalize_registered_application_tools(
@@ -104,9 +96,7 @@ def finalize_registered_application_tools(
     expected_names = set(source_names)
     local_names = set(local_contract_names)
     if any(not isinstance(name, str) or not name for name in local_names):
-        raise FastMCPRegistryError(
-            "application-local contract names must be non-empty strings"
-        )
+        raise FastMCPRegistryError("application-local contract names must be non-empty strings")
     unknown_local = tuple(sorted(local_names - expected_names))
     if unknown_local:
         raise FastMCPRegistryError(
@@ -123,22 +113,16 @@ def finalize_registered_application_tools(
         )
     installed_names = target.retain_tools(source_names)
 
-    source_contracts = {
-        contract["name"]: contract for contract in source.tool_contracts()
-    }
-    target_contracts = {
-        contract["name"]: contract for contract in target.tool_contracts()
-    }
+    source_contracts = {contract["name"]: contract for contract in source.tool_contracts()}
+    target_contracts = {contract["name"]: contract for contract in target.tool_contracts()}
     mismatched = tuple(
         name
         for name in source_names
-        if name not in local_names
-        and target_contracts[name] != source_contracts[name]
+        if name not in local_names and target_contracts[name] != source_contracts[name]
     )
     if mismatched:
         raise FastMCPRegistryError(
-            "explicit application tool assembly changed canonical contracts "
-            f"{mismatched!r}"
+            f"explicit application tool assembly changed canonical contracts {mismatched!r}"
         )
     return installed_names
 

@@ -59,9 +59,7 @@ def test_smallest_node_is_selected_for_compiler_span() -> None:
         revision_id="revision-1",
         document="main.weave",
     )
-    return_span = next(
-        span for span in node_map["nodes"] if span["node_id"] == "n_return"
-    )
+    return_span = next(span for span in node_map["nodes"] if span["node_id"] == "n_return")
 
     assert (
         smallest_node_for_span(

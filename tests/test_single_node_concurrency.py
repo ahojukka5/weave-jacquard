@@ -162,15 +162,19 @@ def test_stale_prepared_node_write_publishes_nothing(tmp_path: Path) -> None:
 
         assert raised.value.code == "STALE_BRANCH_HEAD"
         assert workspace.branch_head("demo", "main") == accepted["revision_id"]
-        assert workspace.db.connection.execute(
-            "SELECT COUNT(*) AS count FROM revisions"
-        ).fetchone()["count"] == revision_count
-        assert workspace.db.connection.execute(
-            "SELECT COUNT(*) AS count FROM operations"
-        ).fetchone()["count"] == operation_count
-        assert workspace.find_nodes(
-            "demo", "main", "main.weave", head="stale"
-        ) == []
+        assert (
+            workspace.db.connection.execute("SELECT COUNT(*) AS count FROM revisions").fetchone()[
+                "count"
+            ]
+            == revision_count
+        )
+        assert (
+            workspace.db.connection.execute("SELECT COUNT(*) AS count FROM operations").fetchone()[
+                "count"
+            ]
+            == operation_count
+        )
+        assert workspace.find_nodes("demo", "main", "main.weave", head="stale") == []
 
 
 @pytest.mark.parametrize("value", ["", 3, False])
@@ -239,12 +243,14 @@ def test_unprepared_write_rejects_mid_call_branch_advance(
 
         assert raised.value.code == "STALE_BRANCH_HEAD"
         assert workspace.branch_head("demo", "main") == competitor_result["revision_id"]
-        assert workspace.db.connection.execute(
-            "SELECT COUNT(*) AS count FROM revisions"
-        ).fetchone()["count"] == revision_count + 1
-        assert workspace.find_nodes(
-            "demo", "main", "main.weave", head="would-clobber"
-        ) == []
-        assert workspace.find_nodes(
-            "demo", "main", "main.weave", value=99
-        )[0]["node_id"] == competitor_result["node_id"]
+        assert (
+            workspace.db.connection.execute("SELECT COUNT(*) AS count FROM revisions").fetchone()[
+                "count"
+            ]
+            == revision_count + 1
+        )
+        assert workspace.find_nodes("demo", "main", "main.weave", head="would-clobber") == []
+        assert (
+            workspace.find_nodes("demo", "main", "main.weave", value=99)[0]["node_id"]
+            == competitor_result["node_id"]
+        )

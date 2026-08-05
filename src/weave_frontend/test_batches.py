@@ -382,11 +382,7 @@ class TestBatchService(CompilerArtifactMixin):
             if manifest.get(field) != counts[outcome]:
                 raise ArtifactIntegrityError(f"test batch {outcome} count is invalid")
         expected_status = (
-            "incomplete"
-            if counts["error"]
-            else "failed"
-            if counts["failed"]
-            else "passed"
+            "incomplete" if counts["error"] else "failed" if counts["failed"] else "passed"
         )
         if status != expected_status or manifest.get("all_passed") is not (
             expected_status == "passed"
@@ -410,10 +406,7 @@ class TestBatchService(CompilerArtifactMixin):
         return (
             isinstance(value, list)
             and 1 <= len(value) <= MAX_TEST_BATCH_TARGETS
-            and all(
-                isinstance(name, str) and TEST_TARGET_NAME.fullmatch(name)
-                for name in value
-            )
+            and all(isinstance(name, str) and TEST_TARGET_NAME.fullmatch(name) for name in value)
             and len(set(value)) == len(value)
         )
 
@@ -429,9 +422,7 @@ class TestBatchService(CompilerArtifactMixin):
         field: str,
     ) -> None:
         if actual != expected:
-            raise ArtifactIntegrityError(
-                f"test batch {field} is invalid: {test_target!r}"
-            )
+            raise ArtifactIntegrityError(f"test batch {field} is invalid: {test_target!r}")
 
     @staticmethod
     def _hash_json(value: dict[str, Any]) -> str:

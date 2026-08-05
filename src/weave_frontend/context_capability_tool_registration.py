@@ -10,18 +10,14 @@ from .fastmcp_registry import FastMCPRegistryAdapter, FastMCPRegistryError
 if TYPE_CHECKING:
     from .mcp_capabilities import ApplicationContext
 
-_CANONICAL_FUNCTION_ATTRIBUTE = (
-    "__weave_jacquard_canonical_tool_function__"
-)
+_CANONICAL_FUNCTION_ATTRIBUTE = "__weave_jacquard_canonical_tool_function__"
 
 
 def _canonical_function(name: str, tool: Any) -> Any:
     function = getattr(tool, "fn", None)
     canonical = getattr(function, _CANONICAL_FUNCTION_ATTRIBUTE, function)
     if not callable(canonical):
-        raise FastMCPRegistryError(
-            f"registered capability tool {name!r} has no canonical callable"
-        )
+        raise FastMCPRegistryError(f"registered capability tool {name!r} has no canonical callable")
     return canonical
 
 
@@ -39,8 +35,7 @@ def capability_tool_names(
         sorted(
             name
             for name, tool in tools.items()
-            if getattr(_canonical_function(name, tool), "__module__", None)
-            == module.__name__
+            if getattr(_canonical_function(name, tool), "__module__", None) == module.__name__
         )
     )
 
@@ -48,9 +43,7 @@ def capability_tool_names(
 def _clone_tool_model(name: str, tool: Any) -> Any:
     model_copy = getattr(tool, "model_copy", None)
     if not callable(model_copy):
-        raise FastMCPRegistryError(
-            f"capability MCP tool {name!r} cannot be cloned locally"
-        )
+        raise FastMCPRegistryError(f"capability MCP tool {name!r} cannot be cloned locally")
     try:
         clone = model_copy(update={})
     except Exception as exc:
@@ -58,13 +51,9 @@ def _clone_tool_model(name: str, tool: Any) -> Any:
             f"capability MCP tool {name!r} could not be cloned locally"
         ) from exc
     if clone is tool:
-        raise FastMCPRegistryError(
-            f"capability MCP tool {name!r} reused its shared object"
-        )
+        raise FastMCPRegistryError(f"capability MCP tool {name!r} reused its shared object")
     if getattr(clone, "fn", None) is not getattr(tool, "fn", None):
-        raise FastMCPRegistryError(
-            f"capability MCP tool {name!r} changed its canonical callable"
-        )
+        raise FastMCPRegistryError(f"capability MCP tool {name!r} changed its canonical callable")
     return clone
 
 
@@ -99,9 +88,7 @@ def install_context_capability_tools(
             "fn",
             None,
         ):
-            raise FastMCPRegistryError(
-                f"capability MCP tool {name!r} lost its canonical callable"
-            )
+            raise FastMCPRegistryError(f"capability MCP tool {name!r} lost its canonical callable")
     return installed
 
 

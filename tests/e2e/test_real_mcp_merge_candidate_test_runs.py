@@ -92,7 +92,7 @@ def _branch_heads(branches: list[dict[str, Any]]) -> dict[str, str]:
 
 def _fake_compiler(path: Path) -> Path:
     path.write_text(
-        r'''#!/usr/bin/env python3
+        r"""#!/usr/bin/env python3
 from __future__ import annotations
 
 import json
@@ -158,7 +158,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-''',
+""",
         encoding="utf-8",
     )
     path.chmod(0o755)
@@ -219,9 +219,7 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert capabilities["policy"]["filesystem"] == "isolated"
 
         await _call(session, trace, "project_initialize", project=PROJECT)
-        initial = _branch_heads(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )["main"]
+        initial = _branch_heads(await _call(session, trace, "branch_list", project=PROJECT))["main"]
         program = await _call(
             session,
             trace,
@@ -296,9 +294,7 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
             replace=True,
             expected_revision_id=base_revision,
         )
-        heads_before = _branch_heads(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        heads_before = _branch_heads(await _call(session, trace, "branch_list", project=PROJECT))
         assert heads_before == {
             "feature": feature["revision_id"],
             "main": base_revision,
@@ -480,9 +476,7 @@ def test_real_mcp_executes_virtual_merge_candidate_tests(tmp_path: Path) -> None
         json.dumps(attestation_trace, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    execution_calls = [
-        entry for entry in trace if entry["tool"] == "branch_merge_test_batch_run"
-    ]
+    execution_calls = [entry for entry in trace if entry["tool"] == "branch_merge_test_batch_run"]
     assert len(execution_calls) == 1
     result = execution_calls[0]["payload"]["result"]
     assert result["status"] == "failed"

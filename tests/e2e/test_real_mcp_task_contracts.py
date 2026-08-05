@@ -149,9 +149,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         assert "whole-document scope" in help_payload["help"]["scope"]
 
         await _call(session, trace, "project_initialize", project=PROJECT)
-        initial = _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        initial = _main_head(await _call(session, trace, "branch_list", project=PROJECT))
         program = await _call(
             session,
             trace,
@@ -360,12 +358,11 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         operation_payload = audit["operations"][0]["payload"]
         assert operation_payload["task_contract"]["task"] == "implementation"
         assert operation_payload["task_contract"]["actor"] == "agent-a"
-        assert operation_payload["task_contract"]["contract_hash"] == applied[
-            "task_contract_hash"
-        ]
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == applied["revision_id"]
+        assert operation_payload["task_contract"]["contract_hash"] == applied["task_contract_hash"]
+        assert (
+            _main_head(await _call(session, trace, "branch_list", project=PROJECT))
+            == applied["revision_id"]
+        )
 
     return trace
 

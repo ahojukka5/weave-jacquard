@@ -259,9 +259,7 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
             "branch_list",
             project=PROJECT,
         )
-        heads_before = {
-            item["name"]: item["head_revision_id"] for item in branches_before
-        }
+        heads_before = {item["name"]: item["head_revision_id"] for item in branches_before}
 
         first = await _call(
             session,
@@ -289,9 +287,10 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         assert clean["changed_documents"] == ["clean-one.weave"]
         assert clean["changed_documents_truncated"] is True
         assert clean["source_checkpoint"]["checkpoint_state"] == "head"
-        assert clean["source_checkpoint"]["checkpoint"][
-            "checkpoint_revision_id"
-        ] == clean_checkpoint["revision_id"]
+        assert (
+            clean["source_checkpoint"]["checkpoint"]["checkpoint_revision_id"]
+            == clean_checkpoint["revision_id"]
+        )
         assert clean["preflight"]["arguments"]["preview_id"] == clean["preview_id"]
 
         replayed_preview = await _call(
@@ -302,9 +301,7 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         )
         assert replayed_preview["preview_id"] == clean["preview_id"]
         assert replayed_preview["target_head_revision_id"] == target_head["revision_id"]
-        assert replayed_preview["source_head_revision_id"] == clean_checkpoint[
-            "revision_id"
-        ]
+        assert replayed_preview["source_head_revision_id"] == clean_checkpoint["revision_id"]
 
         conflict = first["sources"][1]
         assert conflict["classification"] == "conflicted"
@@ -336,9 +333,7 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         assert noop["mergeable"] is True
         assert noop["changed_document_count"] == 0
         assert noop["merged_root_hash"] == noop["target_root_hash"]
-        assert noop["source_checkpoint"]["checkpoint_state"] == (
-            "none_in_first_parent_history"
-        )
+        assert noop["source_checkpoint"]["checkpoint_state"] == ("none_in_first_parent_history")
 
         branches_after_reads = await _call(
             session,
@@ -409,9 +404,9 @@ def _verify_read_only_database(tmp_path: Path) -> None:
                WHERE operation_kind LIKE '%merge%'"""
         ).fetchone()["count"]
         assert merge_operations == 0
-        branch_count = connection.execute(
-            "SELECT COUNT(*) AS count FROM branches"
-        ).fetchone()["count"]
+        branch_count = connection.execute("SELECT COUNT(*) AS count FROM branches").fetchone()[
+            "count"
+        ]
         assert branch_count == 4
     finally:
         connection.close()
@@ -429,7 +424,5 @@ def test_real_mcp_pages_project_merge_queue(tmp_path: Path) -> None:
     assert len(reads) == 4
     assert sum(entry["payload"]["ok"] is True for entry in reads) == 3
     assert [
-        entry["payload"]["error"]["code"]
-        for entry in reads
-        if entry["payload"]["ok"] is False
+        entry["payload"]["error"]["code"] for entry in reads if entry["payload"]["ok"] is False
     ] == ["STALE_PROJECT_MERGE_QUEUE_CATALOG"]

@@ -165,9 +165,7 @@ def test_project_merge_queue_pages_exact_catalog_and_compact_previews(
         assert "does not represent merge priority" in first["priority_note"]
 
         clean = first["sources"][0]
-        assert clean["source_head_revision_id"] == state["clean_checkpoint"][
-            "revision_id"
-        ]
+        assert clean["source_head_revision_id"] == state["clean_checkpoint"]["revision_id"]
         assert clean["classification"] == "clean_changes"
         assert clean["mergeable"] is True
         assert clean["conflict_count"] == 0
@@ -198,26 +196,20 @@ def test_project_merge_queue_pages_exact_catalog_and_compact_previews(
         }
 
         conflict = first["sources"][1]
-        assert conflict["source_head_revision_id"] == state["conflict_head"][
-            "revision_id"
-        ]
+        assert conflict["source_head_revision_id"] == state["conflict_head"]["revision_id"]
         assert conflict["classification"] == "conflicted"
         assert conflict["mergeable"] is False
         assert conflict["conflict_count"] >= 1
         assert len(conflict["conflicts"]) == 1
         assert state["atom"]["node_id"] in conflict["conflicts"][0]
-        assert conflict["conflicts_truncated"] is (
-            conflict["conflict_count"] > 1
-        )
+        assert conflict["conflicts_truncated"] is (conflict["conflict_count"] > 1)
         assert conflict["changed_document_count"] == 0
         assert conflict["merged_root_hash"] is None
         assert conflict["preflight"] is None
         assert conflict["source_checkpoint"]["checkpoint_state"] == "behind_head"
         assert conflict["source_checkpoint"]["checkpoint_is_head"] is False
         assert conflict["source_checkpoint"]["revisions_since_checkpoint"] == 1
-        assert conflict["source_checkpoint"][
-            "program_state_changed_since_checkpoint"
-        ] is True
+        assert conflict["source_checkpoint"]["program_state_changed_since_checkpoint"] is True
 
         second = service.page(
             "demo",
@@ -236,9 +228,7 @@ def test_project_merge_queue_pages_exact_catalog_and_compact_previews(
         assert noop["mergeable"] is True
         assert noop["changed_document_count"] == 0
         assert noop["merged_root_hash"] == noop["target_root_hash"]
-        assert noop["source_checkpoint"]["checkpoint_state"] == (
-            "none_in_first_parent_history"
-        )
+        assert noop["source_checkpoint"]["checkpoint_state"] == ("none_in_first_parent_history")
         assert noop["preflight"]["arguments"]["preview_id"] == noop["preview_id"]
 
 

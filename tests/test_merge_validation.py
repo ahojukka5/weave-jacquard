@@ -191,9 +191,7 @@ def test_candidate_validation_rejects_stale_preview(
     tmp_path: Path,
 ) -> None:
     values = _clean_candidate(sexpr_workspace)
-    preview = MergePreviewService(sexpr_workspace).preview(
-        "sexpr-demo", "target", "source"
-    )
+    preview = MergePreviewService(sexpr_workspace).preview("sexpr-demo", "target", "source")
     sexpr_workspace.create_form(
         "sexpr-demo",
         "source",
@@ -233,17 +231,11 @@ def test_candidate_validation_reports_conflict_before_compiler(
         "string",
         "base",
     )
-    BuildTargetRegistry(sexpr_workspace).set(
-        "sexpr-demo", "main", "application", "main.weave"
-    )
+    BuildTargetRegistry(sexpr_workspace).set("sexpr-demo", "main", "application", "main.weave")
     sexpr_workspace.create_branch("sexpr-demo", "target", from_branch="main")
     sexpr_workspace.create_branch("sexpr-demo", "source", from_branch="main")
-    sexpr_workspace.set_atom(
-        "sexpr-demo", "target", "main.weave", atom["node_id"], "target"
-    )
-    sexpr_workspace.set_atom(
-        "sexpr-demo", "source", "main.weave", atom["node_id"], "source"
-    )
+    sexpr_workspace.set_atom("sexpr-demo", "target", "main.weave", atom["node_id"], "target")
+    sexpr_workspace.set_atom("sexpr-demo", "source", "main.weave", atom["node_id"], "source")
     fake = _FakeValidator(
         _compiler(tmp_path),
         {"available": True, "valid": True, "returncode": 0},
@@ -251,9 +243,7 @@ def test_candidate_validation_reports_conflict_before_compiler(
     sexpr_workspace.validator = fake
 
     with pytest.raises(ConflictError):
-        _service(sexpr_workspace).validate(
-            "sexpr-demo", "target", "source", "application"
-        )
+        _service(sexpr_workspace).validate("sexpr-demo", "target", "source", "application")
 
     assert fake.calls == []
 
@@ -273,9 +263,7 @@ def test_validation_output_is_bounded(sexpr_workspace, tmp_path: Path) -> None:
         },
     )
 
-    result = _service(sexpr_workspace).validate(
-        "sexpr-demo", "target", "source", "application"
-    )
+    result = _service(sexpr_workspace).validate("sexpr-demo", "target", "source", "application")
 
     assert len(result["stdout"]) == MAX_VALIDATION_OUTPUT_CHARACTERS
     assert len(result["stderr"]) == MAX_VALIDATION_OUTPUT_CHARACTERS
@@ -290,9 +278,7 @@ def test_validation_output_is_bounded(sexpr_workspace, tmp_path: Path) -> None:
 def test_unavailable_compiler_blocks_validated_publication(sexpr_workspace) -> None:
     _clean_candidate(sexpr_workspace)
     sexpr_workspace.validator = _UnavailableValidator()
-    result = _service(sexpr_workspace).validate(
-        "sexpr-demo", "target", "source", "application"
-    )
+    result = _service(sexpr_workspace).validate("sexpr-demo", "target", "source", "application")
 
     assert result["available"] is False
     assert result["valid"] is None

@@ -79,9 +79,7 @@ def validate_node(node: Any) -> None:
     if kind == "integer" and (not isinstance(value, int) or isinstance(value, bool)):
         raise ValidationError("INVALID_VALUE", "integer value must be an integer", node_id=node_id)
     if kind == "float" and (
-        isinstance(value, bool)
-        or not isinstance(value, (int, float))
-        or not math.isfinite(value)
+        isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
     ):
         raise ValidationError(
             "INVALID_VALUE",

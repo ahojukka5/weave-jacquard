@@ -82,9 +82,7 @@ class RevisionNodeDiffService:
         before, before_order = self._flatten(base_root)
         after, after_order = self._flatten(target_root)
         changes = self._changes(before, before_order, after, after_order)
-        counts = Counter(
-            kind for change in changes for kind in change["change_kinds"]
-        )
+        counts = Counter(kind for change in changes for kind in change["change_kinds"])
 
         page = changes[effective_start : effective_start + effective_limit]
         next_index = effective_start + len(page)
@@ -206,9 +204,7 @@ class RevisionNodeDiffService:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
 
     @staticmethod
     def _validate_start_index(start_index: int) -> None:

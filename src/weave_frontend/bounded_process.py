@@ -135,10 +135,7 @@ def _collect(
 
             events = selector.select(timeout=min(remaining, 0.1))
             if not events and process.poll() is not None:
-                events = [
-                    (key, selectors.EVENT_READ)
-                    for key in list(selector.get_map().values())
-                ]
+                events = [(key, selectors.EVENT_READ) for key in list(selector.get_map().values())]
             for key, _ in events:
                 stream = key.fileobj
                 chunk = _read_stream(stream)

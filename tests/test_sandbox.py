@@ -179,7 +179,7 @@ def test_bubblewrap_denies_host_files_and_host_network(tmp_path: Path) -> None:
     accepted, _ = server.accept()
     accepted.close()
 
-    script = r'''
+    script = r"""
 secret=$1
 port=$2
 if [[ -e "$secret" ]]; then
@@ -189,7 +189,7 @@ if { exec 3<>"/dev/tcp/127.0.0.1/$port"; } 2>/dev/null; then
     exit 81
 fi
 printf 'isolated\n'
-'''
+"""
     try:
         result = sandbox.run(
             Path(bash),

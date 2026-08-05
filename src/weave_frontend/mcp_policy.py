@@ -71,9 +71,7 @@ def _validate_modes(
             "INVALID_MERGE_VALIDATION_MODE",
             "allow_uncovered_documents requires validate_affected_targets",
         )
-    if preflight_id is not None and (
-        not isinstance(preflight_id, str) or not preflight_id
-    ):
+    if preflight_id is not None and (not isinstance(preflight_id, str) or not preflight_id):
         raise ValidationError(
             "INVALID_MERGE_PREFLIGHT_ID",
             "preflight_id must be a non-empty string",
@@ -83,8 +81,7 @@ def _validate_modes(
     ):
         raise ValidationError(
             "INVALID_MERGE_VALIDATION_MODE",
-            "preflight replay requires validate_affected_targets "
-            "and no validation_target",
+            "preflight replay requires validate_affected_targets and no validation_target",
         )
 
 
@@ -170,18 +167,12 @@ def _publish_merge_with_policy(
     )
     target_policy = policy_context["target"]
 
-    if (
-        allow_uncovered_documents
-        and target_policy["allow_uncovered_documents"] is not True
-    ):
+    if allow_uncovered_documents and target_policy["allow_uncovered_documents"] is not True:
         raise ValidationError(
             "MERGE_POLICY_VIOLATION",
             "target merge policy forbids uncovered-document overrides",
         )
-    if (
-        target_policy["require_affected_validation"] is True
-        and not validate_affected_targets
-    ):
+    if target_policy["require_affected_validation"] is True and not validate_affected_targets:
         raise ValidationError(
             "MERGE_POLICY_AFFECTED_VALIDATION_REQUIRED",
             "target merge policy requires all affected surviving targets to validate",

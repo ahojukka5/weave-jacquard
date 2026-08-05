@@ -156,9 +156,7 @@ def branch_create(
     from_branch: str = "main",
 ) -> dict[str, Any]:
     """Create an independent agent branch from an existing branch head."""
-    return _result(
-        lambda: workspace().create_branch(project, branch, from_branch=from_branch)
-    )
+    return _result(lambda: workspace().create_branch(project, branch, from_branch=from_branch))
 
 
 @mcp.tool()
@@ -294,9 +292,7 @@ def node_set_atom(
     value: Any,
 ) -> dict[str, Any]:
     """Change one atom value while preserving its stable node ID."""
-    return _result(
-        lambda: workspace().set_atom(project, branch, document, node_id, value)
-    )
+    return _result(lambda: workspace().set_atom(project, branch, document, node_id, value))
 
 
 @mcp.tool()

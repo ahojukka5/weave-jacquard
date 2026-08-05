@@ -22,9 +22,7 @@ class _Server:
 
 def _runtime(tmp_path: Path, name: str) -> RuntimeServices:
     return RuntimeServices(
-        RuntimeConfig.from_environ(
-            {"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")}
-        )
+        RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")})
     )
 
 
@@ -134,10 +132,7 @@ def test_metadata_installers_route_through_test_target_owner(
         )
 
     assert observed == [context.runtime]
-    assert all(
-        not context.runtime.service_initialized(name)
-        for name in service_names
-    )
+    assert all(not context.runtime.service_initialized(name) for name in service_names)
 
 
 def test_artifact_installer_rebuilds_quota_on_context_runtime(

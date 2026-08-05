@@ -26,8 +26,7 @@ _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
 def _location_id(path: Path) -> str:
     return hashlib.sha256(
-        b"weave-database-location-v1\0"
-        + str(path.resolve()).encode("utf-8")
+        b"weave-database-location-v1\0" + str(path.resolve()).encode("utf-8")
     ).hexdigest()
 
 
@@ -66,9 +65,7 @@ def _families(
             return values[artifact_id]
 
         pattern = _HEX64 if family == "database_backups" else _HEX32
-        families.append(
-            RetainedArtifactFamily(family, root, pattern, verify)
-        )
+        families.append(RetainedArtifactFamily(family, root, pattern, verify))
     return tuple(families)
 
 
@@ -190,9 +187,7 @@ def test_reconciliation_classifies_reachable_orphaned_and_missing_evidence(
         "lock_internal": 0,
         "unknown": 0,
     }
-    by_family = {
-        family["family"]: family for family in first["families"]
-    }
+    by_family = {family["family"]: family for family in first["families"]}
     assert tuple(sorted(by_family)) == RETAINED_ARTIFACT_FAMILIES
     assert by_family["candidate_builds"]["counts"]["reachable"] == 1
     assert by_family["candidate_builds"]["counts"]["orphaned"] == 1
@@ -201,9 +196,7 @@ def test_reconciliation_classifies_reachable_orphaned_and_missing_evidence(
     missing = by_family["test_runs"]["examples"]["missing"][0]
     assert missing["artifact_id"] == missing_run_id
     assert missing["entry_type"] == "missing"
-    assert missing["required_by"] == [
-        {"family": "test_batches", "artifact_id": batch_id}
-    ]
+    assert missing["required_by"] == [{"family": "test_batches", "artifact_id": batch_id}]
 
     encoded = json.dumps(first, sort_keys=True)
     assert str(tmp_path) not in encoded
@@ -216,9 +209,7 @@ def test_existing_corrupt_target_is_not_reported_as_missing(
     database, revision_id = _database(tmp_path)
     build_id = "a" * 32
     run_id = "b" * 32
-    roots = {
-        family: tmp_path / family for family in RETAINED_ARTIFACT_FAMILIES
-    }
+    roots = {family: tmp_path / family for family in RETAINED_ARTIFACT_FAMILIES}
     for root in roots.values():
         root.mkdir()
     (roots["committed_builds"] / build_id).mkdir()
@@ -319,10 +310,7 @@ def test_reconciliation_rejects_database_change_during_artifact_scan(
     finally:
         database.close()
 
-    assert (
-        captured.value.code
-        == "ARTIFACT_RECONCILIATION_DATABASE_CHANGED"
-    )
+    assert captured.value.code == "ARTIFACT_RECONCILIATION_DATABASE_CHANGED"
 
 
 def test_reconciliation_accepts_exact_database_limit_and_rejects_plus_one(
@@ -371,7 +359,4 @@ def test_reconciliation_accepts_exact_database_limit_and_rejects_plus_one(
     finally:
         database.close()
 
-    assert (
-        captured.value.code
-        == "ARTIFACT_RECONCILIATION_DATABASE_LIMIT_EXCEEDED"
-    )
+    assert captured.value.code == "ARTIFACT_RECONCILIATION_DATABASE_LIMIT_EXCEEDED"

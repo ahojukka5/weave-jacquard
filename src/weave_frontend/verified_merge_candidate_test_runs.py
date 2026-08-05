@@ -31,10 +31,7 @@ class MergeCandidateTestBatchService(
         all_build_errors = (
             isinstance(results, list)
             and bool(results)
-            and all(
-                isinstance(item, dict) and item.get("outcome") == "error"
-                for item in results
-            )
+            and all(isinstance(item, dict) and item.get("outcome") == "error" for item in results)
         )
         if artifacts == {} and all_build_errors:
             if manifest.get("artifact_sha256") != {}:

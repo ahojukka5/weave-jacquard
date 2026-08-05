@@ -17,9 +17,7 @@ from weave_frontend.runtime_container import RuntimeServices
 
 def _runtime(tmp_path: Path) -> RuntimeServices:
     return RuntimeServices(
-        RuntimeConfig.from_environ(
-            {"WEAVE_DB_PATH": str(tmp_path / "context-tools.db")}
-        )
+        RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / "context-tools.db")})
     )
 
 
@@ -28,12 +26,8 @@ def test_context_core_staging_preserves_contracts_and_callables(
 ) -> None:
     source = FastMCPRegistryAdapter(mcp_server.mcp)
     source_objects = dict(source.tool_objects())
-    source_contracts = {
-        contract["name"]: contract for contract in source.tool_contracts()
-    }
-    expected_names = tuple(
-        sorted(name for name in CORE_TOOL_NAMES if name in source_objects)
-    )
+    source_contracts = {contract["name"]: contract for contract in source.tool_contracts()}
+    expected_names = tuple(sorted(name for name in CORE_TOOL_NAMES if name in source_objects))
     expected_contracts = tuple(source_contracts[name] for name in expected_names)
 
     target = FastMCP("context-core-tools")
@@ -42,12 +36,10 @@ def test_context_core_staging_preserves_contracts_and_callables(
     context = ApplicationContext(server=target, runtime=runtime)
 
     assert adapter.tool_names(allow_empty=True) == ()
-    assert "expected_revision_id" in (
-        source_contracts["program_create"]["input_schema"]["properties"]
+    assert (
+        "expected_revision_id" in (source_contracts["program_create"]["input_schema"]["properties"])
     )
-    assert "expected_revision_id" in (
-        source_contracts["context_add"]["input_schema"]["properties"]
-    )
+    assert "expected_revision_id" in (source_contracts["context_add"]["input_schema"]["properties"])
 
     try:
         installed = install_context_core_tools(context, mcp_server.mcp)

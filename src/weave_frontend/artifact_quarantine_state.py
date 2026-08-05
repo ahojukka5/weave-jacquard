@@ -188,10 +188,7 @@ class ArtifactQuarantineState:
             intent["family"],
             intent["plan_entry"]["entry_id"],
         )
-        if (
-            selected_current is not None
-            and selected_current != intent["original_identity_record"]
-        ):
+        if selected_current is not None and selected_current != intent["original_identity_record"]:
             raise ValidationError(
                 "ARTIFACT_QUARANTINE_SOURCE_CHANGED",
                 "selected reconciliation evidence changed after quarantine intent",
@@ -231,24 +228,17 @@ class ArtifactQuarantineState:
             ),
             None,
         )
-        if (
-            current_source is not None
-            and current_source != intent["original_location_record"]
-        ):
+        if current_source is not None and current_source != intent["original_location_record"]:
             raise ValidationError(
                 "ARTIFACT_QUARANTINE_SOURCE_CHANGED",
                 "selected top-level entry changed after quarantine intent",
             )
-        normalized_locations.append(
-            copy.deepcopy(intent["original_location_record"])
-        )
+        normalized_locations.append(copy.deepcopy(intent["original_location_record"]))
         normalized_locations.sort(key=self.location_order)
 
         normalized_roots = copy.deepcopy(current["root_records"])
         target_root = next(
-            record
-            for record in normalized_roots
-            if record["family"] == intent["family"]
+            record for record in normalized_roots if record["family"] == intent["family"]
         )
         original_root = intent["original_root_record"]
         for name in ("size", "mtime_ns", "ctime_ns"):
@@ -334,9 +324,7 @@ class ArtifactQuarantineState:
             )
             nested = self.inventory._nested_family_names(family)
             skipped = {
-                candidate.root
-                for candidate in self.inventory.families
-                if candidate.name in nested
+                candidate.root for candidate in self.inventory.families if candidate.name in nested
             }
             root_id = self.inventory._root_id(family)
             for snapshot in snapshots:
@@ -392,11 +380,7 @@ class ArtifactQuarantineState:
         )
 
     def _entry_id(self, family_name: str, name: str) -> str:
-        family = next(
-            family
-            for family in self.inventory.families
-            if family.name == family_name
-        )
+        family = next(family for family in self.inventory.families if family.name == family_name)
         return self.inventory._entry_id(
             family_name,
             self.inventory._root_id(family),

@@ -118,9 +118,7 @@ class TaskScopedBatchExecutor:
                     exc.code,
                     exc.message,
                     operation_index=index,
-                    operation=(
-                        operation_name if isinstance(operation_name, str) else None
-                    ),
+                    operation=(operation_name if isinstance(operation_name, str) else None),
                     node_id=exc.node_id,
                 ) from exc
             except NotFoundError as exc:
@@ -128,9 +126,7 @@ class TaskScopedBatchExecutor:
                     "NOT_FOUND",
                     str(exc),
                     operation_index=index,
-                    operation=(
-                        operation_name if isinstance(operation_name, str) else None
-                    ),
+                    operation=(operation_name if isinstance(operation_name, str) else None),
                 ) from exc
             kind, target, payload = log_entry
             operation_log.append(

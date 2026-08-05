@@ -254,9 +254,7 @@ def _invoke_installer(
 
     parameters = tuple(signature(installer).parameters.values())
     if len(parameters) != 1:
-        raise TypeError(
-            "install_capability must accept exactly one ApplicationContext"
-        )
+        raise TypeError("install_capability must accept exactly one ApplicationContext")
 
     parameter = parameters[0]
     if parameter.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD):
@@ -265,9 +263,7 @@ def _invoke_installer(
     if parameter.kind is Parameter.KEYWORD_ONLY:
         installer(**{parameter.name: context})
         return
-    raise TypeError(
-        "install_capability must accept exactly one ApplicationContext"
-    )
+    raise TypeError("install_capability must accept exactly one ApplicationContext")
 
 
 def _canonical_registration_server(module_loader: ModuleLoader) -> Any:
@@ -306,9 +302,7 @@ def install_public_capabilities(
     with bind_application_runtime(context.runtime):
         ordered = validate_capabilities(capabilities)
         canonical = ordered == PUBLIC_CAPABILITIES
-        registration_server = (
-            _canonical_registration_server(module_loader) if canonical else None
-        )
+        registration_server = _canonical_registration_server(module_loader) if canonical else None
         if canonical:
             _install_foundational_and_build_tools(
                 context,

@@ -21,7 +21,7 @@ PROGRAM_V2 = PROGRAM_V1.replace('(version "0.1")', '(version "0.2")')
 
 def _fake_compiler(path: Path) -> Path:
     path.write_text(
-        r'''#!/usr/bin/env python3
+        r"""#!/usr/bin/env python3
 from __future__ import annotations
 
 import json
@@ -151,7 +151,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-''',
+""",
         encoding="utf-8",
     )
     path.chmod(0o755)
@@ -167,9 +167,7 @@ def test_build_is_pinned_to_requested_revision_and_reused(tmp_path: Path) -> Non
         workspace.initialize("demo")
         first = workspace.import_program("demo", "main", "main.weave", PROGRAM_V1)
         first_revision = str(first["revision_id"])
-        workspace.import_program(
-            "demo", "main", "main.weave", PROGRAM_V2, replace=True
-        )
+        workspace.import_program("demo", "main", "main.weave", PROGRAM_V2, replace=True)
         assert workspace.branch_head("demo", "main") != first_revision
 
         bridge = CompilerBridge(workspace, compiler=compiler, build_root=build_root)
@@ -185,16 +183,12 @@ def test_build_is_pinned_to_requested_revision_and_reused(tmp_path: Path) -> Non
     assert cached["cached"] is True
 
     source = Path(result["artifact_paths"]["source"]).read_text(encoding="utf-8")
-    node_map = json.loads(
-        Path(result["artifact_paths"]["node_map"]).read_text(encoding="utf-8")
-    )
+    node_map = json.loads(Path(result["artifact_paths"]["node_map"]).read_text(encoding="utf-8"))
     diagnostics = json.loads(
         Path(result["artifact_paths"]["diagnostics"]).read_text(encoding="utf-8")
     )
     compiler_diagnostics = json.loads(
-        Path(result["artifact_paths"]["compiler_diagnostics"]).read_text(
-            encoding="utf-8"
-        )
+        Path(result["artifact_paths"]["compiler_diagnostics"]).read_text(encoding="utf-8")
     )
     executable = Path(result["artifact_paths"]["executable"])
 
@@ -211,19 +205,15 @@ def test_build_is_pinned_to_requested_revision_and_reused(tmp_path: Path) -> Non
 def test_failed_build_maps_compiler_span_and_keeps_revision(tmp_path: Path) -> None:
     compiler = _fake_compiler(tmp_path / "weavec")
     database = tmp_path / "weave.db"
-    failing_source = PROGRAM_V1.replace(
-        '(name "demo")', '(name "force-build-failure")'
-    )
+    failing_source = PROGRAM_V1.replace('(name "demo")', '(name "force-build-failure")')
 
     with SExpressionWorkspace(database, weavec_binary=compiler) as workspace:
         workspace.initialize("demo")
-        imported = workspace.import_program(
-            "demo", "main", "main.weave", failing_source
-        )
+        imported = workspace.import_program("demo", "main", "main.weave", failing_source)
         revision = str(imported["revision_id"])
-        result = CompilerBridge(
-            workspace, compiler=compiler, build_root=tmp_path / "builds"
-        ).build("demo", "main.weave")
+        result = CompilerBridge(workspace, compiler=compiler, build_root=tmp_path / "builds").build(
+            "demo", "main.weave"
+        )
         head_after = workspace.branch_head("demo", "main")
 
     assert result["status"] == "failed"
@@ -236,9 +226,7 @@ def test_failed_build_maps_compiler_span_and_keeps_revision(tmp_path: Path) -> N
     diagnostics = json.loads(
         Path(result["artifact_paths"]["diagnostics"]).read_text(encoding="utf-8")
     )
-    node_map = json.loads(
-        Path(result["artifact_paths"]["node_map"]).read_text(encoding="utf-8")
-    )
+    node_map = json.loads(Path(result["artifact_paths"]["node_map"]).read_text(encoding="utf-8"))
     entry = diagnostics["entries"][0]
     span = entry["span"]
     expected_node = smallest_node_for_span(
@@ -263,9 +251,9 @@ def test_malformed_compiler_diagnostics_prevent_success(tmp_path: Path) -> None:
     with SExpressionWorkspace(database, weavec_binary=compiler) as workspace:
         workspace.initialize("demo")
         workspace.import_program("demo", "main", "main.weave", source)
-        result = CompilerBridge(
-            workspace, compiler=compiler, build_root=tmp_path / "builds"
-        ).build("demo", "main.weave")
+        result = CompilerBridge(workspace, compiler=compiler, build_root=tmp_path / "builds").build(
+            "demo", "main.weave"
+        )
 
     diagnostics = json.loads(
         Path(result["artifact_paths"]["diagnostics"]).read_text(encoding="utf-8")

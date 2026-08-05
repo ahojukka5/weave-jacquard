@@ -42,8 +42,7 @@ def test_timeout_prevents_grandchild_survival_after_leader_exit(
     )
     script = _script(
         tmp_path,
-        "import subprocess, sys\n"
-        f"subprocess.Popen([sys.executable, '-c', {grandchild!r}])\n",
+        f"import subprocess, sys\nsubprocess.Popen([sys.executable, '-c', {grandchild!r}])\n",
     )
 
     try:

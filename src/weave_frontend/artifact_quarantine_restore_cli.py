@@ -43,9 +43,7 @@ def generate_restore(
 ) -> dict[str, Any]:
     """Restore through the production reconciliation and family graph."""
 
-    return ArtifactQuarantineRestoreService(
-        artifact_reconciliation()
-    ).restore(
+    return ArtifactQuarantineRestoreService(artifact_reconciliation()).restore(
         quarantine_id=quarantine_id,
         manifest_id=manifest_id,
     )

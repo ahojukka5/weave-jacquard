@@ -95,10 +95,7 @@ def _schema(tool: Any) -> dict[str, Any]:
 
 
 def _heads(branches: list[dict[str, Any]]) -> dict[str, str]:
-    return {
-        str(branch["name"]): str(branch["head_revision_id"])
-        for branch in branches
-    }
+    return {str(branch["name"]): str(branch["head_revision_id"]) for branch in branches}
 
 
 async def _run(tmp_path: Path) -> list[dict[str, Any]]:
@@ -118,18 +115,14 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         by_name = {tool.name: tool for tool in tools.tools}
         assert set(by_name) >= WRITE_TOOLS
         current_properties = _schema(by_name["branch_create"]).get("properties")
-        exact_properties = _schema(by_name["branch_create_at_revision"]).get(
-            "properties"
-        )
+        exact_properties = _schema(by_name["branch_create_at_revision"]).get("properties")
         assert isinstance(current_properties, dict)
         assert isinstance(exact_properties, dict)
         assert "expected_revision_id" in current_properties
         assert "revision_id" in exact_properties
 
         await _call(session, trace, "project_initialize", project=PROJECT)
-        initial_heads = _heads(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        initial_heads = _heads(await _call(session, trace, "branch_list", project=PROJECT))
         initial_revision = initial_heads["main"]
 
         program = await _call(

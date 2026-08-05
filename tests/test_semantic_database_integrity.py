@@ -87,11 +87,7 @@ def test_integrity_retains_every_admitted_snapshot_error(tmp_path: Path) -> None
     connection.close()
 
     report = inspect_database(path)
-    issue = next(
-        item
-        for item in report["issues"]
-        if item["code"] == "SNAPSHOT_AST_HASH_MISMATCH"
-    )
+    issue = next(item for item in report["issues"] if item["code"] == "SNAPSHOT_AST_HASH_MISMATCH")
     assert issue["count"] == 2
     assert [item["qualified_name"] for item in issue["examples"]] == [
         "a.weave",
@@ -215,15 +211,11 @@ def test_revision_parent_cycle_is_reported(tmp_path: Path) -> None:
     connection.close()
 
     report = inspect_database(path)
-    issue = next(
-        issue for issue in report["issues"] if issue["code"] == "REVISION_PARENT_CYCLE"
-    )
+    issue = next(issue for issue in report["issues"] if issue["code"] == "REVISION_PARENT_CYCLE")
     assert issue["count"] == 1
     assert issue["examples"][0]["revision_count"] == 2
     assert issue["examples"][0]["revision_ids_truncated"] is False
-    assert sorted(issue["examples"][0]["revision_ids"]) == sorted(
-        [root_revision, child_revision]
-    )
+    assert sorted(issue["examples"][0]["revision_ids"]) == sorted([root_revision, child_revision])
 
 
 def test_backup_creation_rejects_semantically_corrupt_source(tmp_path: Path) -> None:

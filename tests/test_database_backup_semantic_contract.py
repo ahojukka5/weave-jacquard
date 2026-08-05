@@ -22,9 +22,7 @@ def test_backup_identity_binds_semantic_integrity_contract(tmp_path: Path) -> No
         )
         backup = service.create()
 
-    assert backup["integrity"]["semantic_contract"] == (
-        DATABASE_SEMANTIC_INTEGRITY_CONTRACT
-    )
+    assert backup["integrity"]["semantic_contract"] == (DATABASE_SEMANTIC_INTEGRITY_CONTRACT)
     assert backup["backup_key"]["semantic_integrity_contract"] == (
         DATABASE_SEMANTIC_INTEGRITY_CONTRACT
     )

@@ -19,9 +19,7 @@ from weave_frontend.runtime_container import (
 
 
 def _runtime(database: str) -> RuntimeServices:
-    return RuntimeServices(
-        RuntimeConfig.from_environ({"WEAVE_DB_PATH": database})
-    )
+    return RuntimeServices(RuntimeConfig.from_environ({"WEAVE_DB_PATH": database}))
 
 
 def test_public_application_owns_exact_process_context() -> None:

@@ -280,9 +280,7 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert validation["compiler"]["sha256"]
         assert validation["preview_id"] == preview["preview_id"]
 
-        heads_after_validation = await _call(
-            session, trace, "branch_list", project=PROJECT
-        )
+        heads_after_validation = await _call(session, trace, "branch_list", project=PROJECT)
         after_validation = {
             item["name"]: item["head_revision_id"] for item in heads_after_validation
         }
@@ -400,9 +398,7 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         )
         assert rejection["code"] == "MERGE_VALIDATION_FAILED"
         final_branches = await _call(session, trace, "branch_list", project=PROJECT)
-        final_heads = {
-            item["name"]: item["head_revision_id"] for item in final_branches
-        }
+        final_heads = {item["name"]: item["head_revision_id"] for item in final_branches}
         assert final_heads["target"] == target_before_rejection
 
     (tmp_path / "merge-validation-trace.json").write_text(

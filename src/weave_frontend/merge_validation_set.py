@@ -48,13 +48,9 @@ class MergeValidationSetService:
             source_branch,
             preview_id=preview_id,
         )
-        surviving = [
-            item for item in impact["affected_targets"] if item["after"] is not None
-        ]
+        surviving = [item for item in impact["affected_targets"] if item["after"] is not None]
         removed = [
-            str(item["name"])
-            for item in impact["affected_targets"]
-            if item["after"] is None
+            str(item["name"]) for item in impact["affected_targets"] if item["after"] is None
         ]
         if len(surviving) > max_target_validations:
             raise ValidationError(
@@ -79,9 +75,7 @@ class MergeValidationSetService:
                 validation_records.append(self._compact(result, item))
 
         unavailable = [
-            str(item["target"])
-            for item in validation_records
-            if item["available"] is not True
+            str(item["target"]) for item in validation_records if item["available"] is not True
         ]
         invalid = [
             str(item["target"])
@@ -124,9 +118,7 @@ class MergeValidationSetService:
             "merged_root_hash": impact["merged_root_hash"],
             "impact_format": impact["format"],
             "changed_program_documents": impact["changed_program_documents"],
-            "candidate_covered_changed_documents": impact[
-                "candidate_covered_changed_documents"
-            ],
+            "candidate_covered_changed_documents": impact["candidate_covered_changed_documents"],
             "uncovered_changed_documents": uncovered,
             "allow_uncovered_documents": allow_uncovered_documents,
             "max_target_validations": max_target_validations,
@@ -187,8 +179,7 @@ class MergeValidationSetService:
         ):
             raise ValidationError(
                 "INVALID_AFFECTED_TARGET_LIMIT",
-                "max_target_validations must be between 1 and "
-                f"{MAX_AFFECTED_TARGET_VALIDATIONS}",
+                f"max_target_validations must be between 1 and {MAX_AFFECTED_TARGET_VALIDATIONS}",
             )
 
     @staticmethod

@@ -131,9 +131,7 @@ class ProjectMergeQueueService:
                 "maximum_page_size": MAX_PROJECT_MERGE_QUEUE_PAGE,
                 "maximum_checkpoint_scan": MAX_AGENT_STATUS_CHECKPOINT_SCAN,
                 "maximum_conflicts_per_source": MAX_PROJECT_MERGE_QUEUE_CONFLICTS,
-                "maximum_changed_documents_per_source": (
-                    MAX_PROJECT_MERGE_QUEUE_DOCUMENTS
-                ),
+                "maximum_changed_documents_per_source": (MAX_PROJECT_MERGE_QUEUE_DOCUMENTS),
             },
             "sources": entries,
             "ordering": "lexical source branch name within one exact branch-head catalog",
@@ -199,9 +197,7 @@ class ProjectMergeQueueService:
             "conflicts_truncated": len(conflicts) > conflict_limit,
             "changed_document_count": len(changed_documents),
             "changed_documents": changed_documents[:changed_document_limit],
-            "changed_documents_truncated": (
-                len(changed_documents) > changed_document_limit
-            ),
+            "changed_documents_truncated": (len(changed_documents) > changed_document_limit),
             "target_root_hash": preview["target_root_hash"],
             "source_root_hash": preview["source_root_hash"],
             "merged_root_hash": preview["merged_root_hash"],

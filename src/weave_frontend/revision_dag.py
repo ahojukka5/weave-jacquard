@@ -101,9 +101,7 @@ def analyze_common_ancestors(
                     f"revision ancestry exceeds the node limit {max_nodes}",
                 )
             raw_parents = tuple(
-                str(parent)
-                for parent in _load_parents(source, revision)
-                if parent is not None
+                str(parent) for parent in _load_parents(source, revision) if parent is not None
             )
             edges_visited += len(raw_parents)
             if edges_visited > max_edges:
@@ -165,9 +163,7 @@ def ancestor_distances(
                     f"revision ancestry exceeds the node limit {max_nodes}",
                 )
             raw_parents = tuple(
-                str(parent)
-                for parent in _load_parents(source, current)
-                if parent is not None
+                str(parent) for parent in _load_parents(source, current) if parent is not None
             )
             edges_visited += len(raw_parents)
             if edges_visited > max_edges:
@@ -240,12 +236,7 @@ def _best_common_ancestors(
 
 
 def _validate_internal_limit(value: Any, *, maximum: int, name: str) -> None:
-    if (
-        isinstance(value, bool)
-        or not isinstance(value, int)
-        or value < 1
-        or value > maximum
-    ):
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > maximum:
         raise ValueError(f"{name} must be between 1 and {maximum}")
 
 

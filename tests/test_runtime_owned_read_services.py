@@ -67,18 +67,13 @@ def test_read_and_recovery_services_are_runtime_owned(tmp_path: Path) -> None:
         assert build_discovery.bridge is compiler_bridge
         assert database_backups.database is workspace.db
 
-        entries = {
-            item["name"]: item
-            for item in services.service_manifest()["services"]
-        }
+        entries = {item["name"]: item for item in services.service_manifest()["services"]}
         assert entries["revision_reads"]["depends_on"] == ["workspace"]
         assert entries["reverts"]["depends_on"] == [
             "merge_previews",
             "workspace",
         ]
-        assert entries["build_discovery"]["depends_on"] == [
-            "compiler_bridge"
-        ]
+        assert entries["build_discovery"]["depends_on"] == ["compiler_bridge"]
         assert entries["database_backups"]["depends_on"] == ["workspace"]
 
         services.clear_service("workspace")

@@ -143,15 +143,11 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
             "branch_checkpoint_history_page",
             "branch_checkpoint_compare",
         } <= set(by_name)
-        page_properties = _schema(by_name["branch_checkpoint_history_page"]).get(
-            "properties"
-        )
+        page_properties = _schema(by_name["branch_checkpoint_history_page"]).get("properties")
         assert isinstance(page_properties, dict)
         assert "start_revision_id" in page_properties
         assert "revision_scan_limit" in page_properties
-        compare_properties = _schema(by_name["branch_checkpoint_compare"]).get(
-            "properties"
-        )
+        compare_properties = _schema(by_name["branch_checkpoint_compare"]).get("properties")
         assert isinstance(compare_properties, dict)
         assert "base_checkpoint_revision_id" in compare_properties
         assert "target_checkpoint_revision_id" in compare_properties
@@ -248,9 +244,10 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         assert first_page["returned_checkpoint_count"] == 2
         assert first_page["checkpoint_limit_reached"] is True
         assert first_page["scan_limit_reached"] is False
-        assert [
-            entry["checkpoint_revision_id"] for entry in first_page["checkpoints"]
-        ] == [third["revision_id"], second["revision_id"]]
+        assert [entry["checkpoint_revision_id"] for entry in first_page["checkpoints"]] == [
+            third["revision_id"],
+            second["revision_id"],
+        ]
         assert first_page["checkpoints"][0]["resume"]["arguments"] == {
             "project": PROJECT,
             "branch": "main",
@@ -268,9 +265,7 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
             revision_scan_limit=20,
         )
         assert second_page["returned_checkpoint_count"] == 1
-        assert second_page["checkpoints"][0]["checkpoint_revision_id"] == first[
-            "revision_id"
-        ]
+        assert second_page["checkpoints"][0]["checkpoint_revision_id"] == first["revision_id"]
         assert second_page["has_more"] is False
 
         sparse = await _call(
@@ -369,12 +364,8 @@ def test_real_mcp_reads_checkpoint_timeline_and_progress(tmp_path: Path) -> None
         json.dumps({"trace": trace, "state": state}, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    timeline_reads = [
-        entry for entry in trace if entry["tool"] == "branch_checkpoint_history_page"
-    ]
-    comparison_reads = [
-        entry for entry in trace if entry["tool"] == "branch_checkpoint_compare"
-    ]
+    timeline_reads = [entry for entry in trace if entry["tool"] == "branch_checkpoint_history_page"]
+    comparison_reads = [entry for entry in trace if entry["tool"] == "branch_checkpoint_compare"]
     assert len(timeline_reads) == 3
     assert len(comparison_reads) == 3
     assert sum(entry["payload"]["ok"] is True for entry in comparison_reads) == 2

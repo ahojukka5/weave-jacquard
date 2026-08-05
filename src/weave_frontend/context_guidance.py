@@ -45,9 +45,7 @@ def install_context_guidance(
     )
 
     if "weave_help" not in adapter.tool_names(allow_empty=True):
-        raise FastMCPRegistryError(
-            "application guidance did not register weave_help"
-        )
+        raise FastMCPRegistryError("application guidance did not register weave_help")
     return "weave_help"
 
 

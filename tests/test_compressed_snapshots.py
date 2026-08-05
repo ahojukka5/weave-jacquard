@@ -14,7 +14,7 @@ from weave_frontend.sexpr import make_atom, make_form
 def _large_program_source() -> str:
     return (
         '(program (name "compressed") (version "0.1") '
-        '(entry main (params) (returns i32) '
+        "(entry main (params) (returns i32) "
         '(do (let payload ptr (const_string_ptr "'
         + ("repeated-value-" * 2000)
         + '")) (return (const_i32 42)))))'
@@ -100,8 +100,7 @@ def test_new_snapshots_are_transparently_compressed_and_reopen(tmp_path):
         assert bytes(prefix) == b"WJZ1"
         assert stored_size < raw_size // 4
         assert (
-            workspace.db.connection.execute("PRAGMA user_version").fetchone()[0]
-            == SCHEMA_VERSION
+            workspace.db.connection.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         )
 
     with SExpressionWorkspace(path) as reopened:
@@ -157,15 +156,20 @@ def test_legacy_snapshot_table_migrates_without_changing_history(tmp_path):
             "SELECT type FROM sqlite_master WHERE name = 'module_snapshots'"
         ).fetchone()
         assert row[0] == "view"
-        assert workspace.db.connection.execute(
-            "SELECT count(*) FROM module_snapshots_compressed"
-        ).fetchone()[0] == 1
-        assert workspace.db.connection.execute(
-            "SELECT count(*) FROM sqlite_master WHERE name = 'module_snapshots_legacy'"
-        ).fetchone()[0] == 0
         assert (
-            workspace.db.connection.execute("PRAGMA user_version").fetchone()[0]
-            == SCHEMA_VERSION
+            workspace.db.connection.execute(
+                "SELECT count(*) FROM module_snapshots_compressed"
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            workspace.db.connection.execute(
+                "SELECT count(*) FROM sqlite_master WHERE name = 'module_snapshots_legacy'"
+            ).fetchone()[0]
+            == 0
+        )
+        assert (
+            workspace.db.connection.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         )
 
 
@@ -180,9 +184,10 @@ def test_snapshot_view_preserves_transactional_insert_update_delete(tmp_path):
                    VALUES (?, 'main', ?, 'hash-1')""",
                 (revision_id, ast),
             )
-        assert database.connection.execute(
-            "SELECT ast_json FROM module_snapshots"
-        ).fetchone()[0] == ast
+        assert (
+            database.connection.execute("SELECT ast_json FROM module_snapshots").fetchone()[0]
+            == ast
+        )
 
         with database.transaction() as connection:
             connection.execute(
@@ -190,9 +195,10 @@ def test_snapshot_view_preserves_transactional_insert_update_delete(tmp_path):
                    WHERE revision_id = ? AND qualified_name = 'main'""",
                 (ast.replace("x", "y"), revision_id),
             )
-        assert "y" * 100 in database.connection.execute(
-            "SELECT ast_json FROM module_snapshots"
-        ).fetchone()[0]
+        assert (
+            "y" * 100
+            in database.connection.execute("SELECT ast_json FROM module_snapshots").fetchone()[0]
+        )
 
         with pytest.raises(RuntimeError), database.transaction() as connection:
             connection.execute(
@@ -200,15 +206,15 @@ def test_snapshot_view_preserves_transactional_insert_update_delete(tmp_path):
                 (revision_id,),
             )
             raise RuntimeError("rollback")
-        assert database.connection.execute(
-            "SELECT count(*) FROM module_snapshots"
-        ).fetchone()[0] == 1
+        assert (
+            database.connection.execute("SELECT count(*) FROM module_snapshots").fetchone()[0] == 1
+        )
 
         with database.transaction() as connection:
             connection.execute(
                 "DELETE FROM module_snapshots WHERE revision_id = ?",
                 (revision_id,),
             )
-        assert database.connection.execute(
-            "SELECT count(*) FROM module_snapshots"
-        ).fetchone()[0] == 0
+        assert (
+            database.connection.execute("SELECT count(*) FROM module_snapshots").fetchone()[0] == 0
+        )

@@ -113,9 +113,7 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         await session.initialize()
         tools = await session.list_tools()
         by_name = {tool.name: tool for tool in tools.tools}
-        assert {TOOL, "project_merge_queue_page", "branch_merge_preflight"} <= set(
-            by_name
-        )
+        assert {TOOL, "project_merge_queue_page", "branch_merge_preflight"} <= set(by_name)
         properties = _schema(by_name[TOOL]).get("properties")
         assert isinstance(properties, dict)
         assert {
@@ -254,9 +252,7 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
             "order_introduced_conflict"
         )
         assert atoms[0] in introduced["steps"][1]["conflicts"][0]
-        assert introduced["first_publication_candidate"]["arguments"][
-            "source_branch"
-        ] == "alpha"
+        assert introduced["first_publication_candidate"]["arguments"]["source_branch"] == "alpha"
 
         redundant = await _call(
             session,
@@ -269,12 +265,11 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         )
         assert redundant["train_complete"] is True
         assert redundant["steps"][1]["no_changes"] is True
-        assert redundant["steps"][1]["virtual_target_root_before"] == redundant[
-            "steps"
-        ][1]["virtual_target_root_after"]
-        assert redundant["steps"][1][
-            "publication_requires_refresh_after_prior_step"
-        ] is True
+        assert (
+            redundant["steps"][1]["virtual_target_root_before"]
+            == redundant["steps"][1]["virtual_target_root_after"]
+        )
+        assert redundant["steps"][1]["publication_requires_refresh_after_prior_step"] is True
 
         removed = await _call(
             session,
@@ -289,13 +284,9 @@ async def _run(tmp_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         assert removed["steps"][1]["source_head_revision_id"] == heads["legacy"]
         assert removed["steps"][1]["original_preview_mergeable"] is False
         assert removed["steps"][1]["train_step_mergeable"] is True
-        assert removed["steps"][1]["relation_to_original_preview"] == (
-            "order_removed_conflict"
-        )
+        assert removed["steps"][1]["relation_to_original_preview"] == ("order_removed_conflict")
         assert removed["steps"][1]["no_changes"] is True
-        assert "no compiler, preflight, or merge publication ran" in removed[
-            "simulation_note"
-        ]
+        assert "no compiler, preflight, or merge publication ran" in removed["simulation_note"]
 
         heads_after = {
             item["name"]: item["head_revision_id"]
@@ -350,9 +341,9 @@ def _verify_read_only_database(tmp_path: Path) -> None:
                WHERE operation_kind LIKE '%merge_train%'"""
         ).fetchone()["count"]
         assert train_operations == 0
-        branch_count = connection.execute(
-            "SELECT COUNT(*) AS count FROM branches"
-        ).fetchone()["count"]
+        branch_count = connection.execute("SELECT COUNT(*) AS count FROM branches").fetchone()[
+            "count"
+        ]
         assert branch_count == 8
     finally:
         connection.close()
@@ -369,6 +360,4 @@ def test_real_mcp_simulates_selected_merge_trains(tmp_path: Path) -> None:
     train_calls = [entry for entry in trace if entry["tool"] == TOOL]
     assert len(train_calls) == 4
     assert sum(entry["payload"]["ok"] is True for entry in train_calls) == 3
-    assert train_calls[-1]["payload"]["error"]["code"] == (
-        "STALE_SELECTED_MERGE_TRAIN_CATALOG"
-    )
+    assert train_calls[-1]["payload"]["error"]["code"] == ("STALE_SELECTED_MERGE_TRAIN_CATALOG")

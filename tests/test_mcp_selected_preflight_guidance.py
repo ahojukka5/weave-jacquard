@@ -53,10 +53,7 @@ def test_selected_guidance_layers_without_mutating_impact_topics() -> None:
     assert "selected preflight" in server.descriptions["weave_help"]
     assert mcp_merge_impact_queue_guidance.weave_help("workflow") == base_workflow
     assert mcp_merge_impact_queue_guidance.weave_help("read") == base_read
-    assert (
-        mcp_merge_impact_queue_guidance.weave_help("merge_impact_queue")
-        == base_impact
-    )
+    assert mcp_merge_impact_queue_guidance.weave_help("merge_impact_queue") == base_impact
 
 
 def test_selected_instructions_explain_selection_catalog_and_publication() -> None:

@@ -20,11 +20,7 @@ def test_public_application_manifest_contains_artifact_storage() -> None:
     )
 
     assert "artifact_storage_report" in PUBLIC_TOOL_MANIFEST["tool_names"]
+    assert PUBLIC_APPLICATION_MANIFEST["tool_count"] == len(PUBLIC_TOOL_MANIFEST["tool_names"])
     assert (
-        PUBLIC_APPLICATION_MANIFEST["tool_count"]
-        == len(PUBLIC_TOOL_MANIFEST["tool_names"])
-    )
-    assert (
-        PUBLIC_APPLICATION_MANIFEST["tool_manifest_id"]
-        == PUBLIC_TOOL_MANIFEST["tool_manifest_id"]
+        PUBLIC_APPLICATION_MANIFEST["tool_manifest_id"] == PUBLIC_TOOL_MANIFEST["tool_manifest_id"]
     )

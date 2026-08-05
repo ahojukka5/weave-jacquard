@@ -117,14 +117,10 @@ class MergePreviewService:
             source_branch=source_branch,
             author=author,
             expected_target_head=(
-                str(snapshot["target_head_revision_id"])
-                if snapshot is not None
-                else None
+                str(snapshot["target_head_revision_id"]) if snapshot is not None else None
             ),
             expected_source_head=(
-                str(snapshot["source_head_revision_id"])
-                if snapshot is not None
-                else None
+                str(snapshot["source_head_revision_id"]) if snapshot is not None else None
             ),
         )
         return {
@@ -248,14 +244,10 @@ class MergePreviewService:
                     "document": document,
                     "status": status,
                     "before_hash": (
-                        self.workspace.db.hash_value(before)
-                        if before is not None
-                        else None
+                        self.workspace.db.hash_value(before) if before is not None else None
                     ),
                     "after_hash": (
-                        self.workspace.db.hash_value(after)
-                        if after is not None
-                        else None
+                        self.workspace.db.hash_value(after) if after is not None else None
                     ),
                     **summary,
                 }

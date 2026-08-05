@@ -23,9 +23,7 @@ from .database_integrity import (
 from .errors import ArtifactIntegrityError, NotFoundError, ValidationError
 
 ARTIFACT_RECONCILIATION_FORMAT = "weave-artifact-reconciliation-v1"
-ARTIFACT_RECONCILIATION_DATABASE_FORMAT = (
-    "weave-artifact-reconciliation-database-v1"
-)
+ARTIFACT_RECONCILIATION_DATABASE_FORMAT = "weave-artifact-reconciliation-database-v1"
 MAX_RECONCILIATION_DATABASE_PROJECTS = 100_000
 MAX_RECONCILIATION_DATABASE_REVISIONS = 1_000_000
 MAX_RECONCILIATION_RELATIONSHIPS = 2_000_000
@@ -89,11 +87,7 @@ class ArtifactReconciliationService:
             max_database_revisions,
         )
         self._validate_positive_limit("max_relationships", max_relationships)
-        effective_examples = (
-            inventory.max_examples
-            if max_examples is None
-            else max_examples
-        )
+        effective_examples = inventory.max_examples if max_examples is None else max_examples
         self._validate_positive_limit("max_examples", effective_examples)
 
         self.database = database
@@ -121,9 +115,7 @@ class ArtifactReconciliationService:
         report = self._reconcile(database_before, inventory)
         identity = {
             "format": ARTIFACT_RECONCILIATION_FORMAT,
-            "database_snapshot_id": database_before.report[
-                "database_snapshot_id"
-            ],
+            "database_snapshot_id": database_before.report["database_snapshot_id"],
             "inventory_id": inventory.report["inventory_id"],
             "families": report.pop("_identity_families"),
         }
@@ -192,22 +184,17 @@ class ArtifactReconciliationService:
                 connection.close()
 
         project_rows = [
-            {"project_id": str(row["id"]), "name": str(row["name"])}
-            for row in projects
+            {"project_id": str(row["id"]), "name": str(row["name"])} for row in projects
         ]
         revision_rows = [
             {
                 "revision_id": str(row["id"]),
                 "project_id": str(row["project_id"]),
                 "parent1_revision_id": (
-                    str(row["parent1_id"])
-                    if row["parent1_id"] is not None
-                    else None
+                    str(row["parent1_id"]) if row["parent1_id"] is not None else None
                 ),
                 "parent2_revision_id": (
-                    str(row["parent2_id"])
-                    if row["parent2_id"] is not None
-                    else None
+                    str(row["parent2_id"]) if row["parent2_id"] is not None else None
                 ),
                 "root_hash": str(row["root_hash"]),
             }
@@ -222,8 +209,7 @@ class ArtifactReconciliationService:
         }
         project_names = {row["project_id"]: row["name"] for row in project_rows}
         revision_projects = {
-            row["revision_id"]: project_names[row["project_id"]]
-            for row in revision_rows
+            row["revision_id"]: project_names[row["project_id"]] for row in revision_rows
         }
         report = {
             "format": ARTIFACT_RECONCILIATION_DATABASE_FORMAT,
@@ -252,9 +238,7 @@ class ArtifactReconciliationService:
             entries_remaining -= len(snapshots)
             nested = self.inventory._nested_family_names(family)
             skipped_roots = {
-                candidate.root
-                for candidate in self.inventory.families
-                if candidate.name in nested
+                candidate.root for candidate in self.inventory.families if candidate.name in nested
             }
             family_records: list[dict[str, Any]] = []
             for snapshot in snapshots:
@@ -282,26 +266,16 @@ class ArtifactReconciliationService:
             )
             family_reports.append(family_report)
             identity_families.append(family_identity)
-            records.extend(
-                {"family": family.name, **record}
-                for record in family_records
-            )
+            records.extend({"family": family.name, **record} for record in family_records)
 
         aggregate_counts = {
-            classification: sum(
-                family["counts"][classification]
-                for family in family_reports
-            )
+            classification: sum(family["counts"][classification] for family in family_reports)
             for classification in _INVENTORY_CLASSIFICATIONS
         }
         aggregate = {
             "family_count": len(family_reports),
-            "entry_count": sum(
-                family["entry_count"] for family in family_reports
-            ),
-            "entries_scanned": sum(
-                family["entries_scanned"] for family in family_reports
-            ),
+            "entry_count": sum(family["entry_count"] for family in family_reports),
+            "entries_scanned": sum(family["entries_scanned"] for family in family_reports),
             "counts": aggregate_counts,
         }
         report = {
@@ -312,12 +286,8 @@ class ArtifactReconciliationService:
             "limits": {
                 "families": MAX_RECONCILIATION_FAMILIES,
                 "entries": self.inventory.max_entries,
-                "entries_per_family": (
-                    self.inventory.max_entries_per_family
-                ),
-                "examples_per_classification": (
-                    self.inventory.max_examples
-                ),
+                "entries_per_family": (self.inventory.max_entries_per_family),
+                "examples_per_classification": (self.inventory.max_examples),
             },
             "inventory_id": self._hash_json(
                 {
@@ -334,11 +304,7 @@ class ArtifactReconciliationService:
         snapshot: Any,
     ) -> tuple[dict[str, Any], dict[str, Any] | None]:
         entry_type = self.inventory._entry_type(snapshot.mode)
-        artifact_id = (
-            snapshot.name
-            if family.artifact_id_pattern.fullmatch(snapshot.name)
-            else None
-        )
+        artifact_id = snapshot.name if family.artifact_id_pattern.fullmatch(snapshot.name) else None
         entry_id = self.inventory._entry_id(
             family.name,
             self.inventory._root_id(family),
@@ -421,8 +387,7 @@ class ArtifactReconciliationService:
         verified = {
             (record["family"], record["artifact_id"]): record
             for record in inventory.records
-            if record["classification"] == "verified"
-            and record["artifact_id"] is not None
+            if record["classification"] == "verified" and record["artifact_id"] is not None
         }
         anchors: dict[tuple[str, str], list[dict[str, str]]] = {}
         references: dict[
@@ -489,9 +454,7 @@ class ArtifactReconciliationService:
                 record["artifact_id"],
             )
             if record["classification"] == "verified":
-                classification = (
-                    "reachable" if key in reachable else "orphaned"
-                )
+                classification = "reachable" if key in reachable else "orphaned"
                 public["classification"] = classification
                 evidence = inventory.evidence[key]
                 identity_record = {
@@ -509,8 +472,7 @@ class ArtifactReconciliationService:
             identity_by_family[record["family"]].append(identity_record)
 
         family_roots = {
-            family.name: self.inventory._root_id(family)
-            for family in self.inventory.families
+            family.name: self.inventory._root_id(family) for family in self.inventory.families
         }
         for target, sources in sorted(required_by.items()):
             family, artifact_id = target
@@ -547,10 +509,7 @@ class ArtifactReconciliationService:
                 }
             )
 
-        inventory_families = {
-            family["family"]: family
-            for family in inventory.report["families"]
-        }
+        inventory_families = {family["family"]: family for family in inventory.report["families"]}
         family_reports: list[dict[str, Any]] = []
         identity_families: list[dict[str, Any]] = []
         for family in sorted(by_family):
@@ -571,10 +530,7 @@ class ArtifactReconciliationService:
                 ),
             )
             counts = {
-                classification: sum(
-                    item["classification"] == classification
-                    for item in ordered
-                )
+                classification: sum(item["classification"] == classification for item in ordered)
                 for classification in _RECONCILIATION_CLASSIFICATIONS
             }
             examples = {
@@ -596,9 +552,7 @@ class ArtifactReconciliationService:
                     "root_id": family_roots[family],
                     "complete": True,
                     "entry_count": len(ordered),
-                    "physical_entry_count": inventory_families[family][
-                        "entry_count"
-                    ],
+                    "physical_entry_count": inventory_families[family]["entry_count"],
                     "missing_entry_count": counts["missing"],
                     "counts": counts,
                     "examples": examples,
@@ -608,21 +562,14 @@ class ArtifactReconciliationService:
             identity_families.append(identity)
 
         aggregate_counts = {
-            classification: sum(
-                family["counts"][classification]
-                for family in family_reports
-            )
+            classification: sum(family["counts"][classification] for family in family_reports)
             for classification in _RECONCILIATION_CLASSIFICATIONS
         }
         aggregate = {
             "family_count": len(family_reports),
-            "physical_entry_count": inventory.report["aggregate"][
-                "entry_count"
-            ],
+            "physical_entry_count": inventory.report["aggregate"]["entry_count"],
             "missing_entry_count": aggregate_counts["missing"],
-            "catalog_entry_count": sum(
-                family["entry_count"] for family in family_reports
-            ),
+            "catalog_entry_count": sum(family["entry_count"] for family in family_reports),
             "relationship_count": relationship_count,
             "counts": aggregate_counts,
         }
@@ -676,9 +623,7 @@ class ArtifactReconciliationService:
                 revision_id = subject.get(field)
                 if not isinstance(revision_id, str):
                     return []
-                anchors.append(
-                    {"project": project, "revision_id": revision_id}
-                )
+                anchors.append({"project": project, "revision_id": revision_id})
             return anchors
         if family == "tested_merge_attestations":
             revision = evidence.get("merged_revision")
@@ -721,9 +666,7 @@ class ArtifactReconciliationService:
         elif family == "tested_merge_attestations":
             qualification_id = evidence.get("qualification_id")
             if isinstance(qualification_id, str):
-                references.add(
-                    ("candidate_test_qualifications", qualification_id)
-                )
+                references.add(("candidate_test_qualifications", qualification_id))
         return tuple(sorted(references))
 
     @staticmethod
@@ -737,31 +680,24 @@ class ArtifactReconciliationService:
             source = evidence.get("source")
             return (
                 isinstance(source, Mapping)
-                and source.get("location_id")
-                == database.report["location_id"]
+                and source.get("location_id") == database.report["location_id"]
             )
         if not anchors:
             return False
         return all(
-            database.revision_projects.get(anchor["revision_id"])
-            == anchor["project"]
+            database.revision_projects.get(anchor["revision_id"]) == anchor["project"]
             for anchor in anchors
         )
 
     @staticmethod
     def _public_record(record: Mapping[str, Any]) -> dict[str, Any]:
         return {
-            key: value
-            for key, value in record.items()
-            if key != "family" and value is not None
+            key: value for key, value in record.items() if key != "family" and value is not None
         }
 
     @staticmethod
     def _database_location_id(path: Path) -> str:
-        encoded = (
-            b"weave-database-location-v1\0"
-            + str(path.resolve()).encode("utf-8")
-        )
+        encoded = b"weave-database-location-v1\0" + str(path.resolve()).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
     @staticmethod

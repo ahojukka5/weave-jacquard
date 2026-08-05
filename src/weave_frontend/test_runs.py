@@ -217,9 +217,7 @@ class TestRunService(CompilerArtifactMixin):
                 raise ArtifactIntegrityError(f"test run {name} artifact hash is invalid")
             observed_hash = manifest.get("observed", {}).get(f"{name}_sha256")
             if actual_hash != observed_hash:
-                raise ArtifactIntegrityError(
-                    f"test run {name} observation hash is invalid"
-                )
+                raise ArtifactIntegrityError(f"test run {name} observation hash is invalid")
             artifact_paths[name] = str(path)
         result = dict(manifest)
         result["artifact_paths"] = artifact_paths
@@ -310,9 +308,7 @@ class TestRunService(CompilerArtifactMixin):
                 raise ArtifactIntegrityError(f"staged test run {name} artifact is missing")
             expected = manifest.get("artifact_sha256", {}).get(name)
             if self._sha256_file(path) != expected:
-                raise ArtifactIntegrityError(
-                    f"staged test run {name} artifact hash is invalid"
-                )
+                raise ArtifactIntegrityError(f"staged test run {name} artifact hash is invalid")
 
     def _run_directory(self, run_id: str, *, require_exists: bool = True) -> Path:
         if not isinstance(run_id, str) or not TEST_RUN_ID.fullmatch(run_id):

@@ -174,9 +174,7 @@ def test_verification_enforces_holding_period_and_is_deterministic(
                 minimum_holding_seconds=1,
                 as_of_unix_ns=100,
             )
-        assert captured.value.code == (
-            "ARTIFACT_QUARANTINE_HOLDING_PERIOD_NOT_MET"
-        )
+        assert captured.value.code == ("ARTIFACT_QUARANTINE_HOLDING_PERIOD_NOT_MET")
 
         first = _verification(reconciliation, quarantine, plan)
         second = _verification(reconciliation, quarantine, plan)
@@ -215,9 +213,7 @@ def test_delete_is_exact_permanent_and_idempotent(tmp_path: Path) -> None:
     assert first["restorable"] is False
     assert first["logical_bytes_reclaimed"] == len(b"payload")
     assert not os.path.lexists(root / artifact_id)
-    assert not os.path.lexists(
-        root / f".quarantine-{quarantine['quarantine_entry_id']}"
-    )
+    assert not os.path.lexists(root / f".quarantine-{quarantine['quarantine_entry_id']}")
     assert report["aggregate"]["counts"]["quarantined"] == 0
     assert str(tmp_path) not in str(first)
 
@@ -239,9 +235,7 @@ def test_delete_rejects_wrong_exact_plan_identity(tmp_path: Path) -> None:
                 as_of_unix_ns=2 * _SECOND,
             )
         assert captured.value.code == "ARTIFACT_QUARANTINE_PLAN_ID_MISMATCH"
-        assert (
-            root / f".quarantine-{quarantine['quarantine_entry_id']}"
-        ).is_dir()
+        assert (root / f".quarantine-{quarantine['quarantine_entry_id']}").is_dir()
     finally:
         database.close()
 
@@ -272,9 +266,7 @@ def test_delete_resumes_after_capsule_removal_before_result(
     try:
         with pytest.raises(RuntimeError, match="simulated delete interruption"):
             service.delete(**arguments, deleted_at_unix_ns=4 * _SECOND)
-        assert not os.path.lexists(
-            root / f".quarantine-{quarantine['quarantine_entry_id']}"
-        )
+        assert not os.path.lexists(root / f".quarantine-{quarantine['quarantine_entry_id']}")
 
         monkeypatch.setattr(service.io, "write_metadata", original_write)
         result = service.delete(**arguments, deleted_at_unix_ns=8 * _SECOND)
@@ -336,8 +328,8 @@ def test_delete_batch_completes_multiple_exact_entries(tmp_path: Path) -> None:
     database, root, evidence, reconciliation = _fixture(tmp_path)
     _add_orphan(root, evidence, "e" * 32, payload=b"first")
     _add_orphan(root, evidence, "f" * 32, payload=b"second")
-    first_plan, first_quarantine, second_plan, second_quarantine = (
-        _prepare_two_quarantines(reconciliation)
+    first_plan, first_quarantine, second_plan, second_quarantine = _prepare_two_quarantines(
+        reconciliation
     )
     first_verification = _verification(
         reconciliation,
@@ -354,9 +346,7 @@ def test_delete_batch_completes_multiple_exact_entries(tmp_path: Path) -> None:
         _delete_arguments(second_quarantine, second_plan, second_verification),
     ]
     try:
-        result = ArtifactQuarantineDeleteBatchService(
-            reconciliation
-        ).delete_batch(entries)
+        result = ArtifactQuarantineDeleteBatchService(reconciliation).delete_batch(entries)
     finally:
         database.close()
 
@@ -373,8 +363,8 @@ def test_delete_batch_reports_partial_failure_and_replays_success(
     database, root, evidence, reconciliation = _fixture(tmp_path)
     _add_orphan(root, evidence, "1" * 32, payload=b"first")
     _add_orphan(root, evidence, "2" * 32, payload=b"second")
-    first_plan, first_quarantine, second_plan, second_quarantine = (
-        _prepare_two_quarantines(reconciliation)
+    first_plan, first_quarantine, second_plan, second_quarantine = _prepare_two_quarantines(
+        reconciliation
     )
     first_verification = _verification(
         reconciliation,
@@ -414,9 +404,5 @@ def test_delete_batch_reports_partial_failure_and_replays_success(
         "ARTIFACT_QUARANTINE_DELETE_VERIFICATION_MISMATCH"
     )
     assert second == first
-    assert not os.path.lexists(
-        root / f".quarantine-{first_quarantine['quarantine_entry_id']}"
-    )
-    assert (
-        root / f".quarantine-{second_quarantine['quarantine_entry_id']}"
-    ).is_dir()
+    assert not os.path.lexists(root / f".quarantine-{first_quarantine['quarantine_entry_id']}")
+    assert (root / f".quarantine-{second_quarantine['quarantine_entry_id']}").is_dir()

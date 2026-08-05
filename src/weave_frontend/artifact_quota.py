@@ -30,14 +30,10 @@ def parse_artifact_quota(value: str | None) -> int | None:
     if value is None or value == "":
         return None
     if value != value.strip() or not value.isascii() or not value.isdecimal():
-        raise ValueError(
-            f"{ARTIFACT_QUOTA_ENV} must be an unsigned decimal byte count"
-        )
+        raise ValueError(f"{ARTIFACT_QUOTA_ENV} must be an unsigned decimal byte count")
     parsed = int(value)
     if parsed > MAX_ARTIFACT_QUOTA_BYTES:
-        raise ValueError(
-            f"{ARTIFACT_QUOTA_ENV} must not exceed {MAX_ARTIFACT_QUOTA_BYTES}"
-        )
+        raise ValueError(f"{ARTIFACT_QUOTA_ENV} must not exceed {MAX_ARTIFACT_QUOTA_BYTES}")
     return parsed
 
 
@@ -105,8 +101,7 @@ class ArtifactQuotaService:
             or not 0 <= max_bytes <= MAX_ARTIFACT_QUOTA_BYTES
         ):
             raise ValueError(
-                "max_bytes must be null or an integer between 0 and "
-                f"{MAX_ARTIFACT_QUOTA_BYTES}"
+                f"max_bytes must be null or an integer between 0 and {MAX_ARTIFACT_QUOTA_BYTES}"
             )
         raw_lock_path = Path(lock_path)
         if raw_lock_path.name in {"", ".", ".."}:
@@ -128,11 +123,7 @@ class ArtifactQuotaService:
         observed_bytes = int(storage["aggregate"]["logical_bytes"])
         current_bytes = int(retained["aggregate"]["logical_bytes"])
         internal_bytes = max(0, observed_bytes - current_bytes)
-        available = (
-            None
-            if self.max_bytes is None
-            else max(0, self.max_bytes - current_bytes)
-        )
+        available = None if self.max_bytes is None else max(0, self.max_bytes - current_bytes)
         policy_payload = {
             "format": ARTIFACT_QUOTA_POLICY_FORMAT,
             "enabled": self.max_bytes is not None,
@@ -141,13 +132,9 @@ class ArtifactQuotaService:
             "observed_logical_bytes": observed_bytes,
             "internal_logical_bytes": internal_bytes,
             "available_logical_bytes": available,
-            "exceeded": (
-                self.max_bytes is not None and current_bytes > self.max_bytes
-            ),
+            "exceeded": (self.max_bytes is not None and current_bytes > self.max_bytes),
             "enforcement": (
-                "interprocess-publication-admission"
-                if self.max_bytes is not None
-                else "disabled"
+                "interprocess-publication-admission" if self.max_bytes is not None else "disabled"
             ),
             "lock_id": self._lock_id(),
             "retained_storage_snapshot_id": retained["storage_snapshot_id"],
@@ -163,9 +150,7 @@ class ArtifactQuotaService:
                 {
                     "format": ARTIFACT_QUOTA_REPORT_FORMAT,
                     "storage_snapshot_id": storage["storage_snapshot_id"],
-                    "retained_storage_snapshot_id": retained[
-                        "storage_snapshot_id"
-                    ],
+                    "retained_storage_snapshot_id": retained["storage_snapshot_id"],
                     "policy": policy_payload,
                 }
             ),
@@ -292,9 +277,7 @@ class ArtifactQuotaService:
                             "ARTIFACT_STORAGE_SCAN_FAILED",
                             "artifact staging changed during quota admission",
                         ) from exc
-                    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(
-                        metadata.st_mode
-                    ):
+                    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
                         continue
                     result.append(Path(entry.path))
                     if len(result) > MAX_ARTIFACT_STAGED_CANDIDATES:

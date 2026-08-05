@@ -25,9 +25,7 @@ def _json_object_with_size(size: int) -> bytes:
 
 def test_candidate_qualification_manifest_accepts_exact_limit(tmp_path: Path) -> None:
     path = tmp_path / "qualification-manifest.json"
-    path.write_bytes(
-        _json_object_with_size(MAX_MERGE_CANDIDATE_TEST_MANIFEST_BYTES)
-    )
+    path.write_bytes(_json_object_with_size(MAX_MERGE_CANDIDATE_TEST_MANIFEST_BYTES))
 
     result = MergeCandidateTestBatchService._read_manifest(path)
 
@@ -38,9 +36,7 @@ def test_candidate_qualification_manifest_rejects_limit_plus_one(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "qualification-manifest.json"
-    path.write_bytes(
-        _json_object_with_size(MAX_MERGE_CANDIDATE_TEST_MANIFEST_BYTES + 1)
-    )
+    path.write_bytes(_json_object_with_size(MAX_MERGE_CANDIDATE_TEST_MANIFEST_BYTES + 1))
 
     with pytest.raises(ArtifactIntegrityError, match="exceeds"):
         MergeCandidateTestBatchService._read_manifest(path)

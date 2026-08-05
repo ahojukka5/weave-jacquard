@@ -336,9 +336,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             "branch_list",
             project="conflict-merge",
         )
-        conflict_heads = {
-            item["name"]: item["head_revision_id"] for item in conflict_branches
-        }
+        conflict_heads = {item["name"]: item["head_revision_id"] for item in conflict_branches}
         assert conflict_heads["target"] == target_conflict["revision_id"]
 
     (tmp_path / "merge-preview-trace.json").write_text(

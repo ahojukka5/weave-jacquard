@@ -351,9 +351,7 @@ async def _run_stdio_qualification(
 
 @pytest.mark.real_mcp
 def test_real_stdio_mcp_constructs_program_through_public_tools(tmp_path: Path) -> None:
-    trace = asyncio.run(
-        _run_stdio_qualification(tmp_path, compiler=None, build_native=False)
-    )
+    trace = asyncio.run(_run_stdio_qualification(tmp_path, compiler=None, build_native=False))
     assert [entry["tool"] for entry in trace].count("node_create_form") == 6
     assert trace[-1]["tool"] == "branch_history"
 
@@ -370,9 +368,7 @@ def test_real_stdio_mcp_builds_and_runs_with_final_weavec(tmp_path: Path) -> Non
     if os.name == "nt":
         pytest.skip("native execution qualification is currently POSIX-only")
 
-    trace = asyncio.run(
-        _run_stdio_qualification(tmp_path, compiler=compiler, build_native=True)
-    )
+    trace = asyncio.run(_run_stdio_qualification(tmp_path, compiler=compiler, build_native=True))
     assert any(entry["tool"] == "program_validate" for entry in trace)
     assert any(entry["tool"] == "program_build" for entry in trace)
     assert any(entry["tool"] == "build_get" for entry in trace)

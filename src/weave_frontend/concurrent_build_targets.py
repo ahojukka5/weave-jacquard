@@ -23,8 +23,7 @@ class BuildTargetRegistry(_BaseBuildTargetRegistry):
         if len(documents) > MAX_BUILD_DOCUMENTS:
             raise ValidationError(
                 "BUILD_DOCUMENT_LIMIT_EXCEEDED",
-                "one build target may reference at most "
-                f"{MAX_BUILD_DOCUMENTS} documents",
+                f"one build target may reference at most {MAX_BUILD_DOCUMENTS} documents",
             )
         return documents
 
@@ -108,9 +107,7 @@ class BuildTargetRegistry(_BaseBuildTargetRegistry):
             state,
             message=f"delete build target {target_name}",
             author=author,
-            operations=[
-                ("delete_build_target", storage_document, {"name": target_name})
-            ],
+            operations=[("delete_build_target", storage_document, {"name": target_name})],
             expected_branch_heads={branch: base_revision_id},
             stale_error_code="STALE_BRANCH_HEAD",
         )

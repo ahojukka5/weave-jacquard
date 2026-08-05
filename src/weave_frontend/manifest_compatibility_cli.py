@@ -42,23 +42,16 @@ def _read_manifest(path: Path) -> Mapping[str, Any]:
     except CompilerFileTooLarge as exc:
         raise ManifestCompatibilityError(str(exc)) from exc
     except UnicodeDecodeError as exc:
-        raise ManifestCompatibilityError(
-            f"manifest {path.name!r} is not valid UTF-8"
-        ) from exc
+        raise ManifestCompatibilityError(f"manifest {path.name!r} is not valid UTF-8") from exc
     except json.JSONDecodeError as exc:
         raise ManifestCompatibilityError(
-            f"manifest {path.name!r} has invalid JSON at "
-            f"line {exc.lineno}, column {exc.colno}"
+            f"manifest {path.name!r} has invalid JSON at line {exc.lineno}, column {exc.colno}"
         ) from exc
     except OSError as exc:
         reason = exc.strerror or type(exc).__name__
-        raise ManifestCompatibilityError(
-            f"cannot read manifest {path.name!r}: {reason}"
-        ) from exc
+        raise ManifestCompatibilityError(f"cannot read manifest {path.name!r}: {reason}") from exc
     if not isinstance(document, Mapping):
-        raise ManifestCompatibilityError(
-            f"manifest {path.name!r} must contain a JSON object"
-        )
+        raise ManifestCompatibilityError(f"manifest {path.name!r} must contain a JSON object")
     return document
 
 
@@ -100,18 +93,12 @@ def compare_manifest_files(
     """Compare bounded files or one file against the installed public contract."""
 
     if new_path is None and installed is None:
-        raise ManifestCompatibilityError(
-            "new_manifest or --installed is required"
-        )
+        raise ManifestCompatibilityError("new_manifest or --installed is required")
     if new_path is not None and installed is not None:
-        raise ManifestCompatibilityError(
-            "new_manifest cannot be used with --installed"
-        )
+        raise ManifestCompatibilityError("new_manifest cannot be used with --installed")
     old_document = _read_manifest(old_path)
     new_document = (
-        _read_manifest(new_path)
-        if new_path is not None
-        else _installed_manifest(str(installed))
+        _read_manifest(new_path) if new_path is not None else _installed_manifest(str(installed))
     )
     return _compare_documents(old_document, new_document)
 

@@ -161,9 +161,10 @@ def test_train_detects_order_introduced_conflict_and_stops(tmp_path: Path) -> No
         assert result["train_complete"] is False
         assert result["conflict_step_index"] == 1
         assert result["remaining_sources_not_simulated"] == ["same-one"]
-        assert result["final_virtual_target_root_hash"] == result["steps"][0][
-            "virtual_target_root_after"
-        ]
+        assert (
+            result["final_virtual_target_root_hash"]
+            == result["steps"][0]["virtual_target_root_after"]
+        )
 
         alpha = result["steps"][0]
         assert alpha["source_head_revision_id"] == state["alpha"]["revision_id"]
@@ -220,9 +221,7 @@ def test_train_marks_identical_later_source_as_redundant(tmp_path: Path) -> None
         assert second["relation_to_original_preview"] == "consistent_clean"
         assert second["no_changes"] is True
         assert second["changed_document_count"] == 0
-        assert second["virtual_target_root_before"] == second[
-            "virtual_target_root_after"
-        ]
+        assert second["virtual_target_root_before"] == second["virtual_target_root_after"]
         assert second["publication_requires_refresh_after_prior_step"] is True
 
 
@@ -248,9 +247,7 @@ def test_train_can_remove_original_conflict_after_bridge_source(tmp_path: Path) 
         assert legacy["train_step_mergeable"] is True
         assert legacy["relation_to_original_preview"] == "order_removed_conflict"
         assert legacy["no_changes"] is True
-        assert legacy["virtual_target_root_before"] == legacy[
-            "virtual_target_root_after"
-        ]
+        assert legacy["virtual_target_root_before"] == legacy["virtual_target_root_after"]
 
 
 def test_train_rejects_stale_catalog_before_simulation(tmp_path: Path) -> None:

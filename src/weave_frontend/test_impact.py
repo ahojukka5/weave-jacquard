@@ -122,9 +122,7 @@ class TestImpactPlanService:
                 str(target["document"]),
                 *(str(value) for value in target["additional_documents"]),
             ]
-            changed_sources = sorted(
-                set(target_documents).intersection(changed_program_documents)
-            )
+            changed_sources = sorted(set(target_documents).intersection(changed_program_documents))
             reasons: list[str] = []
             if name in changed_test_targets:
                 reasons.append("test_definition_changed")
@@ -188,9 +186,7 @@ class TestImpactPlanService:
 
         remaining_entries = impacted_tests
         if start_after_name is not None:
-            remaining_entries = [
-                item for item in impacted_tests if item["name"] > start_after_name
-            ]
+            remaining_entries = [item for item in impacted_tests if item["name"] > start_after_name]
         returned_entries = remaining_entries[:limit]
         remaining_count = len(remaining_entries) - len(returned_entries)
         complete_selection = start_after_name is None and remaining_count == 0
@@ -205,9 +201,7 @@ class TestImpactPlanService:
             else None
         )
         next_after_name = (
-            returned_entries[-1]["name"]
-            if returned_entries and remaining_count > 0
-            else None
+            returned_entries[-1]["name"] if returned_entries and remaining_count > 0 else None
         )
         return {
             "format": TEST_IMPACT_PLAN_FORMAT,
@@ -290,8 +284,7 @@ class TestImpactPlanService:
             for document in set(base_state).union(target_state)
             if document not in base_state
             or document not in target_state
-            or cls._hash_json(base_state[document])
-            != cls._hash_json(target_state[document])
+            or cls._hash_json(base_state[document]) != cls._hash_json(target_state[document])
         }
 
     @staticmethod

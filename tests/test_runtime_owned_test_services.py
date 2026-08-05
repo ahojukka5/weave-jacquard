@@ -76,10 +76,7 @@ def test_committed_test_services_are_runtime_owned(tmp_path: Path) -> None:
         assert impacts.build_targets is build_module.build_targets()
         assert impacts.tests is targets
 
-        entries = {
-            item["name"]: item
-            for item in services.service_manifest()["services"]
-        }
+        entries = {item["name"]: item for item in services.service_manifest()["services"]}
         assert entries["test_targets"]["depends_on"] == ["workspace"]
         assert entries["test_target_pages"]["depends_on"] == ["test_targets"]
         assert entries["test_runs"]["depends_on"] == [

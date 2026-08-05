@@ -47,9 +47,7 @@ class ArtifactLifecycleStorageService(ArtifactStorageService):
                 {
                     **family,
                     "usage": {
-                        "retained_logical_bytes": (
-                            family["logical_bytes"] - quarantined
-                        ),
+                        "retained_logical_bytes": (family["logical_bytes"] - quarantined),
                         "quarantined_logical_bytes": quarantined,
                     },
                 }
@@ -63,17 +61,11 @@ class ArtifactLifecycleStorageService(ArtifactStorageService):
                 item["usage"]["quarantined_logical_bytes"] for item in families
             ),
         }
-        payload = {
-            key: value
-            for key, value in base.items()
-            if key != "storage_snapshot_id"
-        }
+        payload = {key: value for key, value in base.items() if key != "storage_snapshot_id"}
         payload.update(
             {
                 "lifecycle_format": ARTIFACT_STORAGE_LIFECYCLE_FORMAT,
-                "quarantine_accounting": (
-                    "reserved-top-level-capsule-namespace"
-                ),
+                "quarantine_accounting": ("reserved-top-level-capsule-namespace"),
                 "usage": usage,
                 "families": families,
             }

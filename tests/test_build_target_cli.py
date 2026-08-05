@@ -71,9 +71,7 @@ def test_target_build_accepts_exact_revision() -> None:
 
 
 def test_source_list_has_revision_selector() -> None:
-    args = build_parser().parse_args(
-        ["source-list", "demo", "--revision", "revision-456"]
-    )
+    args = build_parser().parse_args(["source-list", "demo", "--revision", "revision-456"])
 
     assert args.command == "source-list"
     assert args.project == "demo"

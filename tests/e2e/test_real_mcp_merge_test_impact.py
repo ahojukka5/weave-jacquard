@@ -181,9 +181,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             replace=True,
             expected_revision_id=base_revision,
         )
-        heads_before = _branch_heads(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        heads_before = _branch_heads(await _call(session, trace, "branch_list", project=PROJECT))
         assert heads_before == {
             "feature": feature["revision_id"],
             "main": base_revision,
@@ -257,9 +255,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         assert repeated["plan_id"] == plan["plan_id"]
         assert repeated["impacted_tests"] == plan["impacted_tests"]
         assert repeated["candidate_execution"] == plan["candidate_execution"]
-        heads_after = _branch_heads(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        heads_after = _branch_heads(await _call(session, trace, "branch_list", project=PROJECT))
         assert heads_after == heads_before
 
     return trace
@@ -272,10 +268,9 @@ def test_real_mcp_plans_virtual_merge_candidate_tests(tmp_path: Path) -> None:
         json.dumps(trace, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    impact_calls = [
-        entry for entry in trace if entry["tool"] == "branch_merge_test_impact"
-    ]
+    impact_calls = [entry for entry in trace if entry["tool"] == "branch_merge_test_impact"]
     assert len(impact_calls) == 2
-    assert impact_calls[0]["payload"]["result"]["plan_id"] == impact_calls[1][
-        "payload"
-    ]["result"]["plan_id"]
+    assert (
+        impact_calls[0]["payload"]["result"]["plan_id"]
+        == impact_calls[1]["payload"]["result"]["plan_id"]
+    )

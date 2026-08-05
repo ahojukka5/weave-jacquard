@@ -121,9 +121,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             "branch_checkpoint_get",
             "branch_resume_snapshot",
         } <= set(by_name)
-        create_properties = _schema(by_name["branch_checkpoint_create"]).get(
-            "properties"
-        )
+        create_properties = _schema(by_name["branch_checkpoint_create"]).get("properties")
         assert isinstance(create_properties, dict)
         assert "expected_revision_id" in create_properties
         assert "next_steps" in create_properties
@@ -132,9 +130,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
         assert "revision_id" in get_properties
 
         await _call(session, trace, "project_initialize", project=PROJECT)
-        initial = _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        )
+        initial = _main_head(await _call(session, trace, "branch_list", project=PROJECT))
         program = await _call(
             session,
             trace,
@@ -189,9 +185,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             project=PROJECT,
             branch="main",
         )
-        assert first_snapshot["agent_checkpoint"]["checkpoint_id"] == first[
-            "checkpoint_id"
-        ]
+        assert first_snapshot["agent_checkpoint"]["checkpoint_id"] == first["checkpoint_id"]
 
         advanced = await _call(
             session,
@@ -249,12 +243,8 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             project=PROJECT,
             branch="main",
         )
-        assert current_snapshot["agent_checkpoint"]["checkpoint_id"] == second[
-            "checkpoint_id"
-        ]
-        assert current_snapshot["agent_checkpoint"]["checkpoint"]["status"] == (
-            "ready_for_review"
-        )
+        assert current_snapshot["agent_checkpoint"]["checkpoint_id"] == second["checkpoint_id"]
+        assert current_snapshot["agent_checkpoint"]["checkpoint"]["status"] == ("ready_for_review")
 
         stale = await _call_error(
             session,
@@ -279,9 +269,7 @@ async def _run(tmp_path: Path) -> list[dict[str, Any]]:
             expected_revision_id=head,
         )
         assert invalid["code"] == "INVALID_AGENT_CHECKPOINT"
-        assert _main_head(
-            await _call(session, trace, "branch_list", project=PROJECT)
-        ) == head
+        assert _main_head(await _call(session, trace, "branch_list", project=PROJECT)) == head
 
     return trace
 
@@ -295,10 +283,7 @@ def _verify_database(tmp_path: Path) -> None:
             ("Jacquard agent checkpoint",),
         ).fetchall()
         assert len(checkpoint_documents) == 2
-        assert all(
-            "Stale checkpoint" not in str(row["body"])
-            for row in checkpoint_documents
-        )
+        assert all("Stale checkpoint" not in str(row["body"]) for row in checkpoint_documents)
 
         operations = connection.execute(
             """SELECT revision_id, payload_json
@@ -360,7 +345,5 @@ def test_real_mcp_publishes_and_resolves_agent_checkpoints(tmp_path: Path) -> No
     assert len(writes) == 4
     assert sum(entry["payload"]["ok"] is True for entry in writes) == 2
     assert {
-        entry["payload"]["error"]["code"]
-        for entry in writes
-        if entry["payload"]["ok"] is False
+        entry["payload"]["error"]["code"] for entry in writes if entry["payload"]["ok"] is False
     } == {"STALE_BRANCH_HEAD", "INVALID_AGENT_CHECKPOINT"}

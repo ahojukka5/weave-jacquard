@@ -163,9 +163,11 @@ class BubblewrapSandbox:
                         timeout=5,
                     )
                     if isolation_probe.returncode != 0:
-                        message = isolation_probe.stdout[:MAX_SANDBOX_VERSION_BYTES].decode(
-                            "utf-8", errors="replace"
-                        ).strip()
+                        message = (
+                            isolation_probe.stdout[:MAX_SANDBOX_VERSION_BYTES]
+                            .decode("utf-8", errors="replace")
+                            .strip()
+                        )
                         error = (
                             f"bubblewrap isolation probe exited {isolation_probe.returncode}"
                             + (f": {message}" if message else "")
@@ -182,9 +184,7 @@ class BubblewrapSandbox:
                             check=False,
                             timeout=5,
                         )
-                        process_output = process_probe.stdout[
-                            :MAX_SANDBOX_VERSION_BYTES
-                        ]
+                        process_output = process_probe.stdout[:MAX_SANDBOX_VERSION_BYTES]
                         if process_probe.returncode == 91:
                             error = "single-process policy allowed child process creation"
                         elif self._is_fork_denial(
@@ -193,13 +193,10 @@ class BubblewrapSandbox:
                         ):
                             available = True
                         else:
-                            message = process_output.decode(
-                                "utf-8", errors="replace"
-                            ).strip()
+                            message = process_output.decode("utf-8", errors="replace").strip()
                             error = (
                                 "single-process policy probe exited "
-                                f"{process_probe.returncode}"
-                                + (f": {message}" if message else "")
+                                f"{process_probe.returncode}" + (f": {message}" if message else "")
                             )
             except (OSError, subprocess.TimeoutExpired) as exc:
                 error = f"bubblewrap isolation probe failed: {exc}"
@@ -427,8 +424,7 @@ class BubblewrapSandbox:
                 events = selector.select(timeout=min(remaining, 0.1))
                 if not events and process.poll() is not None:
                     events = [
-                        (key, selectors.EVENT_READ)
-                        for key in list(selector.get_map().values())
+                        (key, selectors.EVENT_READ) for key in list(selector.get_map().values())
                     ]
                 for key, _ in events:
                     stream = key.fileobj

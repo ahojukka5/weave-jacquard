@@ -189,9 +189,7 @@ class DatabaseBackupService(CompilerArtifactMixin):
             final_identity["sha256"] != backup["artifact_sha256"]["database"]
             or final_identity["bytes"] != backup["artifact_bytes"]["database"]
         ):
-            raise ArtifactIntegrityError(
-                "restored database changed after atomic publication"
-            )
+            raise ArtifactIntegrityError("restored database changed after atomic publication")
         return {
             "format": DATABASE_RESTORE_FORMAT,
             "backup_id": backup_id,
@@ -275,9 +273,7 @@ class DatabaseBackupService(CompilerArtifactMixin):
         try:
             integrity = self._normalized_integrity(database_path)
         except ValidationError as exc:
-            raise ArtifactIntegrityError(
-                "database backup integrity inspection failed"
-            ) from exc
+            raise ArtifactIntegrityError("database backup integrity inspection failed") from exc
         if integrity.get("valid") is not True or manifest.get("integrity") != integrity:
             raise ArtifactIntegrityError("database backup integrity evidence is invalid")
 
@@ -401,9 +397,7 @@ class DatabaseBackupService(CompilerArtifactMixin):
                 source_after.st_size,
                 source_after.st_mtime_ns,
             ):
-                raise ArtifactIntegrityError(
-                    "database backup artifact changed during restore"
-                )
+                raise ArtifactIntegrityError("database backup artifact changed during restore")
             return {"bytes": copied, "sha256": digest.hexdigest()}
         finally:
             os.close(source_descriptor)
@@ -426,9 +420,7 @@ class DatabaseBackupService(CompilerArtifactMixin):
         try:
             before = os.fstat(descriptor)
             if not stat.S_ISREG(before.st_mode):
-                raise ArtifactIntegrityError(
-                    "database backup artifact must be a regular file"
-                )
+                raise ArtifactIntegrityError("database backup artifact must be a regular file")
             digest = hashlib.sha256()
             total = 0
             while chunk := os.read(descriptor, 1024 * 1024):
@@ -446,13 +438,9 @@ class DatabaseBackupService(CompilerArtifactMixin):
                 after.st_size,
                 after.st_mtime_ns,
             ):
-                raise ArtifactIntegrityError(
-                    "database backup artifact changed while hashing"
-                )
+                raise ArtifactIntegrityError("database backup artifact changed while hashing")
             if total != before.st_size:
-                raise ArtifactIntegrityError(
-                    "database backup artifact size changed while hashing"
-                )
+                raise ArtifactIntegrityError("database backup artifact size changed while hashing")
             return {"bytes": total, "sha256": digest.hexdigest()}
         finally:
             os.close(descriptor)
@@ -462,14 +450,10 @@ class DatabaseBackupService(CompilerArtifactMixin):
         # Bind only file-stable SQLite properties. Process library version must
         # not participate: disaster recovery often runs after a host upgrade.
         return {
-            "schema_version": int(
-                connection.execute("PRAGMA user_version").fetchone()[0]
-            ),
+            "schema_version": int(connection.execute("PRAGMA user_version").fetchone()[0]),
             "page_size": int(connection.execute("PRAGMA page_size").fetchone()[0]),
             "page_count": int(connection.execute("PRAGMA page_count").fetchone()[0]),
-            "journal_mode": str(
-                connection.execute("PRAGMA journal_mode").fetchone()[0]
-            ).lower(),
+            "journal_mode": str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower(),
         }
 
     @classmethod
@@ -484,9 +468,7 @@ class DatabaseBackupService(CompilerArtifactMixin):
         try:
             identity = cls._connection_identity(connection)
         except sqlite3.Error as exc:
-            raise ArtifactIntegrityError(
-                "cannot inspect database backup SQLite identity"
-            ) from exc
+            raise ArtifactIntegrityError("cannot inspect database backup SQLite identity") from exc
         finally:
             connection.close()
         if not cls._valid_database_identity(identity, require_location=False):
@@ -509,9 +491,7 @@ class DatabaseBackupService(CompilerArtifactMixin):
             return False
         integer_fields = ("schema_version", "page_size", "page_count")
         if any(
-            isinstance(value[field], bool)
-            or not isinstance(value[field], int)
-            or value[field] < 0
+            isinstance(value[field], bool) or not isinstance(value[field], int) or value[field] < 0
             for field in integer_fields
         ):
             return False
@@ -542,13 +522,9 @@ class DatabaseBackupService(CompilerArtifactMixin):
                 max_bytes=MAX_DATABASE_BACKUP_MANIFEST_BYTES,
             )
         except RetainedArtifactReadError as exc:
-            raise ArtifactIntegrityError(
-                f"cannot read database backup manifest: {exc}"
-            ) from exc
+            raise ArtifactIntegrityError(f"cannot read database backup manifest: {exc}") from exc
         if not isinstance(value, dict):
-            raise ArtifactIntegrityError(
-                "database backup manifest root must be an object"
-            )
+            raise ArtifactIntegrityError("database backup manifest root must be an object")
         return value
 
     @staticmethod
@@ -572,8 +548,7 @@ class DatabaseBackupService(CompilerArtifactMixin):
         ):
             raise ValidationError(
                 "INVALID_DATABASE_BACKUP_TIMEOUT",
-                "timeout_seconds must be between 1 and "
-                f"{MAX_DATABASE_BACKUP_TIMEOUT_SECONDS}",
+                f"timeout_seconds must be between 1 and {MAX_DATABASE_BACKUP_TIMEOUT_SECONDS}",
             )
 
     @staticmethod

@@ -139,9 +139,15 @@ def test_every_single_node_tool_rejects_stale_prepared_base(
 
         assert raised.value.code == "STALE_BRANCH_HEAD"
         assert workspace.branch_head("demo", "main") == accepted["revision_id"]
-        assert workspace.db.connection.execute(
-            "SELECT COUNT(*) AS count FROM revisions"
-        ).fetchone()["count"] == revision_count
-        assert workspace.db.connection.execute(
-            "SELECT COUNT(*) AS count FROM operations"
-        ).fetchone()["count"] == operation_count
+        assert (
+            workspace.db.connection.execute("SELECT COUNT(*) AS count FROM revisions").fetchone()[
+                "count"
+            ]
+            == revision_count
+        )
+        assert (
+            workspace.db.connection.execute("SELECT COUNT(*) AS count FROM operations").fetchone()[
+                "count"
+            ]
+            == operation_count
+        )

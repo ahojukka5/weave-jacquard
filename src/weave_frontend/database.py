@@ -256,8 +256,7 @@ class Database:
             or not 0 <= busy_timeout_ms <= MAX_DATABASE_BUSY_TIMEOUT_MS
         ):
             raise ValueError(
-                "busy_timeout_ms must be an integer between 0 and "
-                f"{MAX_DATABASE_BUSY_TIMEOUT_MS}"
+                f"busy_timeout_ms must be an integer between 0 and {MAX_DATABASE_BUSY_TIMEOUT_MS}"
             )
         self.path = Path(path)
         self.busy_timeout_ms = busy_timeout_ms
@@ -270,9 +269,7 @@ class Database:
             self.connection.row_factory = sqlite3.Row
             self.connection.execute(f"PRAGMA busy_timeout = {busy_timeout_ms}")
             self.connection.execute("PRAGMA foreign_keys = ON")
-            current_version = int(
-                self.connection.execute("PRAGMA user_version").fetchone()[0]
-            )
+            current_version = int(self.connection.execute("PRAGMA user_version").fetchone()[0])
             if current_version > SCHEMA_VERSION:
                 raise RuntimeError(
                     "database schema version "

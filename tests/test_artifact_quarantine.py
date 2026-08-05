@@ -263,8 +263,7 @@ def test_quarantine_resumes_after_move_interruption(
             )
         assert not os.path.lexists(root / artifact_id)
         assert any(
-            path.name.startswith(".quarantine-")
-            and path.name.endswith(".staging")
+            path.name.startswith(".quarantine-") and path.name.endswith(".staging")
             for path in root.iterdir()
         )
 
@@ -348,11 +347,7 @@ def test_quarantine_moves_unknown_symlink_without_following_target(
         classification="unknown",
         as_of=10 * _SECOND,
     )
-    entry = next(
-        item
-        for item in plan["entries"]
-        if item["entry_type"] == "symlink"
-    )
+    entry = next(item for item in plan["entries"] if item["entry_type"] == "symlink")
     try:
         result = ArtifactQuarantineService(reconciliation).quarantine(
             policy,

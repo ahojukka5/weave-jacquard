@@ -39,9 +39,7 @@ def test_candidate_build_manifest_accepts_exact_limit(tmp_path: Path) -> None:
 
 def test_candidate_build_manifest_rejects_limit_plus_one(tmp_path: Path) -> None:
     path = tmp_path / "manifest.json"
-    path.write_bytes(
-        _json_object_with_size(MAX_MERGE_CANDIDATE_BUILD_MANIFEST_BYTES + 1)
-    )
+    path.write_bytes(_json_object_with_size(MAX_MERGE_CANDIDATE_BUILD_MANIFEST_BYTES + 1))
 
     with pytest.raises(ArtifactIntegrityError, match="exceeds"):
         MergeCandidateBuildService._read_manifest(path)

@@ -123,9 +123,7 @@ class CompilerInputMixin:
     def _safe_document_basename(document: str) -> str:
         basename = document.replace("\\", "/").rsplit("/", 1)[-1]
         safe = "".join(
-            character
-            if character.isalnum() or character in {".", "_", "-"}
-            else "_"
+            character if character.isalnum() or character in {".", "_", "-"} else "_"
             for character in basename
         )
         if not safe:
@@ -171,7 +169,5 @@ class CompilerInputMixin:
             (revision_id, project),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
         return str(row["root_hash"])

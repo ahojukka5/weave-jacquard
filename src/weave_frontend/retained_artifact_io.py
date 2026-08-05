@@ -18,8 +18,7 @@ class RetainedArtifactTooLarge(RetainedArtifactReadError):
 
     def __init__(self, path: Path, *, limit: int, observed: int) -> None:
         super().__init__(
-            f"retained artifact {path.name!r} exceeds {limit} bytes "
-            f"(observed at least {observed})"
+            f"retained artifact {path.name!r} exceeds {limit} bytes (observed at least {observed})"
         )
         self.path = path
         self.limit = limit

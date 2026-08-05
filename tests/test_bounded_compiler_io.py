@@ -88,10 +88,7 @@ def test_bounded_process_kills_on_timeout(tmp_path: Path) -> None:
 def test_bounded_process_times_out_after_output_streams_close(tmp_path: Path) -> None:
     script = _script(
         tmp_path,
-        "import os, time\n"
-        "os.close(1)\n"
-        "os.close(2)\n"
-        "time.sleep(10)\n",
+        "import os, time\nos.close(1)\nos.close(2)\ntime.sleep(10)\n",
         "closed-output.py",
     )
 
@@ -153,8 +150,7 @@ def test_frontend_validation_rejects_compiler_output_limit(tmp_path: Path) -> No
 def test_frontend_validation_rejects_oversized_wir(tmp_path: Path) -> None:
     compiler = _script(
         tmp_path,
-        "import pathlib, sys\n"
-        "pathlib.Path(sys.argv[2]).write_bytes(b'w' * 33)\n",
+        "import pathlib, sys\npathlib.Path(sys.argv[2]).write_bytes(b'w' * 33)\n",
         "wir-compiler.py",
     )
     validator = WeavecValidator(
@@ -177,8 +173,7 @@ def test_frontend_validation_rejects_oversized_wir(tmp_path: Path) -> None:
 def test_frontend_validation_reads_bounded_wir_success(tmp_path: Path) -> None:
     compiler = _script(
         tmp_path,
-        "import pathlib, sys\n"
-        "pathlib.Path(sys.argv[2]).write_text('(wir)', encoding='utf-8')\n",
+        "import pathlib, sys\npathlib.Path(sys.argv[2]).write_text('(wir)', encoding='utf-8')\n",
         "success-compiler.py",
     )
     validator = WeavecValidator(

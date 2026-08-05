@@ -8,18 +8,14 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 COMPATIBILITY_DIFF_FORMAT = "weave-jacquard-compatibility-diff-v1"
-APPLICATION_COMPATIBILITY_DIFF_FORMAT = (
-    "weave-jacquard-application-compatibility-diff-v1"
-)
+APPLICATION_COMPATIBILITY_DIFF_FORMAT = "weave-jacquard-application-compatibility-diff-v1"
 SUPPORTED_TOOL_MANIFEST_FORMATS = frozenset(
     {
         "weave-jacquard-tool-manifest-v1",
         "weave-jacquard-tool-manifest-v2",
     }
 )
-SUPPORTED_APPLICATION_MANIFEST_FORMATS = frozenset(
-    {"weave-jacquard-application-v2"}
-)
+SUPPORTED_APPLICATION_MANIFEST_FORMATS = frozenset({"weave-jacquard-application-v2"})
 _CLASSIFICATION_ORDER = {
     "identity-only": 0,
     "documentation-only": 1,
@@ -79,9 +75,7 @@ def _require_string_list(
 def _require_tool_manifest(manifest: Mapping[str, Any], label: str) -> str:
     manifest_format = manifest.get("format")
     if manifest_format not in SUPPORTED_TOOL_MANIFEST_FORMATS:
-        raise ManifestCompatibilityError(
-            f"unsupported {label} manifest format {manifest_format!r}"
-        )
+        raise ManifestCompatibilityError(f"unsupported {label} manifest format {manifest_format!r}")
     tools = manifest.get("tools")
     if not isinstance(tools, Sequence) or isinstance(tools, (str, bytes, bytearray)):
         raise ManifestCompatibilityError(f"{label} manifest tools must be a list")
@@ -98,14 +92,10 @@ def _require_tool_manifest(manifest: Mapping[str, Any], label: str) -> str:
                 f"{label} manifest tool at index {index} has no valid name"
             )
         if name in names:
-            raise ManifestCompatibilityError(
-                f"{label} manifest contains duplicate tool {name!r}"
-            )
+            raise ManifestCompatibilityError(f"{label} manifest contains duplicate tool {name!r}")
         names.append(name)
         if not isinstance(tool.get(schema_field, {}), Mapping):
-            raise ManifestCompatibilityError(
-                f"tool {name!r} {schema_field} must be an object"
-            )
+            raise ManifestCompatibilityError(f"tool {name!r} {schema_field} must be an object")
 
     if manifest_format.endswith("-v2"):
         tool_count = manifest.get("tool_count")
@@ -114,31 +104,23 @@ def _require_tool_manifest(manifest: Mapping[str, Any], label: str) -> str:
             or not isinstance(tool_count, int)
             or tool_count != len(tools)
         ):
-            raise ManifestCompatibilityError(
-                f"{label} manifest tool_count does not match tools"
-            )
+            raise ManifestCompatibilityError(f"{label} manifest tool_count does not match tools")
         tool_names = _require_string_list(
             manifest.get("tool_names"),
             label=f"{label} manifest tool_names",
             sorted_unique=True,
         )
         if tool_names != tuple(sorted(names)):
-            raise ManifestCompatibilityError(
-                f"{label} manifest tool_names does not match tools"
-            )
+            raise ManifestCompatibilityError(f"{label} manifest tool_names does not match tools")
         if not isinstance(manifest.get("tool_manifest_id"), str):
-            raise ManifestCompatibilityError(
-                f"{label} manifest tool_manifest_id must be a string"
-            )
+            raise ManifestCompatibilityError(f"{label} manifest tool_manifest_id must be a string")
     return manifest_format
 
 
 def _require_application_manifest(manifest: Mapping[str, Any], label: str) -> str:
     manifest_format = manifest.get("format")
     if manifest_format not in SUPPORTED_APPLICATION_MANIFEST_FORMATS:
-        raise ManifestCompatibilityError(
-            f"unsupported {label} manifest format {manifest_format!r}"
-        )
+        raise ManifestCompatibilityError(f"unsupported {label} manifest format {manifest_format!r}")
     capabilities = manifest.get("capabilities")
     if not isinstance(capabilities, Sequence) or isinstance(
         capabilities,
@@ -176,18 +158,14 @@ def _require_application_manifest(manifest: Mapping[str, Any], label: str) -> st
             f"{label} manifest tool_count must be a non-negative integer"
         )
     if not isinstance(manifest.get("tool_manifest_id"), str):
-        raise ManifestCompatibilityError(
-            f"{label} manifest tool_manifest_id must be a string"
-        )
+        raise ManifestCompatibilityError(f"{label} manifest tool_manifest_id must be a string")
     _require_string_list(
         manifest.get("configuration_variables"),
         label=f"{label} manifest configuration_variables",
         sorted_unique=True,
     )
     if not isinstance(manifest.get("application_id"), str):
-        raise ManifestCompatibilityError(
-            f"{label} manifest application_id must be a string"
-        )
+        raise ManifestCompatibilityError(f"{label} manifest application_id must be a string")
     return manifest_format
 
 
@@ -221,9 +199,7 @@ def _enum_map(value: Any, *, label: str) -> dict[str, Any]:
         try:
             identity = _canonical_json(item)
         except (TypeError, ValueError) as exc:
-            raise ManifestCompatibilityError(
-                f"{label} contains a non-canonical value"
-            ) from exc
+            raise ManifestCompatibilityError(f"{label} contains a non-canonical value") from exc
         if identity in result:
             raise ManifestCompatibilityError(f"{label} must not contain duplicates")
         result[identity] = item
@@ -269,16 +245,8 @@ def _enum_change(
     new_raw = new.get("enum", _MISSING)
     if old_raw is _MISSING and new_raw is _MISSING:
         return None
-    old_values = (
-        None
-        if old_raw is _MISSING
-        else _enum_map(old_raw, label=f"{pointer} old enum")
-    )
-    new_values = (
-        None
-        if new_raw is _MISSING
-        else _enum_map(new_raw, label=f"{pointer} new enum")
-    )
+    old_values = None if old_raw is _MISSING else _enum_map(old_raw, label=f"{pointer} old enum")
+    new_values = None if new_raw is _MISSING else _enum_map(new_raw, label=f"{pointer} new enum")
     if old_values is None:
         return _change(
             f"{pointer}/enum",
@@ -369,9 +337,7 @@ def _schema_value_changes(
                 )
             )
         else:
-            changes.extend(
-                _schema_value_changes(child_pointer, old[field], new[field])
-            )
+            changes.extend(_schema_value_changes(child_pointer, old[field], new[field]))
     return changes
 
 
@@ -465,14 +431,10 @@ def _schema_changes(
         )
 
     old_remainder = {
-        key: value
-        for key, value in old_schema.items()
-        if key not in {"required", "properties"}
+        key: value for key, value in old_schema.items() if key not in {"required", "properties"}
     }
     new_remainder = {
-        key: value
-        for key, value in new_schema.items()
-        if key not in {"required", "properties"}
+        key: value for key, value in new_schema.items() if key not in {"required", "properties"}
     }
     changes.extend(_schema_value_changes(base, old_remainder, new_remainder))
     return changes
@@ -580,10 +542,7 @@ def compare_tool_manifests(
 
 
 def _capability_map(manifest: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
-    return {
-        capability["name"]: capability
-        for capability in manifest["capabilities"]
-    }
+    return {capability["name"]: capability for capability in manifest["capabilities"]}
 
 
 def compare_application_manifests(
@@ -699,9 +658,7 @@ def compare_manifests(
                 raise ManifestCompatibilityError(
                     "manifest families differ: tool manifest != application manifest"
                 )
-            raise ManifestCompatibilityError(
-                f"unsupported new manifest format {new_format!r}"
-            )
+            raise ManifestCompatibilityError(f"unsupported new manifest format {new_format!r}")
         return compare_tool_manifests(old_manifest, new_manifest)
     if old_format in SUPPORTED_APPLICATION_MANIFEST_FORMATS:
         if new_format not in SUPPORTED_APPLICATION_MANIFEST_FORMATS:
@@ -709,13 +666,9 @@ def compare_manifests(
                 raise ManifestCompatibilityError(
                     "manifest families differ: application manifest != tool manifest"
                 )
-            raise ManifestCompatibilityError(
-                f"unsupported new manifest format {new_format!r}"
-            )
+            raise ManifestCompatibilityError(f"unsupported new manifest format {new_format!r}")
         return compare_application_manifests(old_manifest, new_manifest)
-    raise ManifestCompatibilityError(
-        f"unsupported old manifest format {old_format!r}"
-    )
+    raise ManifestCompatibilityError(f"unsupported old manifest format {old_format!r}")
 
 
 __all__ = [

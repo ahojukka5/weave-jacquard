@@ -74,9 +74,7 @@ class SExpressionWorkspace(_NodeConcurrentWorkspace):
             (revision_id, project_id),
         ).fetchone()
         if row is None:
-            raise NotFoundError(
-                f"revision {revision_id!r} does not belong to project {project!r}"
-            )
+            raise NotFoundError(f"revision {revision_id!r} does not belong to project {project!r}")
         try:
             with self.db.transaction() as connection:
                 connection.execute(

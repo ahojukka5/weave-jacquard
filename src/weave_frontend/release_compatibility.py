@@ -16,9 +16,7 @@ from .manifest_compatibility import (
     compare_tool_manifests,
 )
 
-RELEASE_COMPATIBILITY_REVIEW_FORMAT = (
-    "weave-jacquard-release-compatibility-review-v1"
-)
+RELEASE_COMPATIBILITY_REVIEW_FORMAT = "weave-jacquard-release-compatibility-review-v1"
 COMPATIBILITY_POLICY_FORMAT = "weave-jacquard-compatibility-policy-v1"
 RELEASE_MANIFEST_INDEX_FORMAT = "weave-jacquard-release-manifest-index-v1"
 QUALIFICATION_COMPLETION_FORMAT = "weave-jacquard-qualification-complete-v1"
@@ -65,9 +63,7 @@ def _require_sha256(value: Any, *, label: str) -> str:
         or len(value) != 64
         or any(character not in "0123456789abcdef" for character in value)
     ):
-        raise ReleaseCompatibilityError(
-            f"{label} must be a lowercase SHA-256 identity"
-        )
+        raise ReleaseCompatibilityError(f"{label} must be a lowercase SHA-256 identity")
     return value
 
 
@@ -121,9 +117,7 @@ def _load_evidence(root: Path, *, label: str) -> dict[str, Any]:
         label=f"{label} qualification completion",
     )
     if completion.get("format") != QUALIFICATION_COMPLETION_FORMAT:
-        raise ReleaseCompatibilityError(
-            f"{label} qualification completion format is unsupported"
-        )
+        raise ReleaseCompatibilityError(f"{label} qualification completion format is unsupported")
     if completion.get("status") != "passed":
         raise ReleaseCompatibilityError(f"{label} qualification did not pass")
     git_sha = completion.get("git_sha")
@@ -153,33 +147,21 @@ def _load_evidence(root: Path, *, label: str) -> dict[str, Any]:
     documents: dict[str, Mapping[str, Any]] = {}
     for position, entry in enumerate(entries):
         if not isinstance(entry, Mapping):
-            raise ReleaseCompatibilityError(
-                f"{label} manifest entry {position} must be an object"
-            )
+            raise ReleaseCompatibilityError(f"{label} manifest entry {position} must be an object")
         kind = entry.get("kind")
         if kind not in _MANIFEST_PATHS or kind in by_kind:
-            raise ReleaseCompatibilityError(
-                f"{label} manifest entry {position} kind is invalid"
-            )
+            raise ReleaseCompatibilityError(f"{label} manifest entry {position} kind is invalid")
         expected_path = _MANIFEST_PATHS[kind]
         if entry.get("path") != expected_path:
-            raise ReleaseCompatibilityError(
-                f"{label} {kind} manifest path is not canonical"
-            )
+            raise ReleaseCompatibilityError(f"{label} {kind} manifest path is not canonical")
         path = _entry_path(evidence_root, expected_path, label=f"{label} {kind}")
         document, payload = _read_object(path, label=f"{label} {kind} manifest")
         if entry.get("bytes") != len(payload):
-            raise ReleaseCompatibilityError(
-                f"{label} {kind} manifest byte count does not match"
-            )
+            raise ReleaseCompatibilityError(f"{label} {kind} manifest byte count does not match")
         if entry.get("sha256") != _sha256(payload):
-            raise ReleaseCompatibilityError(
-                f"{label} {kind} manifest checksum does not match"
-            )
+            raise ReleaseCompatibilityError(f"{label} {kind} manifest checksum does not match")
         if entry.get("format") != document.get("format"):
-            raise ReleaseCompatibilityError(
-                f"{label} {kind} manifest format does not match"
-            )
+            raise ReleaseCompatibilityError(f"{label} {kind} manifest format does not match")
         by_kind[kind] = entry
         documents[kind] = document
 
@@ -187,12 +169,8 @@ def _load_evidence(root: Path, *, label: str) -> dict[str, Any]:
         raise ReleaseCompatibilityError(
             f"{label} evidence must contain tool, application, and capability manifests"
         )
-    if documents["capability"].get("format") != (
-        "weave-jacquard-capability-manifest-v1"
-    ):
-        raise ReleaseCompatibilityError(
-            f"{label} capability manifest format is unsupported"
-        )
+    if documents["capability"].get("format") != ("weave-jacquard-capability-manifest-v1"):
+        raise ReleaseCompatibilityError(f"{label} capability manifest format is unsupported")
 
     identities = {
         "tool": ("tool_manifest_id", "tool_manifest_id"),
@@ -383,9 +361,7 @@ def write_review_report(path: Path, report: Mapping[str, Any]) -> None:
     if candidate.exists() or candidate.is_symlink():
         raise ReleaseCompatibilityError("compatibility review output already exists")
     if not candidate.parent.resolve().is_dir():
-        raise ReleaseCompatibilityError(
-            "compatibility review output parent must exist"
-        )
+        raise ReleaseCompatibilityError("compatibility review output parent must exist")
     candidate.write_bytes(_canonical_bytes(report))
 
 

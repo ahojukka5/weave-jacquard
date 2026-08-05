@@ -540,9 +540,7 @@ class SExpressionWorkspace(Workspace):
             state,
             message=f"add context {title}",
             author=author,
-            operations=[
-                ("add_context", scope_name, {"document_id": document_id})
-            ],
+            operations=[("add_context", scope_name, {"document_id": document_id})],
             extra_document_ids=[document_id],
         )
         return {
@@ -676,10 +674,7 @@ class SExpressionWorkspace(Workspace):
         return {
             "id": node["id"],
             "kind": "list",
-            "children": [
-                cls._truncate(child, depth - 1)
-                for child in node["children"]
-            ],
+            "children": [cls._truncate(child, depth - 1) for child in node["children"]],
         }
 
     @classmethod

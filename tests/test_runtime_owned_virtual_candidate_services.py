@@ -80,10 +80,7 @@ def test_virtual_candidate_services_are_runtime_owned(tmp_path: Path) -> None:
         assert attestations.workspace is workspace
         assert attestations.qualifications is batches
 
-        entries = {
-            item["name"]: item
-            for item in services.service_manifest()["services"]
-        }
+        entries = {item["name"]: item for item in services.service_manifest()["services"]}
         assert entries["merge_candidate_builds"]["depends_on"] == [
             "build_targets",
             "compiler_bridge",

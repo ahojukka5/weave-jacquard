@@ -51,9 +51,9 @@ def test_runner_never_deletes_requested_evidence_directory() -> None:
     source = (ROOT / "scripts" / "qualify.sh").read_text(encoding="utf-8")
 
     assert 'rm -rf "$out_dir"' not in source
-    assert 'output directory already exists' in (
-        ROOT / "scripts" / "qualification.py"
-    ).read_text(encoding="utf-8")
+    assert "output directory already exists" in (ROOT / "scripts" / "qualification.py").read_text(
+        encoding="utf-8"
+    )
     assert 'mv -T -n -- "$staging_dir" "$final_out"' in source
 
 
@@ -86,10 +86,7 @@ def test_resolve_output_requires_a_new_safe_directory(tmp_path: Path) -> None:
 def test_bounded_command_deadline_survives_closed_output(tmp_path: Path) -> None:
     executable = _executable(
         tmp_path / "closed-output.py",
-        "import os, time\n"
-        "os.close(1)\n"
-        "os.close(2)\n"
-        "time.sleep(10)\n",
+        "import os, time\nos.close(1)\nos.close(2)\ntime.sleep(10)\n",
     )
 
     started = time.monotonic()
@@ -109,8 +106,7 @@ def test_bounded_command_deadline_survives_closed_output(tmp_path: Path) -> None
 def test_command_version_rejects_overflow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     executable = _executable(
         tmp_path / "compiler.py",
-        "import sys\n"
-        "sys.stdout.write('x' * 17)\n",
+        "import sys\nsys.stdout.write('x' * 17)\n",
     )
     monkeypatch.setattr(qualification, "MAX_VERSION_OUTPUT_BYTES", 16)
 

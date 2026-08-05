@@ -32,9 +32,7 @@ def normalize_retention_policy(
         "reconciliation_id",
         "rules",
     }:
-        _policy_error(
-            "policy must contain exactly format, reconciliation_id, and rules"
-        )
+        _policy_error("policy must contain exactly format, reconciliation_id, and rules")
     if value["format"] != ARTIFACT_RETENTION_POLICY_FORMAT:
         _policy_error("policy format is unsupported")
     if not is_sha256(value["reconciliation_id"]):
@@ -44,8 +42,7 @@ def normalize_retention_policy(
         _policy_error(f"rules must contain 1-{MAX_RETENTION_RULES} entries")
 
     patterns = {
-        family.name: family.artifact_id_pattern
-        for family in reconciliation.inventory.families
+        family.name: family.artifact_id_pattern for family in reconciliation.inventory.families
     }
     allowed = {
         "family",
@@ -88,9 +85,7 @@ def normalize_retention_policy(
             or any(not isinstance(item, str) for item in protected)
             or len(set(protected)) != len(protected)
         ):
-            _policy_error(
-                "protected_artifact_ids must be a bounded unique string list"
-            )
+            _policy_error("protected_artifact_ids must be a bounded unique string list")
         if any(patterns[family].fullmatch(item) is None for item in protected):
             _policy_error("protected artifact ID does not match its family contract")
         rules.append(
@@ -102,9 +97,7 @@ def normalize_retention_policy(
                 "protected_artifact_ids": sorted(protected),
             }
         )
-    ordered = tuple(
-        sorted(rules, key=lambda item: (item["family"], item["classification"]))
-    )
+    ordered = tuple(sorted(rules, key=lambda item: (item["family"], item["classification"])))
     return (
         {
             "format": ARTIFACT_RETENTION_POLICY_FORMAT,
@@ -160,11 +153,7 @@ def validate_positive(name: str, value: Any) -> None:
 
 
 def validate_nonnegative(name: str, value: Any, *, policy: bool = False) -> None:
-    invalid = (
-        isinstance(value, bool)
-        or not isinstance(value, int)
-        or not 0 <= value <= 2**63 - 1
-    )
+    invalid = isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 2**63 - 1
     if invalid and policy:
         _policy_error(f"{name} must be a non-negative signed 64-bit integer")
     if invalid:

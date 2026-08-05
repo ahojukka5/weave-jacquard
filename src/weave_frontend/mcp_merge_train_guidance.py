@@ -76,9 +76,7 @@ def weave_help(topic: str = "workflow") -> dict[str, Any]:
     response = _base.weave_help(topic)
     help_value = deepcopy(response["help"])
     if topic == "read":
-        help_value["tools"]["selected_merge_train_preview"] = (
-            _MERGE_TRAIN_READ_DESCRIPTION
-        )
+        help_value["tools"]["selected_merge_train_preview"] = _MERGE_TRAIN_READ_DESCRIPTION
     return {**response, "help": help_value}
 
 
