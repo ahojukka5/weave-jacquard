@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .runtime_config import RuntimeConfig
-from .sandbox import BubblewrapSandbox
+from ..sandbox import BubblewrapSandbox
+from .config import RuntimeConfig
 
 
 class RuntimeBubblewrapSandbox(BubblewrapSandbox):

@@ -10,9 +10,9 @@ import weave_frontend.mcp_test_batches as batch_module
 import weave_frontend.mcp_test_impact as impact_module
 import weave_frontend.mcp_test_runs as run_module
 import weave_frontend.mcp_test_targets as target_module
-import weave_frontend.runtime_container as runtime_module
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import (
+import weave_frontend.runtime.container as runtime_module
+from weave_frontend.runtime import (
+    RuntimeConfig,
     RuntimeServices,
     close_runtime_services,
     install_runtime_services,
@@ -76,10 +76,7 @@ def test_committed_test_services_are_runtime_owned(tmp_path: Path) -> None:
         assert impacts.build_targets is build_module.build_targets()
         assert impacts.tests is targets
 
-        entries = {
-            item["name"]: item
-            for item in services.service_manifest()["services"]
-        }
+        entries = {item["name"]: item for item in services.service_manifest()["services"]}
         assert entries["test_targets"]["depends_on"] == ["workspace"]
         assert entries["test_target_pages"]["depends_on"] == ["test_targets"]
         assert entries["test_runs"]["depends_on"] == [

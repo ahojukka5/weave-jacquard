@@ -7,7 +7,7 @@ from typing import Any
 from .mcp_build import merge_previews
 from .mcp_server import _result, mcp, workspace
 from .revert import RevertService
-from .runtime_container import runtime_service
+from .runtime import runtime_service
 
 
 @runtime_service(

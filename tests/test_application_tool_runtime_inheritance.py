@@ -9,8 +9,7 @@ from weave_frontend.application_tool_registration import (
     bind_registered_application_tools,
 )
 from weave_frontend.mcp_capabilities import ApplicationContext
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import RuntimeServices, runtime_services
+from weave_frontend.runtime import RuntimeConfig, RuntimeServices, runtime_services
 
 
 @dataclass
@@ -37,9 +36,7 @@ class _Server:
 
 def _runtime(tmp_path: Path, name: str) -> RuntimeServices:
     return RuntimeServices(
-        RuntimeConfig.from_environ(
-            {"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")}
-        )
+        RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")})
     )
 
 
@@ -78,9 +75,7 @@ def test_inherited_runtime_context_reacquires_after_parent_returns(
         "inner": _tool("inner", inner_call),
         "spawn": _tool("spawn", spawn_child),
     }
-    bind_registered_application_tools(
-        ApplicationContext(server=server, runtime=runtime)
-    )
+    bind_registered_application_tools(ApplicationContext(server=server, runtime=runtime))
 
     async def run_calls() -> RuntimeServices:
         nonlocal release_child

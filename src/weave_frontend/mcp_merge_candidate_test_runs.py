@@ -9,8 +9,7 @@ from .mcp_build import build_targets, compiler_bridge, merge_previews
 from .mcp_server import _result, mcp
 from .mcp_test_targets import test_targets
 from .merge_candidate_test_runs import DEFAULT_OUTPUT_PAGE_BYTES
-from .runtime_container import runtime_config, runtime_service
-from .runtime_sandbox import RuntimeBubblewrapSandbox
+from .runtime import RuntimeBubblewrapSandbox, runtime_config, runtime_service
 from .verified_merge_candidate_build import MergeCandidateBuildService
 from .verified_merge_candidate_test_runs import MergeCandidateTestBatchService
 

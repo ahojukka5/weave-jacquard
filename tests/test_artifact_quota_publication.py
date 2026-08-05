@@ -12,14 +12,11 @@ from weave_frontend.artifacts.quota import ArtifactQuotaService, QuotaPublicatio
 from weave_frontend.artifacts.storage import ArtifactStorageService
 from weave_frontend.compiler import CompilerBridge as BaseCompilerBridge
 from weave_frontend.errors import ArtifactQuotaExceededError
-from weave_frontend.quota_aware_compiler_bridge import (
+from weave_frontend.runtime import (
     CompilerBridge,
-    install_quota_aware_compiler_bridge,
-)
-from weave_frontend.quota_aware_test_batches import TestBatchService
-from weave_frontend.quota_aware_test_runs import TestRunService
-from weave_frontend.quota_aware_tested_merge_attestations import (
+    TestBatchService,
     TestedMergeAttestationService,
+    TestRunService,
 )
 from weave_frontend.test_batches import TestBatchService as BaseTestBatchService
 from weave_frontend.test_runs import TestRunService as BaseTestRunService
@@ -38,17 +35,6 @@ def _quota(root: Path, *, max_bytes: int) -> ArtifactQuotaService:
         lock_path=root.parent / "quota.lock",
         max_bytes=max_bytes,
     )
-
-
-def test_cached_compiler_bridge_can_be_upgraded_idempotently() -> None:
-    bridge = BaseCompilerBridge.__new__(BaseCompilerBridge)
-
-    first = install_quota_aware_compiler_bridge(bridge)
-    second = install_quota_aware_compiler_bridge(first)
-
-    assert first is bridge
-    assert second is bridge
-    assert type(bridge) is CompilerBridge
 
 
 def test_quota_bridge_forwards_evidence_profile(

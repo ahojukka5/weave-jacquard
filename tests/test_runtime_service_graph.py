@@ -10,14 +10,14 @@ import pytest
 import weave_frontend.mcp_build as build_module
 import weave_frontend.mcp_concurrent_nodes as concurrent_nodes
 import weave_frontend.mcp_server as server_module
-import weave_frontend.runtime_container as runtime_module
-from weave_frontend.application_runtime_binding import bind_application_runtime
+import weave_frontend.runtime.container as runtime_module
 from weave_frontend.mcp_runtime_identity import RuntimeIdentityWithServices
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import (
+from weave_frontend.runtime import (
     RUNTIME_SERVICE_GRAPH_FORMAT,
+    RuntimeConfig,
     RuntimeServiceCycleError,
     RuntimeServices,
+    bind_application_runtime,
     runtime_service,
 )
 
@@ -32,9 +32,7 @@ class _Closeable:
 
 
 def _config(tmp_path: Path) -> RuntimeConfig:
-    return RuntimeConfig.from_environ(
-        {"WEAVE_DB_PATH": str(tmp_path / "runtime.db")}
-    )
+    return RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / "runtime.db")})
 
 
 @contextmanager
@@ -203,8 +201,9 @@ def test_two_containers_supply_isolated_named_services(tmp_path: Path) -> None:
     second_value = second.service("example", example)
 
     assert first_value is not second_value
-    assert first.service_manifest(include_state=False)["service_graph_id"] == (
-        second.service_manifest(include_state=False)["service_graph_id"]
+    assert (
+        first.service_manifest(include_state=False)["service_graph_id"]
+        == (second.service_manifest(include_state=False)["service_graph_id"])
     )
     first.close()
     second.close()
@@ -240,9 +239,7 @@ def test_foundational_build_services_are_runtime_owned(tmp_path: Path) -> None:
             assert build_module.merge_previews().workspace is workspace
             assert build_module.build_targets().workspace is workspace
 
-            names = {
-                item["name"] for item in services.service_manifest()["services"]
-            }
+            names = {item["name"] for item in services.service_manifest()["services"]}
             assert {
                 "workspace",
                 "edit_batches",

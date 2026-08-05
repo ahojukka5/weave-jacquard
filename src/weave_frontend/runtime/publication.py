@@ -1,13 +1,18 @@
-"""Production compiler bridge with capability and artifact-quota admission."""
+"""Concrete runtime publishers with aggregate artifact quota admission."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
-from .artifacts.quota import artifact_quota_admission
-from .compiler import CompilerBridge as _CompilerBridge
-from .compiler import WeavecCapabilities
+from ..artifacts.quota import QuotaPublicationLockMixin, artifact_quota_admission
+from ..compiler import CompilerBridge as _CompilerBridge
+from ..compiler import WeavecCapabilities
+from ..test_batches import TestBatchService as _TestBatchService
+from ..test_runs import TestRunService as _TestRunService
+from ..tested_merge_attestations import (
+    TestedMergeAttestationService as _TestedMergeAttestationService,
+)
 
 
 class CompilerBridge(_CompilerBridge):
@@ -79,15 +84,30 @@ class CompilerBridge(_CompilerBridge):
             super()._publish_directory(temporary, final)
 
 
-def install_quota_aware_compiler_bridge(bridge: Any) -> CompilerBridge:
-    """Upgrade the existing cached production bridge without rebuilding dependents."""
+class TestBatchService(QuotaPublicationLockMixin, _TestBatchService):
+    """Publish immutable test batches only while holding the aggregate quota lock."""
 
-    if isinstance(bridge, CompilerBridge):
-        return bridge
-    if type(bridge) is not _CompilerBridge:
-        raise RuntimeError("production compiler bridge has an unsupported type")
-    bridge.__class__ = CompilerBridge
-    return bridge
+    artifact_quota_family = "test_batches"
 
 
-__all__ = ["CompilerBridge", "install_quota_aware_compiler_bridge"]
+class TestRunService(QuotaPublicationLockMixin, _TestRunService):
+    """Publish immutable test runs only while holding the aggregate quota lock."""
+
+    artifact_quota_family = "test_runs"
+
+
+class TestedMergeAttestationService(
+    QuotaPublicationLockMixin,
+    _TestedMergeAttestationService,
+):
+    """Publish attestations only while holding the aggregate quota lock."""
+
+    artifact_quota_family = "tested_merge_attestations"
+
+
+__all__ = [
+    "CompilerBridge",
+    "TestBatchService",
+    "TestRunService",
+    "TestedMergeAttestationService",
+]

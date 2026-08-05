@@ -6,7 +6,7 @@ from typing import Any
 
 from . import mcp_build as _build
 from .mcp_server import _result, mcp, workspace
-from .runtime_container import runtime_service
+from .runtime import runtime_service
 from .task_contracts import TaskContractRegistry
 from .task_scoped_batch import TaskScopedBatchExecutor
 

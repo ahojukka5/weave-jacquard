@@ -6,7 +6,7 @@ from collections.abc import Callable
 from types import MappingProxyType, ModuleType
 from typing import TYPE_CHECKING
 
-from .runtime_container import runtime_services
+from .runtime import runtime_services
 
 if TYPE_CHECKING:
     from .mcp_capabilities import ApplicationContext

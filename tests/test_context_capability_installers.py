@@ -6,14 +6,17 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 from weave_frontend import mcp_test_targets
-from weave_frontend.application_runtime_binding import bind_application_runtime
 from weave_frontend.context_capability_installers import (
     install_production_capability,
     production_installer_names,
 )
 from weave_frontend.mcp_capabilities import ApplicationContext
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import RuntimeServices, runtime_services
+from weave_frontend.runtime import (
+    RuntimeConfig,
+    RuntimeServices,
+    bind_application_runtime,
+    runtime_services,
+)
 
 
 class _Server:
@@ -22,9 +25,7 @@ class _Server:
 
 def _runtime(tmp_path: Path, name: str) -> RuntimeServices:
     return RuntimeServices(
-        RuntimeConfig.from_environ(
-            {"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")}
-        )
+        RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")})
     )
 
 
@@ -134,10 +135,7 @@ def test_metadata_installers_route_through_test_target_owner(
         )
 
     assert observed == [context.runtime]
-    assert all(
-        not context.runtime.service_initialized(name)
-        for name in service_names
-    )
+    assert all(not context.runtime.service_initialized(name) for name in service_names)
 
 
 def test_artifact_installer_rebuilds_quota_on_context_runtime(

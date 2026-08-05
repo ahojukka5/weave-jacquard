@@ -9,7 +9,6 @@ from inspect import Parameter, signature
 from types import ModuleType
 from typing import Any, Protocol
 
-from .application_runtime_binding import bind_application_runtime
 from .application_tool_registration import (
     bind_registered_application_tools,
     finalize_registered_application_tools,
@@ -20,7 +19,7 @@ from .context_capability_tool_registration import (
 )
 from .context_guidance import install_context_guidance
 from .context_tool_registration import install_context_core_tools
-from .runtime_container import RuntimeClosedError, RuntimeServices
+from .runtime import RuntimeClosedError, RuntimeServices, bind_application_runtime
 
 
 @dataclass(frozen=True)
@@ -254,9 +253,7 @@ def _invoke_installer(
 
     parameters = tuple(signature(installer).parameters.values())
     if len(parameters) != 1:
-        raise TypeError(
-            "install_capability must accept exactly one ApplicationContext"
-        )
+        raise TypeError("install_capability must accept exactly one ApplicationContext")
 
     parameter = parameters[0]
     if parameter.kind in (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD):
@@ -265,9 +262,7 @@ def _invoke_installer(
     if parameter.kind is Parameter.KEYWORD_ONLY:
         installer(**{parameter.name: context})
         return
-    raise TypeError(
-        "install_capability must accept exactly one ApplicationContext"
-    )
+    raise TypeError("install_capability must accept exactly one ApplicationContext")
 
 
 def _canonical_registration_server(module_loader: ModuleLoader) -> Any:
@@ -306,9 +301,7 @@ def install_public_capabilities(
     with bind_application_runtime(context.runtime):
         ordered = validate_capabilities(capabilities)
         canonical = ordered == PUBLIC_CAPABILITIES
-        registration_server = (
-            _canonical_registration_server(module_loader) if canonical else None
-        )
+        registration_server = _canonical_registration_server(module_loader) if canonical else None
         if canonical:
             _install_foundational_and_build_tools(
                 context,

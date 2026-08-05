@@ -11,7 +11,7 @@ from .mcp_server import _result, mcp, workspace
 from .mcp_task_contracts import task_contracts
 from .mcp_test_targets import test_targets
 from .resume_snapshot import ResumeSnapshotService
-from .runtime_container import runtime_service
+from .runtime import runtime_service
 from .task_resume_snapshot import TaskResumeSnapshotService
 
 

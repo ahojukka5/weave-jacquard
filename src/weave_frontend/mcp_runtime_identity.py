@@ -8,7 +8,7 @@ from .errors import ValidationError
 from .mcp_build import compiler_bridge
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_runs import test_runs
-from .runtime_container import runtime_config, runtime_service, runtime_services
+from .runtime import runtime_config, runtime_service, runtime_services
 from .runtime_identity import RuntimeIdentityService
 
 
@@ -55,9 +55,7 @@ class RuntimeIdentityWithServices:
                     "identity": registry["_jacquard_identity"],
                     "error": None,
                 }
-        result["service_graph"] = runtime_services().service_manifest(
-            include_state=False
-        )
+        result["service_graph"] = runtime_services().service_manifest(include_state=False)
         result["runtime_id"] = RuntimeIdentityService._hash_json(result)
         return result
 

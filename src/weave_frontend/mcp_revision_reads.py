@@ -6,7 +6,7 @@ from typing import Any
 
 from .mcp_server import _result, mcp, workspace
 from .revision_reads import RevisionReadService
-from .runtime_container import runtime_service
+from .runtime import runtime_service
 
 for _tool_name in ("branch_history", "node_find", "program_render"):
     mcp.remove_tool(_tool_name)

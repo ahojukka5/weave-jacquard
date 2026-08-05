@@ -12,8 +12,7 @@ from weave_frontend.application_tool_registration import (
 )
 from weave_frontend.fastmcp_registry import FastMCPRegistryError
 from weave_frontend.mcp_capabilities import ApplicationContext
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import RuntimeServices, runtime_services
+from weave_frontend.runtime import RuntimeConfig, RuntimeServices, runtime_services
 
 
 @dataclass
@@ -48,9 +47,7 @@ def _tool(function: Any) -> _Tool:
 
 def _runtime(tmp_path: Path, name: str) -> RuntimeServices:
     return RuntimeServices(
-        RuntimeConfig.from_environ(
-            {"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")}
-        )
+        RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")})
     )
 
 
@@ -60,15 +57,11 @@ def test_rebinding_uses_the_retained_canonical_callable(tmp_path: Path) -> None:
     right_runtime = _runtime(tmp_path, "right")
     server = _Server(_tool(runtime_services))
 
-    bind_registered_application_tools(
-        ApplicationContext(server=server, runtime=left_runtime)
-    )
+    bind_registered_application_tools(ApplicationContext(server=server, runtime=left_runtime))
     left_bound = server.tools["runtime_probe"]
     assert asyncio.run(left_bound.fn()) is left_runtime
 
-    bind_registered_application_tools(
-        ApplicationContext(server=server, runtime=right_runtime)
-    )
+    bind_registered_application_tools(ApplicationContext(server=server, runtime=right_runtime))
     right_bound = server.tools["runtime_probe"]
 
     assert right_bound is not left_bound
@@ -87,6 +80,4 @@ def test_rebinding_rejects_invalid_canonical_callable(tmp_path: Path) -> None:
     server = _Server(_tool(probe))
 
     with pytest.raises(FastMCPRegistryError, match="invalid canonical callable"):
-        bind_registered_application_tools(
-            ApplicationContext(server=server, runtime=runtime)
-        )
+        bind_registered_application_tools(ApplicationContext(server=server, runtime=runtime))

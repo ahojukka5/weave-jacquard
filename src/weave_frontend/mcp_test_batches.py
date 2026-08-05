@@ -7,8 +7,7 @@ from typing import Any
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_runs import test_runs
 from .mcp_test_targets import test_targets
-from .quota_aware_test_batches import TestBatchService
-from .runtime_container import runtime_config, runtime_service
+from .runtime import TestBatchService, runtime_config, runtime_service
 
 
 @runtime_service(

@@ -10,7 +10,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import ClassVar
 
-from .artifacts.quota import parse_artifact_quota
+from ..artifacts.quota import parse_artifact_quota
 
 PUBLIC_CONFIGURATION_VARIABLES: tuple[str, ...] = (
     "WEAVEC_BIN",

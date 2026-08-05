@@ -23,8 +23,7 @@ from .mcp_server import _result, mcp, workspace
 from .mcp_test_batches import test_batches
 from .mcp_test_runs import test_runs
 from .mcp_tested_merge_attestations import tested_merge_attestations
-from .quota_aware_compiler_bridge import install_quota_aware_compiler_bridge
-from .runtime_container import runtime_config, runtime_service
+from .runtime import runtime_config, runtime_service
 
 _ARTIFACT_ID_32 = re.compile(r"^[0-9a-f]{32}$")
 _ARTIFACT_ID_64 = re.compile(r"^[0-9a-f]{64}$")
@@ -163,7 +162,7 @@ def artifact_quota() -> ArtifactQuotaService:
         lock_path=workspace().db.path.parent / ".weave-artifact-quota.lock",
         max_bytes=runtime_config().artifact_max_bytes,
     )
-    bridge = install_quota_aware_compiler_bridge(compiler_bridge())
+    bridge = compiler_bridge()
     for service in (
         bridge,
         merge_candidate_builds(),

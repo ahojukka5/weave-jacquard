@@ -11,7 +11,7 @@ from .mcp_test_batches import test_batches
 from .mcp_test_runs import test_runs
 from .mcp_tested_merge_attestations import tested_merge_attestations
 from .revision_evidence import RevisionEvidenceService
-from .runtime_container import runtime_service
+from .runtime import runtime_service
 
 
 @runtime_service(

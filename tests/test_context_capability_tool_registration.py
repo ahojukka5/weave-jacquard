@@ -24,8 +24,7 @@ from weave_frontend.mcp_capabilities import (
     ApplicationContext,
     install_public_capabilities,
 )
-from weave_frontend.runtime_config import RuntimeConfig
-from weave_frontend.runtime_container import RuntimeServices, runtime_services
+from weave_frontend.runtime import RuntimeConfig, RuntimeServices, runtime_services
 
 
 @dataclass
@@ -101,9 +100,7 @@ def _tool(
 
 def _runtime(tmp_path: Path, name: str) -> RuntimeServices:
     return RuntimeServices(
-        RuntimeConfig.from_environ(
-            {"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")}
-        )
+        RuntimeConfig.from_environ({"WEAVE_DB_PATH": str(tmp_path / f"{name}.db")})
     )
 
 

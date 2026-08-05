@@ -7,7 +7,7 @@ from typing import Any
 from .mcp_agent_checkpoint import agent_checkpoints
 from .mcp_server import _result, mcp
 from .project_agent_status import ProjectAgentStatusService
-from .runtime_container import runtime_service
+from .runtime import runtime_service
 
 
 @runtime_service("project_agent_statuses", depends_on=("agent_checkpoints",))
