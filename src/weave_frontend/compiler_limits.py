@@ -1,16 +1,13 @@
-"""Resource ceilings and identity formats for compiler execution."""
+"""Compatibility alias for :mod:`weave_frontend.compiler.compiler_limits`."""
 
-from __future__ import annotations
+import sys
 
-BUILD_KEY_FORMAT = "weave-build-key-v5"
-MAX_COMPILER_OUTPUT_BYTES = 4 * 1024 * 1024
-MAX_COMPILER_PROTOCOL_BYTES = 16 * 1024 * 1024
-MAX_WIR_BYTES = 64 * 1024 * 1024
+from .compiler import compiler_limits as _implementation
 
+BUILD_KEY_FORMAT = _implementation.BUILD_KEY_FORMAT
+MAX_COMPILER_OUTPUT_BYTES = _implementation.MAX_COMPILER_OUTPUT_BYTES
+MAX_COMPILER_PROTOCOL_BYTES = _implementation.MAX_COMPILER_PROTOCOL_BYTES
+MAX_WIR_BYTES = _implementation.MAX_WIR_BYTES
+sys.modules[__name__] = _implementation
 
-__all__ = [
-    "BUILD_KEY_FORMAT",
-    "MAX_COMPILER_OUTPUT_BYTES",
-    "MAX_COMPILER_PROTOCOL_BYTES",
-    "MAX_WIR_BYTES",
-]
+__all__ = list(_implementation.__all__)

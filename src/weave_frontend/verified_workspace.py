@@ -5,15 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .compiler_capabilities import (
+from .compiler import (
     CapabilityAwareWeavecValidator,
     CapabilityGrammarIndex,
     WeavecCapabilities,
+    WeavecValidator,
 )
 from .concurrent_workspace import SExpressionWorkspace as _ConcurrentWorkspace
 from .errors import NotFoundError, ValidationError
 from .snapshot_codec import SnapshotIntegrityError, load_revision_state
-from .weavec import WeavecValidator
 
 
 class SExpressionWorkspace(_ConcurrentWorkspace):
