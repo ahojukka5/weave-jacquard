@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .errors import ArtifactIntegrityError, NotFoundError, ValidationError
+from ...errors import ArtifactIntegrityError, NotFoundError, ValidationError
 
 RETAINED_ARTIFACT_INVENTORY_FORMAT = "weave-retained-artifact-inventory-v1"
 RETAINED_ARTIFACT_ROOT_ID_FORMAT = "weave-retained-artifact-root-v1"
@@ -89,8 +89,7 @@ class RetainedArtifactInventoryService:
             raise ValueError("at least one retained artifact family is required")
         if len(ordered) > MAX_RECONCILIATION_FAMILIES:
             raise ValueError(
-                "retained artifact families exceed the limit "
-                f"{MAX_RECONCILIATION_FAMILIES}"
+                f"retained artifact families exceed the limit {MAX_RECONCILIATION_FAMILIES}"
             )
         self._validate_positive_limit("max_entries", max_entries)
         self._validate_positive_limit(
@@ -103,13 +102,9 @@ class RetainedArtifactInventoryService:
         by_root: dict[Path, list[str]] = {}
         for family in ordered:
             if not isinstance(family, RetainedArtifactFamily):
-                raise TypeError(
-                    "families must contain RetainedArtifactFamily instances"
-                )
+                raise TypeError("families must contain RetainedArtifactFamily instances")
             if family.name in by_name:
-                raise ValueError(
-                    f"duplicate retained artifact family {family.name!r}"
-                )
+                raise ValueError(f"duplicate retained artifact family {family.name!r}")
             by_name[family.name] = family
             by_root.setdefault(family.root, []).append(family.name)
 
@@ -141,9 +136,7 @@ class RetainedArtifactInventoryService:
             entries_remaining -= len(snapshots)
             nested = self._nested_family_names(family)
             skipped_roots = {
-                candidate.root
-                for candidate in self.families
-                if candidate.name in nested
+                candidate.root for candidate in self.families if candidate.name in nested
             }
             records = [
                 self._classify(family, snapshot)
@@ -170,19 +163,13 @@ class RetainedArtifactInventoryService:
             identity_families.append(family_identity)
 
         aggregate_counts = {
-            classification: sum(
-                family["counts"][classification] for family in family_reports
-            )
+            classification: sum(family["counts"][classification] for family in family_reports)
             for classification in _CLASSIFICATIONS
         }
         aggregate = {
             "family_count": len(family_reports),
-            "entry_count": sum(
-                family["entry_count"] for family in family_reports
-            ),
-            "entries_scanned": sum(
-                family["entries_scanned"] for family in family_reports
-            ),
+            "entry_count": sum(family["entry_count"] for family in family_reports),
+            "entries_scanned": sum(family["entries_scanned"] for family in family_reports),
             "counts": aggregate_counts,
         }
         payload = {
@@ -223,30 +210,24 @@ class RetainedArtifactInventoryService:
         if stat.S_ISLNK(root_stat.st_mode) or not stat.S_ISDIR(root_stat.st_mode):
             raise ValidationError(
                 "ARTIFACT_RECONCILIATION_ROOT_INVALID",
-                "retained artifact root "
-                f"{family.name!r} must be a non-symlink directory",
+                f"retained artifact root {family.name!r} must be a non-symlink directory",
             )
 
         snapshots: list[_EntrySnapshot] = []
         try:
             with os.scandir(root) as iterator:
                 for entry in iterator:
-                    if (
-                        len(snapshots) >= self.max_entries_per_family
-                        or len(snapshots) >= remaining
-                    ):
+                    if len(snapshots) >= self.max_entries_per_family or len(snapshots) >= remaining:
                         raise ValidationError(
                             "ARTIFACT_RECONCILIATION_SCAN_LIMIT_EXCEEDED",
-                            "retained artifact inventory exceeds its bounded "
-                            "entry limit",
+                            "retained artifact inventory exceeds its bounded entry limit",
                         )
                     try:
                         entry_stat = entry.stat(follow_symlinks=False)
                     except OSError as exc:
                         raise ValidationError(
                             "ARTIFACT_RECONCILIATION_SCAN_FAILED",
-                            f"retained artifact family {family.name!r} "
-                            "changed during enumeration",
+                            f"retained artifact family {family.name!r} changed during enumeration",
                         ) from exc
                     snapshots.append(
                         _EntrySnapshot(
@@ -274,11 +255,7 @@ class RetainedArtifactInventoryService:
         snapshot: _EntrySnapshot,
     ) -> dict[str, Any]:
         entry_type = self._entry_type(snapshot.mode)
-        artifact_id = (
-            snapshot.name
-            if family.artifact_id_pattern.fullmatch(snapshot.name)
-            else None
-        )
+        artifact_id = snapshot.name if family.artifact_id_pattern.fullmatch(snapshot.name) else None
         entry_id = self._entry_id(
             family.name,
             self._root_id(family),
@@ -346,10 +323,7 @@ class RetainedArtifactInventoryService:
         nested_roots: list[str],
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         counts = {
-            classification: sum(
-                record["classification"] == classification
-                for record in records
-            )
+            classification: sum(record["classification"] == classification for record in records)
             for classification in _CLASSIFICATIONS
         }
         examples = {
@@ -362,12 +336,7 @@ class RetainedArtifactInventoryService:
         }
         root_id = self._root_id(family)
         identity_entries = [
-            {
-                key: value
-                for key, value in record.items()
-                if value is not None
-            }
-            for record in records
+            {key: value for key, value in record.items() if value is not None} for record in records
         ]
         identity = {
             "family": family.name,
@@ -395,8 +364,7 @@ class RetainedArtifactInventoryService:
         return [
             candidate.name
             for candidate in self.families
-            if candidate.name != family.name
-            and self._is_descendant(candidate.root, family.root)
+            if candidate.name != family.name and self._is_descendant(candidate.root, family.root)
         ]
 
     @staticmethod
@@ -418,11 +386,7 @@ class RetainedArtifactInventoryService:
 
     @staticmethod
     def _public_entry(record: Mapping[str, Any]) -> dict[str, Any]:
-        return {
-            key: value
-            for key, value in record.items()
-            if value is not None
-        }
+        return {key: value for key, value in record.items() if value is not None}
 
     @staticmethod
     def _entry_type(mode: int) -> str:
@@ -485,9 +449,7 @@ class RetainedArtifactInventoryService:
 
     @staticmethod
     def _hash_parts(*parts: str) -> str:
-        return hashlib.sha256(
-            b"\0".join(part.encode("utf-8") for part in parts)
-        ).hexdigest()
+        return hashlib.sha256(b"\0".join(part.encode("utf-8") for part in parts)).hexdigest()
 
     @staticmethod
     def _hash_json(value: Any) -> str:

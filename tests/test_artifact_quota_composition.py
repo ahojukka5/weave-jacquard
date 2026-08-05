@@ -39,9 +39,7 @@ def test_quota_composition_attaches_one_guard_to_every_publisher(
         "tested_merge_attestations": SimpleNamespace(
             attestation_root=roots["tested_merge_attestations"]
         ),
-        "database_backups": SimpleNamespace(
-            backup_root=roots["database_backups"]
-        ),
+        "database_backups": SimpleNamespace(backup_root=roots["database_backups"]),
     }
     monkeypatch.setattr(composition, "compiler_bridge", lambda: bridge)
     monkeypatch.setattr(
@@ -84,13 +82,8 @@ def test_quota_composition_attaches_one_guard_to_every_publisher(
 
         assert quota.max_bytes == 100
         assert bridge.artifact_quota is quota
-        assert all(
-            service.artifact_quota is quota
-            for service in services.values()
-        )
-        assert quota.accounting.roots == {
-            name: path.resolve() for name, path in roots.items()
-        }
+        assert all(service.artifact_quota is quota for service in services.values())
+        assert quota.accounting.roots == {name: path.resolve() for name, path in roots.items()}
     finally:
         composition.artifact_quota.cache_clear()
         composition.artifact_storage.cache_clear()
@@ -109,7 +102,5 @@ def test_public_application_manifest_contains_quota_contract() -> None:
         PUBLIC_TOOL_MANIFEST,
     )
 
-    assert ARTIFACT_QUOTA_ENV in PUBLIC_APPLICATION_MANIFEST[
-        "configuration_variables"
-    ]
+    assert ARTIFACT_QUOTA_ENV in PUBLIC_APPLICATION_MANIFEST["configuration_variables"]
     assert "artifact_storage_report" in PUBLIC_TOOL_MANIFEST["tool_names"]

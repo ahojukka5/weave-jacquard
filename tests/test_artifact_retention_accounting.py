@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 import weave_frontend.artifacts.retention.accounting as artifact_retention_accounting
-from weave_frontend.artifact_reconciliation import (
+from weave_frontend.artifacts.reconciliation import (
     RetainedArtifactInventoryService,
 )
 from weave_frontend.artifacts.retention import (

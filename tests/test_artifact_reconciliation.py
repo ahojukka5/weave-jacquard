@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from weave_frontend.artifact_reconciliation import (
+from weave_frontend.artifacts.reconciliation import (
     RETAINED_ARTIFACT_FAMILIES,
     RETAINED_ARTIFACT_INVENTORY_FORMAT,
     RetainedArtifactFamily,
@@ -52,9 +52,7 @@ def test_inventory_classifies_entries_without_exposing_paths(
             raise ValidationError("BROKEN_ARTIFACT", "broken")
         return {"artifact_id": artifact_id}
 
-    report = RetainedArtifactInventoryService(
-        [_family("committed_builds", root, verify)]
-    ).report()
+    report = RetainedArtifactInventoryService([_family("committed_builds", root, verify)]).report()
 
     assert report["format"] == RETAINED_ARTIFACT_INVENTORY_FORMAT
     assert report["complete"] is True
@@ -78,9 +76,10 @@ def test_inventory_classifies_entries_without_exposing_paths(
     assert ".candidate-stage" not in encoded
     assert ".candidate.lock" not in encoded
     assert "operator-note" not in encoded
-    assert report == RetainedArtifactInventoryService(
-        [_family("committed_builds", root, verify)]
-    ).report()
+    assert (
+        report
+        == RetainedArtifactInventoryService([_family("committed_builds", root, verify)]).report()
+    )
 
 
 def test_inventory_accepts_exact_limits_and_rejects_limit_plus_one(
@@ -153,9 +152,7 @@ def test_inventory_excludes_direct_nested_family_root(tmp_path: Path) -> None:
     by_family = {family["family"]: family for family in report["families"]}
     assert by_family["committed_builds"]["entry_count"] == 0
     assert by_family["committed_builds"]["entries_scanned"] == 1
-    assert by_family["committed_builds"]["nested_roots"] == [
-        "candidate_builds"
-    ]
+    assert by_family["committed_builds"]["nested_roots"] == ["candidate_builds"]
     assert by_family["candidate_builds"]["counts"]["verified"] == 1
 
 
@@ -172,14 +169,9 @@ def test_inventory_fails_when_family_changes_during_verification(
         return {"artifact_id": value}
 
     with pytest.raises(ValidationError) as captured:
-        RetainedArtifactInventoryService(
-            [_family("committed_builds", root, verify)]
-        ).report()
+        RetainedArtifactInventoryService([_family("committed_builds", root, verify)]).report()
 
-    assert (
-        captured.value.code
-        == "ARTIFACT_RECONCILIATION_CHANGED_DURING_SCAN"
-    )
+    assert captured.value.code == "ARTIFACT_RECONCILIATION_CHANGED_DURING_SCAN"
 
 
 def test_inventory_declares_all_production_families() -> None:

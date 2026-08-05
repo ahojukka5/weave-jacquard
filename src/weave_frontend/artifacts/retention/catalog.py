@@ -6,8 +6,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from ...artifact_reachability import ARTIFACT_RECONCILIATION_FORMAT
 from ...errors import ValidationError
+from ..reconciliation import ARTIFACT_RECONCILIATION_FORMAT
 from .policy import entry_order
 
 

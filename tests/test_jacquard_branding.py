@@ -32,7 +32,7 @@ def test_distribution_and_entry_points_use_jacquard_name() -> None:
         "weave-build": "weave_jacquard.build_cli:main",
         "weave-manifest-diff": "weave_jacquard.manifest_compatibility_cli:main",
         "weave-release-compatibility": "weave_frontend.release_compatibility:main",
-        "weave-artifact-reconcile": ("weave_frontend.artifact_reconciliation_cli:main"),
+        "weave-artifact-reconcile": ("weave_frontend.artifacts.reconciliation.cli:main"),
         "weave-artifact-retention-plan": ("weave_frontend.artifacts.retention.cli:main"),
         "weave-artifact-quarantine": ("weave_frontend.artifacts.quarantine.cli:main"),
         "weave-artifact-quarantine-restore": (

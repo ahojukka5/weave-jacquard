@@ -8,9 +8,9 @@ import stat
 from collections.abc import Mapping
 from typing import Any
 
-from ...artifact_reachability import ARTIFACT_RECONCILIATION_FORMAT
 from ...artifacts.retention import hash_json
 from ...errors import ValidationError
+from ..reconciliation import ARTIFACT_RECONCILIATION_FORMAT
 
 ARTIFACT_QUARANTINE_CATALOG_FORMAT = "weave-artifact-quarantine-catalog-v1"
 

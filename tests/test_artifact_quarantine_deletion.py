@@ -7,11 +7,6 @@ from typing import Any
 
 import pytest
 
-from weave_frontend.artifact_reachability import ArtifactReconciliationService
-from weave_frontend.artifact_reconciliation import (
-    RetainedArtifactFamily,
-    RetainedArtifactInventoryService,
-)
 from weave_frontend.artifacts.quarantine.deletion import (
     ArtifactQuarantineDeleteService,
 )
@@ -21,6 +16,11 @@ from weave_frontend.artifacts.quarantine.deletion_batch import (
 from weave_frontend.artifacts.quarantine.service import ArtifactQuarantineService
 from weave_frontend.artifacts.quarantine.verification import (
     ArtifactQuarantineVerificationService,
+)
+from weave_frontend.artifacts.reconciliation import (
+    ArtifactReconciliationService,
+    RetainedArtifactFamily,
+    RetainedArtifactInventoryService,
 )
 from weave_frontend.artifacts.retention import (
     ARTIFACT_RETENTION_POLICY_FORMAT,

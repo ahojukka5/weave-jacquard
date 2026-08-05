@@ -9,12 +9,12 @@ from typing import Any
 import pytest
 
 import weave_frontend.artifacts.quarantine.service as quarantine_module
-from weave_frontend.artifact_reachability import ArtifactReconciliationService
-from weave_frontend.artifact_reconciliation import (
+from weave_frontend.artifacts.quarantine.service import ArtifactQuarantineService
+from weave_frontend.artifacts.reconciliation import (
+    ArtifactReconciliationService,
     RetainedArtifactFamily,
     RetainedArtifactInventoryService,
 )
-from weave_frontend.artifacts.quarantine.service import ArtifactQuarantineService
 from weave_frontend.artifacts.retention import (
     ARTIFACT_RETENTION_POLICY_FORMAT,
     ArtifactRetentionPlanner,
