@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
-from .compiler import BUILD_KEY_FORMAT
+from .compiler import BUILD_KEY_FORMAT, normalize_evidence_profile
 from .errors import NotFoundError, ValidationError
 
 BUILD_LIST_FORMAT = "weave-build-list-page-v1"
@@ -82,9 +82,7 @@ class BuildDiscoveryService:
                 rejected.append({"build_id": build_id, "code": exc.code})
                 continue
             except NotFoundError:
-                rejected.append(
-                    {"build_id": build_id, "code": "BUILD_NOT_FOUND_DURING_SCAN"}
-                )
+                rejected.append({"build_id": build_id, "code": "BUILD_NOT_FOUND_DURING_SCAN"})
                 continue
 
             if summary["project"] != project or not self._matches(summary, filters):
@@ -217,6 +215,7 @@ class BuildDiscoveryService:
         return {
             "build_id": build_id,
             "status": manifest["status"],
+            "evidence_profile": manifest.get("evidence_profile"),
             "project": project,
             "branch": branch,
             "revision_id": revision_id,
@@ -233,9 +232,7 @@ class BuildDiscoveryService:
             "compiler_diagnostics_protocol_valid": manifest.get(
                 "compiler_diagnostics_protocol_valid"
             ),
-            "compiler_manifest_protocol_valid": manifest.get(
-                "compiler_manifest_protocol_valid"
-            ),
+            "compiler_manifest_protocol_valid": manifest.get("compiler_manifest_protocol_valid"),
             "executable_available": isinstance(artifacts.get("executable"), str),
             "diagnostics_available": isinstance(artifacts.get("diagnostics"), str),
         }
@@ -276,6 +273,12 @@ class BuildDiscoveryService:
         compiler_sha256: str,
         target: str,
     ) -> None:
+        if "evidence_profile" not in manifest:
+            raise ValidationError(
+                "INVALID_BUILD_MANIFEST",
+                "current build key requires an explicit evidence profile",
+            )
+        evidence_profile = normalize_evidence_profile(manifest["evidence_profile"])
         sources = manifest.get("sources")
         artifact_hashes = manifest.get("artifact_sha256")
         if not isinstance(sources, list) or len(sources) != len(documents):
@@ -313,9 +316,7 @@ class BuildDiscoveryService:
                     "BUILD_SOURCE_METADATA_MISMATCH",
                     f"source metadata hash does not match artifact hash at index {index}",
                 )
-            key_documents.append(
-                {"document": document, "source_sha256": str(source_sha256)}
-            )
+            key_documents.append({"document": document, "source_sha256": str(source_sha256)})
 
         if manifest.get("source_sha256") != key_documents[0]["source_sha256"]:
             raise ValidationError(
@@ -324,11 +325,7 @@ class BuildDiscoveryService:
             )
 
         output_limit = manifest.get("compiler_output_limit_bytes")
-        if (
-            isinstance(output_limit, bool)
-            or not isinstance(output_limit, int)
-            or output_limit <= 0
-        ):
+        if isinstance(output_limit, bool) or not isinstance(output_limit, int) or output_limit <= 0:
             raise ValidationError(
                 "BUILD_SOURCE_METADATA_MISMATCH",
                 "current build key requires a positive compiler output limit",
@@ -342,6 +339,7 @@ class BuildDiscoveryService:
             "compiler_sha256": compiler_sha256,
             "compiler_output_limit_bytes": output_limit,
             "target": target,
+            "evidence_profile": evidence_profile,
         }
         expected_build_id = hashlib.sha256(
             json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -356,17 +354,11 @@ class BuildDiscoveryService:
     def _matches(summary: dict[str, Any], filters: dict[str, Any]) -> bool:
         if filters["branch"] is not None and summary["branch"] != filters["branch"]:
             return False
-        if (
-            filters["revision_id"] is not None
-            and summary["revision_id"] != filters["revision_id"]
-        ):
+        if filters["revision_id"] is not None and summary["revision_id"] != filters["revision_id"]:
             return False
         if filters["status"] is not None and summary["status"] != filters["status"]:
             return False
-        if (
-            filters["document"] is not None
-            and filters["document"] not in summary["documents"]
-        ):
+        if filters["document"] is not None and filters["document"] not in summary["documents"]:
             return False
         return filters["target"] is None or summary["target"] == filters["target"]
 

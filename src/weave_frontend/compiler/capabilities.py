@@ -201,19 +201,11 @@ class WeavecCapabilities:
             for item in document["protocols"]
             if isinstance(item, Mapping)
         }
-        command_protocols = (
-            set(command_item.get("protocols", ())) if command_item is not None else None
-        )
         for protocol in protocols:
             if protocol not in protocol_map:
                 raise _invalid(
                     "WEAVEC_PROTOCOL_UNSUPPORTED",
                     f"installed weavec does not advertise protocol {protocol!r}",
-                )
-            if command_protocols is not None and protocol not in command_protocols:
-                raise _invalid(
-                    "WEAVEC_PROTOCOL_UNSUPPORTED",
-                    f"weavec command {command!r} does not advertise protocol {protocol!r}",
                 )
         if target is not None:
             installed = {

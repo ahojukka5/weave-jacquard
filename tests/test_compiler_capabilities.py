@@ -267,7 +267,7 @@ def test_frontend_validation_records_capability_identity(tmp_path: Path) -> None
     assert result["wir"] == "(core-module (core-version 2) (decls))\n"
 
 
-def test_requested_protocol_must_belong_to_selected_command(tmp_path: Path) -> None:
+def test_requested_protocol_uses_global_registry_authority(tmp_path: Path) -> None:
     compiler = tmp_path / "weavec"
     registry = _registry()
     commands = registry["commands"]
@@ -279,10 +279,9 @@ def test_requested_protocol_must_belong_to_selected_command(tmp_path: Path) -> N
     _write_compiler(compiler, registry)
     capabilities = WeavecCapabilities(compiler, environment_fallback=False)
 
-    with pytest.raises(ValidationError) as captured:
-        capabilities.require(
-            command="build",
-            protocols=("weavec-compilation-trace-v1",),
-        )
+    document = capabilities.require(
+        command="build",
+        protocols=("weavec-compilation-trace-v1",),
+    )
 
-    assert captured.value.code == "WEAVEC_PROTOCOL_UNSUPPORTED"
+    assert document["format"] == "weavec-capabilities-v1"
