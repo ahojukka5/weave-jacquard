@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from .artifact_quota import artifact_quota_admission
-from .compiler_bridge import CompilerBridge as _CompilerBridge
-from .compiler_capabilities import WeavecCapabilities
+from .compiler import CompilerBridge as _CompilerBridge
+from .compiler import WeavecCapabilities
 
 
 class CompilerBridge(_CompilerBridge):
