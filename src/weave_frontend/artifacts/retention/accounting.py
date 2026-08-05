@@ -8,15 +8,11 @@ import stat
 from pathlib import Path
 from typing import Any
 
-from .artifact_retention_policy import hash_json, validate_nonnegative, validate_positive
-from .errors import ValidationError
+from ...errors import ValidationError
+from .policy import hash_json, validate_nonnegative, validate_positive
 
-ARTIFACT_RETENTION_ENTRY_SNAPSHOT_FORMAT = (
-    "weave-artifact-retention-entry-snapshot-v1"
-)
-ARTIFACT_RETENTION_RELOCATION_SNAPSHOT_FORMAT = (
-    "weave-artifact-retention-relocation-snapshot-v1"
-)
+ARTIFACT_RETENTION_ENTRY_SNAPSHOT_FORMAT = "weave-artifact-retention-entry-snapshot-v1"
+ARTIFACT_RETENTION_RELOCATION_SNAPSHOT_FORMAT = "weave-artifact-retention-relocation-snapshot-v1"
 MAX_RETENTION_SCAN_ENTRIES = 1_000_000
 MAX_RETENTION_SCAN_DEPTH = 64
 MAX_RETENTION_FILE_BYTES = 1024**4
@@ -79,22 +75,12 @@ class ArtifactRetentionAccountant:
         return (
             {
                 "logical_bytes": sum(
-                    item["size"]
-                    for item in first
-                    if item["entry_type"] == "regular_file"
+                    item["size"] for item in first if item["entry_type"] == "regular_file"
                 ),
-                "regular_files": sum(
-                    item["entry_type"] == "regular_file" for item in first
-                ),
-                "directories": sum(
-                    item["entry_type"] == "directory" for item in first
-                ),
-                "symlinks": sum(
-                    item["entry_type"] == "symlink" for item in first
-                ),
-                "special_entries": sum(
-                    item["entry_type"] == "special" for item in first
-                ),
+                "regular_files": sum(item["entry_type"] == "regular_file" for item in first),
+                "directories": sum(item["entry_type"] == "directory" for item in first),
+                "symlinks": sum(item["entry_type"] == "symlink" for item in first),
+                "special_entries": sum(item["entry_type"] == "special" for item in first),
                 "entries_scanned": len(first),
                 "entry_snapshot_id": hash_json(
                     {
@@ -254,9 +240,7 @@ class ArtifactRetentionAccountant:
     @staticmethod
     def _relative_id(value: str) -> str:
         return hashlib.sha256(
-            ARTIFACT_RETENTION_ENTRY_SNAPSHOT_FORMAT.encode("utf-8")
-            + b"\0"
-            + value.encode("utf-8")
+            ARTIFACT_RETENTION_ENTRY_SNAPSHOT_FORMAT.encode("utf-8") + b"\0" + value.encode("utf-8")
         ).hexdigest()
 
 

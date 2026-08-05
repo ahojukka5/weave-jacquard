@@ -13,7 +13,7 @@ from weave_frontend.artifact_reconciliation import (
     RetainedArtifactFamily,
     RetainedArtifactInventoryService,
 )
-from weave_frontend.artifact_retention import (
+from weave_frontend.artifacts.retention import (
     ARTIFACT_RETENTION_PLAN_FORMAT,
     ARTIFACT_RETENTION_POLICY_FORMAT,
     ArtifactRetentionPlanner,
@@ -222,9 +222,7 @@ def test_dry_run_plan_is_deterministic_bounded_and_non_mutating(
     assert first["dry_run"] is True
     assert first["mutation"] == "none"
     assert len(first["plan_id"]) == 64
-    selected_ids = {
-        item.get("artifact_id") for item in first["entries"] if "artifact_id" in item
-    }
+    selected_ids = {item.get("artifact_id") for item in first["entries"] if "artifact_id" in item}
     assert selected_ids == {old_a_id, old_b_id}
     assert reachable_id not in selected_ids
     assert newest_id not in selected_ids

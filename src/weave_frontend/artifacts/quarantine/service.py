@@ -8,10 +8,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from ...artifact_retention import ArtifactRetentionPlanner
-from ...artifact_retention_accounting import ArtifactRetentionAccountant
-from ...artifact_retention_catalog import ArtifactRetentionCatalog
-from ...artifact_retention_policy import hash_json
+from ...artifacts.retention import (
+    ArtifactRetentionAccountant,
+    ArtifactRetentionCatalog,
+    ArtifactRetentionPlanner,
+    hash_json,
+)
 from ...errors import ValidationError
 from .contract import (
     ARTIFACT_QUARANTINE_FORMAT,

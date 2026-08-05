@@ -12,10 +12,6 @@ from weave_frontend.artifact_reconciliation import (
     RetainedArtifactFamily,
     RetainedArtifactInventoryService,
 )
-from weave_frontend.artifact_retention import (
-    ARTIFACT_RETENTION_POLICY_FORMAT,
-    ArtifactRetentionPlanner,
-)
 from weave_frontend.artifacts.quarantine.deletion import (
     ArtifactQuarantineDeleteService,
 )
@@ -25,6 +21,10 @@ from weave_frontend.artifacts.quarantine.deletion_batch import (
 from weave_frontend.artifacts.quarantine.service import ArtifactQuarantineService
 from weave_frontend.artifacts.quarantine.verification import (
     ArtifactQuarantineVerificationService,
+)
+from weave_frontend.artifacts.retention import (
+    ARTIFACT_RETENTION_POLICY_FORMAT,
+    ArtifactRetentionPlanner,
 )
 from weave_frontend.database import Database
 from weave_frontend.errors import ValidationError

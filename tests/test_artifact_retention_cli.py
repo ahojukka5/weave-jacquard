@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-import weave_frontend.artifact_retention_cli as cli_module
+import weave_frontend.artifacts.retention.cli as cli_module
 
 _PLAN = {
     "format": "weave-artifact-retention-plan-v1",
@@ -106,5 +106,5 @@ def test_console_script_exposes_operator_retention_plan() -> None:
     project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
     assert project["project"]["scripts"]["weave-artifact-retention-plan"] == (
-        "weave_frontend.artifact_retention_cli:main"
+        "weave_frontend.artifacts.retention.cli:main"
     )

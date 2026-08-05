@@ -12,14 +12,14 @@ from weave_frontend.artifact_reconciliation import (
     RetainedArtifactFamily,
     RetainedArtifactInventoryService,
 )
-from weave_frontend.artifact_retention import (
-    ARTIFACT_RETENTION_POLICY_FORMAT,
-    ArtifactRetentionPlanner,
-)
 from weave_frontend.artifacts.quarantine.restoration import (
     ArtifactQuarantineRestoreService,
 )
 from weave_frontend.artifacts.quarantine.service import ArtifactQuarantineService
+from weave_frontend.artifacts.retention import (
+    ARTIFACT_RETENTION_POLICY_FORMAT,
+    ArtifactRetentionPlanner,
+)
 from weave_frontend.database import Database
 
 _HEX32 = re.compile(r"^[0-9a-f]{32}$")
