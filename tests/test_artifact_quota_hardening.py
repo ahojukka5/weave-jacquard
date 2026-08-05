@@ -66,10 +66,13 @@ def test_hidden_files_inside_completed_artifacts_remain_in_quota(tmp_path: Path)
     (temporary / "artifact").write_bytes(b"abc")
     quota = _quota(root, max_bytes=6)
 
-    with pytest.raises(ArtifactQuotaExceededError) as captured, quota.admit(
-        family="committed_builds",
-        temporary=temporary,
-        final=root / ("b" * 32),
+    with (
+        pytest.raises(ArtifactQuotaExceededError) as captured,
+        quota.admit(
+            family="committed_builds",
+            temporary=temporary,
+            final=root / ("b" * 32),
+        ),
     ):
         raise AssertionError("hidden retained bytes were not counted")
 
@@ -85,10 +88,13 @@ def test_exact_stage_rejects_symlink_directory(tmp_path: Path) -> None:
     temporary.symlink_to(target, target_is_directory=True)
     quota = _quota(root, max_bytes=10)
 
-    with pytest.raises(ValidationError) as captured, quota.admit(
-        family="committed_builds",
-        temporary=temporary,
-        final=root / ("a" * 32),
+    with (
+        pytest.raises(ValidationError) as captured,
+        quota.admit(
+            family="committed_builds",
+            temporary=temporary,
+            final=root / ("a" * 32),
+        ),
     ):
         raise AssertionError("symlink stage unexpectedly admitted")
 

@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-import weave_frontend.artifact_reconciliation_cli as cli_module
+import weave_frontend.artifacts.reconciliation.cli as cli_module
 import weave_frontend.mcp_artifact_storage as artifact_module
 from weave_frontend.errors import ValidationError
 
@@ -74,9 +74,7 @@ def test_mcp_reconciliation_report_returns_structured_validation_error(
     response = artifact_module.artifact_reconciliation_report()
 
     assert response["ok"] is False
-    assert response["error"]["code"] == (
-        "ARTIFACT_RECONCILIATION_DATABASE_INVALID"
-    )
+    assert response["error"]["code"] == ("ARTIFACT_RECONCILIATION_DATABASE_INVALID")
 
 
 def test_cli_emits_report_and_closes_runtime(
@@ -144,16 +142,12 @@ def test_public_manifests_and_console_script_expose_reconciliation() -> None:
 
     tool_name = "artifact_reconciliation_report"
     assert tool_name in PUBLIC_TOOL_MANIFEST["tool_names"]
+    assert PUBLIC_APPLICATION_MANIFEST["tool_count"] == len(PUBLIC_TOOL_MANIFEST["tool_names"])
     assert (
-        PUBLIC_APPLICATION_MANIFEST["tool_count"]
-        == len(PUBLIC_TOOL_MANIFEST["tool_names"])
-    )
-    assert (
-        PUBLIC_APPLICATION_MANIFEST["tool_manifest_id"]
-        == PUBLIC_TOOL_MANIFEST["tool_manifest_id"]
+        PUBLIC_APPLICATION_MANIFEST["tool_manifest_id"] == PUBLIC_TOOL_MANIFEST["tool_manifest_id"]
     )
 
     project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
     assert project["project"]["scripts"]["weave-artifact-reconcile"] == (
-        "weave_frontend.artifact_reconciliation_cli:main"
+        "weave_frontend.artifacts.reconciliation.cli:main"
     )

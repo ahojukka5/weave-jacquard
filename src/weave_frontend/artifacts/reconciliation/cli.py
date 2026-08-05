@@ -7,9 +7,9 @@ import json
 import sys
 from typing import Any
 
-from .errors import ValidationError, WeaveFrontendError
-from .mcp_artifact_storage import artifact_reconciliation
-from .runtime_container import close_runtime_services
+from ...errors import ValidationError, WeaveFrontendError
+from ...mcp_artifact_storage import artifact_reconciliation
+from ...runtime_container import close_runtime_services
 
 
 def build_parser() -> argparse.ArgumentParser:

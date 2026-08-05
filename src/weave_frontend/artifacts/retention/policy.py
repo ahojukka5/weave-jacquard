@@ -7,8 +7,8 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
-from ...artifact_reconciliation import RETAINED_ARTIFACT_FAMILIES
 from ...errors import ValidationError
+from ..reconciliation import RETAINED_ARTIFACT_FAMILIES
 
 ARTIFACT_RETENTION_POLICY_FORMAT = "weave-artifact-retention-policy-v1"
 MAX_RETENTION_RULES = 64

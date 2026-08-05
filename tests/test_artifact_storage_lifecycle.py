@@ -35,8 +35,7 @@ def test_lifecycle_storage_distinguishes_retained_and_quarantined_bytes(
     }
     assert report["families"][0]["usage"] == report["usage"]
     assert (
-        report["usage"]["retained_logical_bytes"]
-        + report["usage"]["quarantined_logical_bytes"]
+        report["usage"]["retained_logical_bytes"] + report["usage"]["quarantined_logical_bytes"]
         == report["aggregate"]["logical_bytes"]
     )
     encoded = json.dumps(report, sort_keys=True)

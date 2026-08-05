@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 
-from weave_frontend.artifact_reachability import ArtifactReconciliationService
-from weave_frontend.artifact_reconciliation import (
+from weave_frontend.artifacts.reconciliation import (
+    ArtifactReconciliationService,
     RetainedArtifactFamily,
     RetainedArtifactInventoryService,
 )
