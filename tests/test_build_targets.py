@@ -7,6 +7,7 @@ import pytest
 
 from weave_frontend.build_targets import BuildTargetRegistry
 from weave_frontend.errors import ConflictError, NotFoundError, ValidationError
+from weave_frontend.sexpr import make_atom, make_form
 from weave_frontend.sexpr_service import SExpressionWorkspace
 
 MAIN = """(program
@@ -294,3 +295,20 @@ def test_target_validation_and_delete(tmp_path: Path) -> None:
             targets.get("demo", "app")
 
     assert deleted["deleted"] is True
+
+
+def test_persisted_target_requires_explicit_evidence_profile() -> None:
+    root = make_form("build-target")
+    for head, value in (
+        ("primary", "main.weave"),
+        ("compiler-target", "native"),
+    ):
+        field = make_form(head)
+        field["children"].append(make_atom("string", value))
+        root["children"].append(field)
+
+    with pytest.raises(ValidationError) as captured:
+        BuildTargetRegistry._parse_tree(root, name="app")
+
+    assert captured.value.code == "INVALID_BUILD_TARGET"
+    assert "exactly one evidence-profile" in str(captured.value)

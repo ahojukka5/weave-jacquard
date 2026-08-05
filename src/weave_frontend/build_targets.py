@@ -448,10 +448,10 @@ class BuildTargetRegistry:
                 "exactly one compiler-target field is required",
             )
         profiles = fields.get("evidence-profile", [])
-        if len(profiles) > 1:
+        if len(profiles) != 1:
             raise cls._invalid_tree(
                 name,
-                "at most one evidence-profile field is allowed",
+                "exactly one evidence-profile field is required",
             )
         primary = fields["primary"][0]
         sources = fields.get("source", [])
@@ -461,7 +461,7 @@ class BuildTargetRegistry:
             primary,
             sources,
             fields["compiler-target"][0],
-            normalize_evidence_profile(profiles[0] if profiles else None),
+            normalize_evidence_profile(profiles[0]),
         )
 
     @staticmethod
