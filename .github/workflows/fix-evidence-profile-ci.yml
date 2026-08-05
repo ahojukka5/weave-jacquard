@@ -19,7 +19,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply CI fixes
-        run: python scripts/fix_evidence_profile_ci.py
+        run: |
+          python scripts/fix_evidence_profile_ci.py
+          python scripts/fix_build_discovery_profile.py
 
       - name: Validate full portable suite
         run: |
@@ -50,5 +52,5 @@ jobs:
           git add -A
           git commit \
             -m "fix(compiler): complete evidence profile migration" \
-            -m "Use the global compiler protocol registry, migrate the concurrent target writer, and make all build-key v6 fixtures explicit about the none profile."
+            -m "Use the global compiler protocol registry, migrate every target and discovery path, and make build-key v6 fixtures explicit about the none profile."
           git push origin HEAD:agent/evidence-profile-ci-fix-runner
