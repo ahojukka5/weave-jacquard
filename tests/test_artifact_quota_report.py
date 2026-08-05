@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from weave_frontend.artifact_quota import ArtifactQuotaService
-from weave_frontend.artifact_storage import ArtifactStorageService
+from weave_frontend.artifacts.storage import ArtifactStorageService
 
 
 def test_quota_report_separates_retained_and_internal_staging_bytes(

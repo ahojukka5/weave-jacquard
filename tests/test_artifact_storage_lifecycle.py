@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from weave_frontend.artifact_storage_lifecycle import (
+from weave_frontend.artifacts.storage import (
     ARTIFACT_STORAGE_LIFECYCLE_FORMAT,
     ArtifactLifecycleStorageService,
 )

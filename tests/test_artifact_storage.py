@@ -6,13 +6,13 @@ from types import SimpleNamespace
 
 import pytest
 
-import weave_frontend.artifact_storage as storage_module
+import weave_frontend.artifacts.storage.accounting as storage_module
 import weave_frontend.mcp_artifact_storage as mcp_storage_module
-from weave_frontend.artifact_storage import (
+from weave_frontend.artifacts.reconciliation import RETAINED_ARTIFACT_FAMILIES
+from weave_frontend.artifacts.storage import (
     ARTIFACT_STORAGE_REPORT_FORMAT,
     ArtifactStorageService,
 )
-from weave_frontend.artifacts.reconciliation import RETAINED_ARTIFACT_FAMILIES
 from weave_frontend.errors import ValidationError
 
 

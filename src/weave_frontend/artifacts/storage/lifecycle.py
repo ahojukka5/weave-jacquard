@@ -8,12 +8,12 @@ import stat
 from pathlib import Path
 from typing import Any
 
-from .artifact_storage import (
+from ...errors import ValidationError
+from .accounting import (
     MAX_ARTIFACT_SCAN_DEPTH,
     MAX_ARTIFACT_SCAN_ENTRIES,
     ArtifactStorageService,
 )
-from .errors import ValidationError
 
 ARTIFACT_STORAGE_LIFECYCLE_FORMAT = "weave-artifact-storage-lifecycle-v1"
 _QUARANTINE_CAPSULE_NAME = re.compile(r"^\.quarantine-[0-9a-f]{64}$")
@@ -47,9 +47,7 @@ class ArtifactLifecycleStorageService(ArtifactStorageService):
                 {
                     **family,
                     "usage": {
-                        "retained_logical_bytes": (
-                            family["logical_bytes"] - quarantined
-                        ),
+                        "retained_logical_bytes": (family["logical_bytes"] - quarantined),
                         "quarantined_logical_bytes": quarantined,
                     },
                 }
@@ -63,17 +61,11 @@ class ArtifactLifecycleStorageService(ArtifactStorageService):
                 item["usage"]["quarantined_logical_bytes"] for item in families
             ),
         }
-        payload = {
-            key: value
-            for key, value in base.items()
-            if key != "storage_snapshot_id"
-        }
+        payload = {key: value for key, value in base.items() if key != "storage_snapshot_id"}
         payload.update(
             {
                 "lifecycle_format": ARTIFACT_STORAGE_LIFECYCLE_FORMAT,
-                "quarantine_accounting": (
-                    "reserved-top-level-capsule-namespace"
-                ),
+                "quarantine_accounting": ("reserved-top-level-capsule-namespace"),
                 "usage": usage,
                 "families": families,
             }
