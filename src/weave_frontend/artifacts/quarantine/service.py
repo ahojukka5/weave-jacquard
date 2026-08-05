@@ -8,7 +8,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from .artifact_quarantine_contract import (
+from ...artifact_retention import ArtifactRetentionPlanner
+from ...artifact_retention_accounting import ArtifactRetentionAccountant
+from ...artifact_retention_catalog import ArtifactRetentionCatalog
+from ...artifact_retention_policy import hash_json
+from ...errors import ValidationError
+from .contract import (
     ARTIFACT_QUARANTINE_FORMAT,
     ARTIFACT_QUARANTINE_INTENT_FORMAT,
     build_intent,
@@ -18,13 +23,8 @@ from .artifact_quarantine_contract import (
     validate_quarantine_request,
     verify_relocation,
 )
-from .artifact_quarantine_io import ArtifactQuarantineIO
-from .artifact_quarantine_state import ArtifactQuarantineState
-from .artifact_retention import ArtifactRetentionPlanner
-from .artifact_retention_accounting import ArtifactRetentionAccountant
-from .artifact_retention_catalog import ArtifactRetentionCatalog
-from .artifact_retention_policy import hash_json
-from .errors import ValidationError
+from .io import ArtifactQuarantineIO
+from .state import ArtifactQuarantineState
 
 
 class ArtifactQuarantineService:
@@ -32,9 +32,7 @@ class ArtifactQuarantineService:
 
     def __init__(self, reconciliation: Any) -> None:
         if not hasattr(reconciliation, "inventory"):
-            raise TypeError(
-                "reconciliation must expose its retained artifact inventory"
-            )
+            raise TypeError("reconciliation must expose its retained artifact inventory")
         self.reconciliation = reconciliation
         self.catalog = ArtifactRetentionCatalog(reconciliation)
         self.state = ArtifactQuarantineState(reconciliation)
@@ -50,13 +48,11 @@ class ArtifactQuarantineService:
     ) -> dict[str, Any]:
         """Publish one selected entry without deleting quarantined content."""
 
-        normalized_policy, normalized_plan, selected = (
-            validate_quarantine_request(
-                self.reconciliation,
-                policy,
-                plan,
-                entry_id=entry_id,
-            )
+        normalized_policy, normalized_plan, selected = validate_quarantine_request(
+            self.reconciliation,
+            policy,
+            plan,
+            entry_id=entry_id,
         )
         quarantine_id, quarantine_entry_id = quarantine_identities(
             normalized_plan,
@@ -129,20 +125,14 @@ class ArtifactQuarantineService:
                 "retention plan no longer reproduces from current state",
             )
 
-        reconciliation_id, entries, locations = self.catalog.snapshot(
-            plan["reconciliation_id"]
-        )
+        reconciliation_id, entries, locations = self.catalog.snapshot(plan["reconciliation_id"])
         if reconciliation_id != plan["reconciliation_id"]:
             raise ValidationError(
                 "ARTIFACT_QUARANTINE_STALE_PLAN",
                 "selected plan reconciliation is no longer current",
             )
         catalog_entry = next(
-            (
-                entry
-                for entry in entries
-                if entry["entry_id"] == selected["entry_id"]
-            ),
+            (entry for entry in entries if entry["entry_id"] == selected["entry_id"]),
             None,
         )
         if catalog_entry is None:
@@ -195,11 +185,7 @@ class ArtifactQuarantineService:
                 "artifact state changed while snapshotting the selected source",
             )
 
-        timestamp = (
-            time.time_ns()
-            if quarantined_at_unix_ns is None
-            else quarantined_at_unix_ns
-        )
+        timestamp = time.time_ns() if quarantined_at_unix_ns is None else quarantined_at_unix_ns
         if (
             isinstance(timestamp, bool)
             or not isinstance(timestamp, int)
@@ -294,9 +280,7 @@ class ArtifactQuarantineService:
             self.io.fsync_directory(family_root)
             self.io.fsync_directory(staging)
 
-        quarantined, _remaining = self._accountant(
-            intent["plan_limits"]
-        ).capture(
+        quarantined, _remaining = self._accountant(intent["plan_limits"]).capture(
             payload,
             intent["plan_limits"]["scan_entries"],
         )
@@ -343,9 +327,7 @@ class ArtifactQuarantineService:
                 "ARTIFACT_QUARANTINE_CAPSULE_INVALID",
                 "quarantine capsule has unexpected top-level entries",
             )
-        stored_intent = self.io.read_metadata(
-            capsule / "quarantine-intent.json"
-        )
+        stored_intent = self.io.read_metadata(capsule / "quarantine-intent.json")
         if stored_intent != dict(intent):
             raise ValidationError(
                 "ARTIFACT_QUARANTINE_METADATA_INVALID",
@@ -358,9 +340,7 @@ class ArtifactQuarantineService:
         )
         verify_relocation(intent["source_capture"], capture)
         expected_manifest = build_manifest(intent, capture)
-        manifest = self.io.read_metadata(
-            capsule / "quarantine-manifest.json"
-        )
+        manifest = self.io.read_metadata(capsule / "quarantine-manifest.json")
         if manifest != expected_manifest:
             raise ValidationError(
                 "ARTIFACT_QUARANTINE_METADATA_INVALID",

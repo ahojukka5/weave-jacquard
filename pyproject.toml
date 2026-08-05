@@ -40,10 +40,10 @@ weave-manifest-diff = "weave_jacquard.manifest_compatibility_cli:main"
 weave-release-compatibility = "weave_frontend.release_compatibility:main"
 weave-artifact-reconcile = "weave_frontend.artifact_reconciliation_cli:main"
 weave-artifact-retention-plan = "weave_frontend.artifact_retention_cli:main"
-weave-artifact-quarantine = "weave_frontend.artifact_quarantine_cli:main"
-weave-artifact-quarantine-restore = "weave_frontend.artifact_quarantine_restore_cli:main"
-weave-artifact-quarantine-verify = "weave_frontend.artifact_quarantine_lifecycle_cli:verification_main"
-weave-artifact-quarantine-delete = "weave_frontend.artifact_quarantine_lifecycle_cli:delete_main"
+weave-artifact-quarantine = "weave_frontend.artifacts.quarantine.cli:main"
+weave-artifact-quarantine-restore = "weave_frontend.artifacts.quarantine.restoration_cli:main"
+weave-artifact-quarantine-verify = "weave_frontend.artifacts.quarantine.lifecycle_cli:verification_main"
+weave-artifact-quarantine-delete = "weave_frontend.artifacts.quarantine.lifecycle_cli:delete_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-import weave_frontend.artifact_quarantine_cli as cli_module
+import weave_frontend.artifacts.quarantine.cli as cli_module
 
 _RESULT = {
     "format": "weave-artifact-quarantine-v1",
@@ -118,5 +118,5 @@ def test_console_script_exposes_operator_quarantine() -> None:
     project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
     assert project["project"]["scripts"]["weave-artifact-quarantine"] == (
-        "weave_frontend.artifact_quarantine_cli:main"
+        "weave_frontend.artifacts.quarantine.cli:main"
     )

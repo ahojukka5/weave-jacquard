@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-import weave_frontend.artifact_quarantine_lifecycle_cli as cli_module
+import weave_frontend.artifacts.quarantine.lifecycle_cli as cli_module
 
 _VERIFICATION = {
     "format": "weave-artifact-quarantine-verification-v1",
@@ -139,8 +139,8 @@ def test_console_scripts_expose_verification_and_guarded_delete() -> None:
     project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
     assert project["project"]["scripts"]["weave-artifact-quarantine-verify"] == (
-        "weave_frontend.artifact_quarantine_lifecycle_cli:verification_main"
+        "weave_frontend.artifacts.quarantine.lifecycle_cli:verification_main"
     )
     assert project["project"]["scripts"]["weave-artifact-quarantine-delete"] == (
-        "weave_frontend.artifact_quarantine_lifecycle_cli:delete_main"
+        "weave_frontend.artifacts.quarantine.lifecycle_cli:delete_main"
     )

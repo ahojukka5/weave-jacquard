@@ -8,20 +8,18 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from .artifact_quarantine_io import ArtifactQuarantineIO
-from .artifact_quarantine_restore_contract import (
+from ...artifact_retention_accounting import ArtifactRetentionAccountant
+from ...artifact_retention_policy import hash_json, is_sha256
+from ...errors import ValidationError
+from .io import ArtifactQuarantineIO
+from .restoration_contract import (
     validate_stored_manifest,
     validate_stored_quarantine_intent,
     verify_payload_against_manifest,
 )
-from .artifact_quarantine_state import ArtifactQuarantineState
-from .artifact_retention_accounting import ArtifactRetentionAccountant
-from .artifact_retention_policy import hash_json, is_sha256
-from .errors import ValidationError
+from .state import ArtifactQuarantineState
 
-ARTIFACT_QUARANTINE_VERIFICATION_FORMAT = (
-    "weave-artifact-quarantine-verification-v1"
-)
+ARTIFACT_QUARANTINE_VERIFICATION_FORMAT = "weave-artifact-quarantine-verification-v1"
 ARTIFACT_QUARANTINE_DELETE_AUTHORIZATION_FORMAT = (
     "weave-artifact-quarantine-delete-authorization-v1"
 )
@@ -33,9 +31,7 @@ class ArtifactQuarantineVerificationService:
 
     def __init__(self, reconciliation: Any) -> None:
         if not hasattr(reconciliation, "inventory"):
-            raise TypeError(
-                "reconciliation must expose its retained artifact inventory"
-            )
+            raise TypeError("reconciliation must expose its retained artifact inventory")
         self.reconciliation = reconciliation
         self.io = ArtifactQuarantineIO(reconciliation)
         self.state = ArtifactQuarantineState(reconciliation)
@@ -215,9 +211,7 @@ class ArtifactQuarantineVerificationService:
                 "ARTIFACT_QUARANTINE_VERIFICATION_CAPSULE_INVALID",
                 "quarantine capsule is incomplete or has unexpected entries",
             )
-        stored_intent = self.io.read_metadata(
-            capsule / "quarantine-intent.json"
-        )
+        stored_intent = self.io.read_metadata(capsule / "quarantine-intent.json")
         if stored_intent != dict(intent):
             raise ValidationError(
                 "ARTIFACT_QUARANTINE_VERIFICATION_METADATA_INVALID",
@@ -269,10 +263,9 @@ class ArtifactQuarantineVerificationService:
             return
         for family_record in snapshot["identity_families"]:
             for candidate in family_record["records"]:
-                if (
-                    candidate.get("artifact_id") == artifact_id
-                    and candidate.get("classification") in {"reachable", "missing"}
-                ):
+                if candidate.get("artifact_id") == artifact_id and candidate.get(
+                    "classification"
+                ) in {"reachable", "missing"}:
                     raise ValidationError(
                         "ARTIFACT_QUARANTINE_REQUIRED_EVIDENCE",
                         "current database state requires the quarantined artifact",
