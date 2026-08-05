@@ -1,5 +1,6 @@
 """Public compiler integration boundary."""
 
+from .artifacts import MAX_BUILD_MANIFEST_BYTES, CompilerArtifactMixin
 from .bridge import CompilerBridge
 from .capabilities import (
     CAPABILITIES_FORMAT,
@@ -16,7 +17,7 @@ from .diagnostics import (
     COMPILER_DIAGNOSTICS_FORMAT,
     collect_build_diagnostics,
 )
-from .inputs import MaterializedSource, RenderedSource
+from .inputs import CompilerInputMixin, MaterializedSource, RenderedSource
 from .io import (
     CompilerFileTooLarge,
     read_bounded_bytes,
@@ -41,14 +42,17 @@ __all__ = [
     "CAPABILITIES_TIMEOUT_SECONDS",
     "COMPILER_DIAGNOSTICS_FORMAT",
     "COMPILER_MANIFEST_FORMAT",
+    "MAX_BUILD_MANIFEST_BYTES",
     "MAX_CAPABILITIES_BYTES",
     "MAX_COMPILER_OUTPUT_BYTES",
     "MAX_COMPILER_PROTOCOL_BYTES",
     "MAX_WIR_BYTES",
     "CapabilityAwareWeavecValidator",
     "CapabilityGrammarIndex",
+    "CompilerArtifactMixin",
     "CompilerBridge",
     "CompilerFileTooLarge",
+    "CompilerInputMixin",
     "MaterializedSource",
     "RenderedSource",
     "WeavecCapabilities",
