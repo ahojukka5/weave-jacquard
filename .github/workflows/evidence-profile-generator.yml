@@ -19,7 +19,9 @@ jobs:
           fetch-depth: 0
 
       - name: Generate implementation
-        run: python scripts/evidence_profile_generator.py
+        run: |
+          python scripts/fix_evidence_generator.py
+          python scripts/evidence_profile_generator.py
 
       - name: Validate generated tree
         run: |
