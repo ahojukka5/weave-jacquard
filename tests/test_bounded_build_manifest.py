@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from weave_frontend.compiler_artifacts import (
+from weave_frontend.compiler import (
     MAX_BUILD_MANIFEST_BYTES,
     CompilerArtifactMixin,
 )

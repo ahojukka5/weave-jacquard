@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .build_targets import BuildTargetRegistry
-from .compiler_bridge import CompilerBridge
+from .compiler import CompilerBridge
 from .database import Database
 from .database_backup import DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS
 from .database_integrity import inspect_database

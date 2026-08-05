@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from weave_frontend.compiler_diagnostics import collect_build_diagnostics
+from weave_frontend.compiler import collect_build_diagnostics
 
 
 def _node_map() -> dict[str, object]:

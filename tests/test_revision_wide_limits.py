@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from weave_frontend.compiler_inputs import CompilerInputMixin
+from weave_frontend.compiler import CompilerInputMixin
 from weave_frontend.concurrent_build_targets import BuildTargetRegistry
 from weave_frontend.errors import ValidationError
 from weave_frontend.revision_limits import (

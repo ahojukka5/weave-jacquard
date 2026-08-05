@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .compiler_io import CompilerFileTooLarge, read_bounded_json
-from .compiler_limits import MAX_COMPILER_PROTOCOL_BYTES
+from .io import CompilerFileTooLarge, read_bounded_json
+from .limits import MAX_COMPILER_PROTOCOL_BYTES
 
 COMPILER_MANIFEST_FORMAT = "weavec-build-manifest-v1"
 

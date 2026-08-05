@@ -9,18 +9,18 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from .bounded_process import BoundedProcessResult, run_bounded_process
-from .compiler_artifacts import CompilerArtifactMixin
-from .compiler_diagnostics import collect_build_diagnostics
-from .compiler_inputs import CompilerInputMixin, RenderedSource
-from .compiler_io import CompilerFileTooLarge, read_bounded_json
-from .compiler_limits import (
+from ..bounded_process import BoundedProcessResult, run_bounded_process
+from ..errors import NotFoundError, ValidationError
+from .artifacts import CompilerArtifactMixin
+from .diagnostics import collect_build_diagnostics
+from .inputs import CompilerInputMixin, RenderedSource
+from .io import CompilerFileTooLarge, read_bounded_json
+from .limits import (
     BUILD_KEY_FORMAT,
     MAX_COMPILER_OUTPUT_BYTES,
     MAX_COMPILER_PROTOCOL_BYTES,
 )
-from .compiler_manifest import validate_compiler_manifest
-from .errors import NotFoundError, ValidationError
+from .manifest import validate_compiler_manifest
 
 
 class CompilerBridge(CompilerArtifactMixin, CompilerInputMixin):

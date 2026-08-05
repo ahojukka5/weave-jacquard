@@ -5,7 +5,7 @@ Public applications should import :mod:`weave_jacquard`. The historical
 and existing implementation modules retain compatibility.
 """
 
-from .compiler_bridge import CompilerBridge
+from .compiler import CompilerBridge
 from .errors import (
     ArtifactQuotaExceededError,
     ConflictError,

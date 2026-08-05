@@ -5,12 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from weave_frontend.compiler_capabilities import (
+from weave_frontend.compiler import (
+    MAX_COMPILER_OUTPUT_BYTES,
+    MAX_WIR_BYTES,
     CapabilityAwareWeavecValidator,
     CapabilityGrammarIndex,
     WeavecCapabilities,
 )
-from weave_frontend.compiler_limits import MAX_COMPILER_OUTPUT_BYTES, MAX_WIR_BYTES
 from weave_frontend.errors import ValidationError
 
 

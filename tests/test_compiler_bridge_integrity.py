@@ -7,9 +7,9 @@ from typing import Any
 
 import pytest
 
-import weave_frontend.compiler_bridge as bridge_module
-import weave_frontend.compiler_inputs as input_module
-from weave_frontend.compiler_bridge import CompilerBridge
+import weave_frontend.compiler.bridge as bridge_module
+import weave_frontend.compiler.inputs as input_module
+from weave_frontend.compiler import CompilerBridge
 
 
 class _Row(dict[str, str]):

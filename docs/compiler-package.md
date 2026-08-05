@@ -1,31 +1,11 @@
 # Compiler integration package
 
-Jacquard owns compiler integration through the public
-`weave_frontend.compiler` package. This boundary contains the complete client
-side of the final user-facing `weavec` contract while keeping revision,
-artifact-quota, runtime, storage, and MCP composition outside the package.
+Jacquard owns final-compiler integration through one package:
+`weave_frontend.compiler`.
 
-## Owned responsibilities
+## Public boundary
 
-The package owns:
-
-- bounded `weavec capabilities --json` execution and registry validation;
-- final-compiler binary identity and capability caching;
-- frontend validation and WIR retrieval;
-- revision-pinned build command construction and bounded process execution;
-- ordered compiler input materialization and stable node maps;
-- diagnostics and build-manifest protocol validation;
-- compiler artifact hashing, cache admission, and publication primitives;
-- compiler-specific byte ceilings and bounded text or JSON reads.
-
-The package consumes only lower-level process, source rendering, domain error,
-retained-artifact, and grammar primitives. It does not import database
-implementations, MCP presentation, runtime composition, artifact quota,
-build-target orchestration, or any compiler implementation repository.
-
-## Public API
-
-Application code imports compiler behavior from one surface:
+Application code imports compiler behavior only from the package surface:
 
 ```python
 from weave_frontend.compiler import (
@@ -35,38 +15,40 @@ from weave_frontend.compiler import (
 )
 ```
 
-`weave_frontend.compiler.__all__` is the supported package surface. Internal
-files such as `compiler_bridge.py`, `compiler_capabilities.py`, and
-`compiler_manifest.py` are implementation modules inside that package and are
-not application composition points.
+The package owns capability negotiation, bounded compiler execution, input
+materialization, diagnostics, manifests, artifact verification, and compiler
+resource limits. Revision orchestration, artifact quota, runtime composition,
+storage, and MCP presentation remain outside this package.
 
-The quota-aware production bridge remains in
-`weave_frontend.quota_aware_compiler_bridge`. It subclasses the public
-`CompilerBridge` and adds aggregate artifact admission after compiler work has
-completed. The verified workspace remains outside the package and composes the
-public capability and validator objects with revision state.
+## Internal structure
 
-## Compatibility paths
+The implementation modules each own one compiler concern:
 
-The former flat paths remain temporarily importable:
+- `bridge.py`: revision-pinned build orchestration;
+- `capabilities.py`: capability registry validation and lookup;
+- `validator.py`: frontend validation and WIR retrieval;
+- `inputs.py`: ordered source rendering and materialization;
+- `diagnostics.py`: compiler diagnostic validation and node mapping;
+- `manifest.py`: build-manifest validation;
+- `artifacts.py`: artifact identity, verification, and publication primitives;
+- `io.py`: bounded compiler-generated file reads;
+- `limits.py`: compiler-specific byte ceilings and identity formats.
 
-```python
-from weave_frontend.compiler_bridge import CompilerBridge
-from weave_frontend.compiler_capabilities import WeavecCapabilities
-from weave_frontend.weavec import WeavecValidator
-```
+These modules import lower-level Jacquard primitives directly with parent-package
+imports. Pass-through adapter modules are not part of the design.
 
-These files contain no compiler implementation. Each is a transparent module
-alias to its owned package module, so class identity, module-level monkeypatches,
-and existing error behavior remain unchanged. New production code must use
-`weave_frontend.compiler` directly.
+## Compatibility discipline
 
-Compatibility paths may be removed only in a deliberate public-API migration.
-Adding new logic to them is prohibited.
+The former flat compiler modules were internal implementation paths, not a
+supported public compatibility contract. They are removed rather than retained
+as aliases or forwarding modules.
+
+Do not add compatibility shims, duplicate import paths, forwarding modules, or
+deprecation wrappers without an explicit supported public compatibility
+requirement. When an internal boundary changes, migrate every repository caller
+and remove the obsolete path in the same change.
 
 ## Dependency direction
-
-The intended direction is:
 
 ```text
 MCP / CLI / runtime / revision / quota adapters
@@ -81,14 +63,7 @@ process + source map + grammar + domain errors + retained artifact I/O
           final public weavec binary
 ```
 
-The compiler package must never import `weavec0`, `weavec1`, bootstrap compiler
-code, MCP modules, database backends, runtime containers, or application quota
-services. Architecture tests enforce the module aliases, absence of flat
-implementation bodies, public API, and forbidden upper-layer imports.
-
-## Behavior preservation
-
-This refactor relocates the existing implementation blobs unchanged. Command
-construction, capability negotiation, target checks, diagnostics, manifest
-validation, artifact identity, caching, limits, and retention behavior remain
-owned by the same code. Only package ownership and import direction change.
+The compiler package must not import MCP modules, database backends, runtime
+containers, application quota services, `weavec0`, `weavec1`, or bootstrap
+compiler code. Architecture tests enforce the package contents, dependency
+direction, and absence of obsolete compiler import paths.
