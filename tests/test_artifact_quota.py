@@ -13,7 +13,7 @@ from weave_frontend.artifact_quota import (
     artifact_quota_admission,
     parse_artifact_quota,
 )
-from weave_frontend.artifact_storage import ArtifactStorageService
+from weave_frontend.artifacts.storage import ArtifactStorageService
 from weave_frontend.errors import ArtifactQuotaExceededError, ValidationError
 from weave_frontend.mcp_server import _result
 

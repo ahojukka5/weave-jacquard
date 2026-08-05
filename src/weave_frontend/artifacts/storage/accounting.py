@@ -10,7 +10,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-from .errors import ValidationError
+from ...errors import ValidationError
 
 ARTIFACT_STORAGE_REPORT_FORMAT = "weave-artifact-storage-report-v1"
 ARTIFACT_STORAGE_ROOT_ID_FORMAT = "weave-artifact-storage-root-v1"
@@ -26,9 +26,7 @@ class ArtifactStorageService:
         if not isinstance(roots, Mapping) or not roots:
             raise ValueError("artifact roots must be a non-empty mapping")
         if len(roots) > MAX_ARTIFACT_STORAGE_ROOTS:
-            raise ValueError(
-                f"artifact roots exceed the limit {MAX_ARTIFACT_STORAGE_ROOTS}"
-            )
+            raise ValueError(f"artifact roots exceed the limit {MAX_ARTIFACT_STORAGE_ROOTS}")
 
         normalized: dict[str, Path] = {}
         for name, value in roots.items():
@@ -166,11 +164,7 @@ class ArtifactStorageService:
                         entry_path = Path(entry.path)
                         if entry_path in skipped_paths:
                             continue
-                        if (
-                            exclude_internal_entries
-                            and depth == 0
-                            and entry.name.startswith(".")
-                        ):
+                        if exclude_internal_entries and depth == 0 and entry.name.startswith("."):
                             continue
                         try:
                             entry_stat = entry.stat(follow_symlinks=False)
