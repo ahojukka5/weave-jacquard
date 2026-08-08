@@ -1,21 +1,11 @@
 name: Bounded process stress
 
+# The 1000-iteration matrix is soak/confidence evidence, not a merge gate.
+# Keep it available on a schedule and on demand while ordinary pull requests
+# rely on the bounded-process unit tests in the main CI workflow.
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/bounded-process-stress.yml
-      - scripts/stress_bounded_process.py
-      - src/weave_frontend/bounded_process.py
-      - tests/test_bounded_compiler_io.py
-      - tests/test_bounded_process_group_cleanup.py
-  pull_request:
-    paths:
-      - .github/workflows/bounded-process-stress.yml
-      - scripts/stress_bounded_process.py
-      - src/weave_frontend/bounded_process.py
-      - tests/test_bounded_compiler_io.py
-      - tests/test_bounded_process_group_cleanup.py
+  schedule:
+    - cron: '31 2 * * 2,5'
   workflow_dispatch:
 
 permissions:
@@ -25,24 +15,9 @@ defaults:
   run:
     shell: bash
 
-concurrency:
-  group: bounded-process-stress-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  guard-self-hosted:
-    name: Verify trusted source for self-hosted jobs
-    runs-on: ubuntu-latest
-    steps:
-      - name: Reject pull requests from forks
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
-        run: |
-          echo "::error::Self-hosted runner jobs do not run for pull requests from forks."
-          exit 1
-
   stress:
     name: Run 1000-iteration termination matrix
-    needs: guard-self-hosted
     runs-on: self-hosted
     timeout-minutes: 15
 
