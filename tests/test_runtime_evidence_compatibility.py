@@ -6,7 +6,7 @@ from copy import deepcopy
 
 import pytest
 
-from weave_frontend.runtime_evidence_compatibility import (
+from weave_frontend.runtime import (
     RUNTIME_IDENTITY_COMPATIBILITY_DIFF_FORMAT,
     RUNTIME_IDENTITY_FORMAT,
     SERVICE_GRAPH_COMPATIBILITY_DIFF_FORMAT,

@@ -14,7 +14,7 @@ from .manifest_compatibility import (
     ManifestCompatibilityError,
     compare_manifests,
 )
-from .runtime_evidence_compatibility import (
+from .runtime import (
     RUNTIME_IDENTITY_FORMAT,
     SERVICE_GRAPH_FORMAT,
     RuntimeEvidenceCompatibilityError,

@@ -1,6 +1,15 @@
 """Public runtime configuration, lifecycle, identity, and composition boundary."""
 
 from .binding import bind_application_runtime
+from .compatibility import (
+    RUNTIME_IDENTITY_COMPATIBILITY_DIFF_FORMAT,
+    SERVICE_GRAPH_COMPATIBILITY_DIFF_FORMAT,
+    SERVICE_GRAPH_FORMAT,
+    RuntimeEvidenceCompatibilityError,
+    compare_runtime_evidence,
+    compare_runtime_identities,
+    compare_service_graphs,
+)
 from .config import PUBLIC_CONFIGURATION_VARIABLES, RuntimeConfig
 from .container import (
     RUNTIME_SERVICE_GRAPH_FORMAT,
@@ -39,15 +48,19 @@ __all__ = [
     "CompilerBridge",
     "MAX_RUNTIME_VERSION_BYTES",
     "PUBLIC_CONFIGURATION_VARIABLES",
+    "RUNTIME_IDENTITY_COMPATIBILITY_DIFF_FORMAT",
     "RUNTIME_IDENTITY_FORMAT",
     "RUNTIME_SERVICE_GRAPH_FORMAT",
     "RUNTIME_VERSION_TIMEOUT_SECONDS",
     "RuntimeBubblewrapSandbox",
     "RuntimeClosedError",
     "RuntimeConfig",
+    "RuntimeEvidenceCompatibilityError",
     "RuntimeIdentityService",
     "RuntimeServiceCycleError",
     "RuntimeServices",
+    "SERVICE_GRAPH_COMPATIBILITY_DIFF_FORMAT",
+    "SERVICE_GRAPH_FORMAT",
     "TestBatchService",
     "TestRunService",
     "TestedMergeAttestationService",
@@ -55,6 +68,9 @@ __all__ = [
     "clear_runtime_compiler_bridge",
     "clear_runtime_service",
     "close_runtime_services",
+    "compare_runtime_evidence",
+    "compare_runtime_identities",
+    "compare_service_graphs",
     "compiler_bridge_cache_info",
     "install_runtime_services",
     "reset_runtime_services",

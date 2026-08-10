@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from weave_frontend import manifest_compatibility_cli as cli
-from weave_frontend.runtime_evidence_compatibility import SERVICE_GRAPH_FORMAT
+from weave_frontend.runtime import SERVICE_GRAPH_FORMAT
 from weave_jacquard.manifest_compatibility_cli import main as public_main
 
 
