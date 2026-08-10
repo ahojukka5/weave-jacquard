@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from weave_frontend import SExpressionWorkspace, ValidationError
-from weave_frontend.concurrent_build_targets import BuildTargetRegistry
+from weave_frontend.builds import ConcurrentBuildTargetRegistry as BuildTargetRegistry
 
 PROGRAM_A = """(program
   (name \"program-target-concurrency\")

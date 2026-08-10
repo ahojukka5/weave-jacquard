@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from weave_frontend import NotFoundError, SExpressionWorkspace, ValidationError
-from weave_frontend.concurrent_build_targets import BuildTargetRegistry
+from weave_frontend.builds import ConcurrentBuildTargetRegistry as BuildTargetRegistry
 from weave_frontend.concurrent_merge_policy import MergePolicyRegistry
 from weave_frontend.resume_snapshot import (
     MAX_CONTEXT_PREVIEW_CHARS,
