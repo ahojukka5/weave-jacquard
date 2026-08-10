@@ -1,4 +1,4 @@
-"""Public runtime configuration, lifecycle, and composition boundary."""
+"""Public runtime configuration, lifecycle, identity, and composition boundary."""
 
 from .binding import bind_application_runtime
 from .config import PUBLIC_CONFIGURATION_VARIABLES, RuntimeConfig
@@ -19,6 +19,13 @@ from .container import (
     runtime_services,
     workspace_cache_info,
 )
+from .identity import (
+    CONFIGURATION_VALUE_ID_FORMAT,
+    MAX_RUNTIME_VERSION_BYTES,
+    RUNTIME_IDENTITY_FORMAT,
+    RUNTIME_VERSION_TIMEOUT_SECONDS,
+    RuntimeIdentityService,
+)
 from .publication import (
     CompilerBridge,
     TestBatchService,
@@ -28,12 +35,17 @@ from .publication import (
 from .sandbox import RuntimeBubblewrapSandbox
 
 __all__ = [
+    "CONFIGURATION_VALUE_ID_FORMAT",
     "CompilerBridge",
+    "MAX_RUNTIME_VERSION_BYTES",
     "PUBLIC_CONFIGURATION_VARIABLES",
+    "RUNTIME_IDENTITY_FORMAT",
     "RUNTIME_SERVICE_GRAPH_FORMAT",
+    "RUNTIME_VERSION_TIMEOUT_SECONDS",
     "RuntimeBubblewrapSandbox",
     "RuntimeClosedError",
     "RuntimeConfig",
+    "RuntimeIdentityService",
     "RuntimeServiceCycleError",
     "RuntimeServices",
     "TestBatchService",
