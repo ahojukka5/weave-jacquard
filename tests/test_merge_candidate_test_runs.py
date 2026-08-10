@@ -7,12 +7,12 @@ from typing import Any
 
 import pytest
 
+from weave_frontend.builds import MetadataBuildTargetRegistry as BuildTargetRegistry
 from weave_frontend.compiler import CompilerBridge
 from weave_frontend.errors import ArtifactIntegrityError
 from weave_frontend.merge_candidate_build import MergeCandidateBuildService
 from weave_frontend.merge_candidate_test_runs import MergeCandidateTestBatchService
 from weave_frontend.merge_preview import MERGE_PREVIEW_FORMAT
-from weave_frontend.metadata_build_targets import BuildTargetRegistry
 from weave_frontend.sandbox import SandboxLimits, SandboxResult
 from weave_frontend.sexpr import make_atom, make_form
 from weave_frontend.test_target_views import VerifiedTestTargetRegistry

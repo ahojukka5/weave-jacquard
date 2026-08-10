@@ -6,8 +6,8 @@ from typing import Any
 
 from . import mcp_build as _build
 from . import selected_merge_train_preview as _train
+from .builds import MetadataBuildTargetRegistry as BuildTargetRegistry
 from .mcp_server import _result, mcp, workspace
-from .metadata_build_targets import BuildTargetRegistry
 from .metadata_merge_impact import MergeTargetImpactService
 from .metadata_merge_preview import MergePreviewService
 from .metadata_selected_merge_train_preview import SelectedMergeTrainPreviewService

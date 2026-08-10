@@ -9,7 +9,7 @@ from weave_frontend.build_target_validation import (
     build_target_references,
     validate_build_target_references,
 )
-from weave_frontend.metadata_build_targets import BuildTargetRegistry
+from weave_frontend.builds import MetadataBuildTargetRegistry as BuildTargetRegistry
 from weave_frontend.metadata_merge_preview import MergePreviewService
 
 
