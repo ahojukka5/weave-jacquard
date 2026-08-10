@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import mcp_build as _build
-from .concurrent_build_targets import BuildTargetRegistry
+from .builds import ConcurrentBuildTargetRegistry as BuildTargetRegistry
 
 # The registry cache contains no external resources. Replace the implementation
 # and clear any test-populated instance before registering the final write tools.
