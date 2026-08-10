@@ -5,6 +5,7 @@ from .concurrency import BuildTargetRegistry as ConcurrentBuildTargetRegistry
 from .discovery import BUILD_CATALOG_FORMAT, BUILD_LIST_FORMAT, MAX_BUILD_LIST_PAGE_SIZE
 from .inspection import MAX_DIAGNOSTIC_PAGE_SIZE, BuildInspectionService
 from .metadata import BuildTargetRegistry as MetadataBuildTargetRegistry
+from .references import build_target_references, validate_build_target_references
 
 __all__ = [
     "BUILD_CATALOG_FORMAT",
@@ -16,4 +17,6 @@ __all__ = [
     "MAX_BUILD_LIST_PAGE_SIZE",
     "MAX_DIAGNOSTIC_PAGE_SIZE",
     "MetadataBuildTargetRegistry",
+    "build_target_references",
+    "validate_build_target_references",
 ]

@@ -5,11 +5,11 @@ from pathlib import Path
 import pytest
 
 from weave_frontend import SExpressionWorkspace, ValidationError
-from weave_frontend.build_target_validation import (
+from weave_frontend.builds import MetadataBuildTargetRegistry as BuildTargetRegistry
+from weave_frontend.builds import (
     build_target_references,
     validate_build_target_references,
 )
-from weave_frontend.builds import MetadataBuildTargetRegistry as BuildTargetRegistry
 from weave_frontend.metadata_merge_preview import MergePreviewService
 
 
