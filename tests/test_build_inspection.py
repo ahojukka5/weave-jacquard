@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from weave_frontend.build_inspection import BuildInspectionService
+from weave_frontend.builds import BuildInspectionService
 from weave_frontend.errors import ValidationError
 
 

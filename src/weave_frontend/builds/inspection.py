@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
-from .errors import ValidationError
+from ..errors import ValidationError
 
 MAX_DIAGNOSTIC_PAGE_SIZE = 200
 
