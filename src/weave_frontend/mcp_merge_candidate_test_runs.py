@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .build_inspection import BuildInspectionService
+from .builds import BuildInspectionService
 from .mcp_build import build_targets, compiler_bridge, merge_previews
 from .mcp_server import _result, mcp
 from .mcp_test_targets import test_targets
