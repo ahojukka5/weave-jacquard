@@ -30,6 +30,7 @@ def test_build_catalog_implementation_is_not_flattened_into_package_root() -> No
     for module in (
         "build_discovery",
         "build_inspection",
+        "build_target_validation",
         "concurrent_build_targets",
         "metadata_build_targets",
         "verified_build_discovery",
@@ -83,4 +84,6 @@ def test_builds_public_boundary_is_explicit() -> None:
         "MAX_BUILD_LIST_PAGE_SIZE",
         "MAX_DIAGNOSTIC_PAGE_SIZE",
         "MetadataBuildTargetRegistry",
+        "build_target_references",
+        "validate_build_target_references",
     }.issubset(exported)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .build_target_validation import validate_build_target_references
+from .builds import validate_build_target_references
 from .errors import ConflictError, NotFoundError, ValidationError
 from .merge_preview import MergePreviewService
 from .task_contracts import validate_task_contract_references

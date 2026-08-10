@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from .build_targets import BUILD_TARGET_PREFIX, BuildTargetRegistry
-from .errors import ValidationError
-from .project_metadata import is_project_metadata_document
-from .sexpr import JsonObject
+from ..build_targets import BUILD_TARGET_PREFIX, BuildTargetRegistry
+from ..errors import ValidationError
+from ..project_metadata import is_project_metadata_document
+from ..sexpr import JsonObject
 
 
 def build_target_references(
