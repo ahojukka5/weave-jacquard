@@ -19,8 +19,9 @@ env:
 
 jobs:
   native-qualification:
-    name: Pinned compiler qualification
-    runs-on: ubuntu-latest
+    name: "test: native E2E against pinned weavec"
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: self-hosted
     timeout-minutes: 60
 
     steps:
@@ -28,8 +29,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up job-local scratch directories
-        # Job-level env cannot reference the runner context, so these are
-        # published here instead of in the job's env block.
         run: |
           echo "QUALIFICATION_DIR=${{ runner.temp }}/jacquard-native-qualification" >> "$GITHUB_ENV"
           echo "COMPILER_STAGE=${{ runner.temp }}/jacquard-weavec-provider" >> "$GITHUB_ENV"
@@ -45,16 +44,16 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e '.[dev]'
 
-      - name: Install native, compiler, and sandbox runtimes
+      - name: Verify native, compiler, and sandbox runtimes
         run: |
-          sudo apt-get update
-          sudo apt-get install -y bubblewrap clang file llvm
-          if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
-            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          fi
-          if [[ -e /proc/sys/kernel/unprivileged_userns_clone ]]; then
-            sudo sysctl -w kernel.unprivileged_userns_clone=1
-          fi
+          set -euo pipefail
+          command -v bwrap
+          command -v clang
+          command -v file
+          command -v llvm-as
+          bwrap --version
+          clang --version
+          llvm-as --version
 
       - name: Build and verify exact weavec provider
         run: |
