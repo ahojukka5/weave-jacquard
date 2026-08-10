@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from weave_frontend.build_discovery import (
+from weave_frontend.builds import (
     BUILD_CATALOG_FORMAT,
     BUILD_LIST_FORMAT,
     BuildDiscoveryService,
