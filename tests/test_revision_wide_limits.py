@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
+from weave_frontend.builds import ConcurrentBuildTargetRegistry as BuildTargetRegistry
 from weave_frontend.compiler import CompilerInputMixin
-from weave_frontend.concurrent_build_targets import BuildTargetRegistry
 from weave_frontend.errors import ValidationError
 from weave_frontend.revision_limits import (
     MAX_BRANCH_HISTORY_PAGE_SIZE,
