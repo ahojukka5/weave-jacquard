@@ -8,8 +8,12 @@ from .errors import ValidationError
 from .mcp_build import compiler_bridge
 from .mcp_server import _result, mcp, workspace
 from .mcp_test_runs import test_runs
-from .runtime import runtime_config, runtime_service, runtime_services
-from .runtime_identity import RuntimeIdentityService
+from .runtime import (
+    RuntimeIdentityService,
+    runtime_config,
+    runtime_service,
+    runtime_services,
+)
 
 
 def _application_manifest() -> dict[str, Any]:

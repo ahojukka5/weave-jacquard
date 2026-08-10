@@ -9,7 +9,7 @@ from typing import Any
 from weave_frontend.errors import ValidationError
 from weave_frontend.mcp_capabilities import PUBLIC_CAPABILITIES
 from weave_frontend.mcp_revert_guidance import weave_help
-from weave_frontend.runtime_identity import (
+from weave_frontend.runtime import (
     RUNTIME_IDENTITY_FORMAT,
     RuntimeIdentityService,
 )

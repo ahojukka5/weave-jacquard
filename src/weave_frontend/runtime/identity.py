@@ -13,9 +13,9 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from .bounded_process import run_bounded_process
-from .database import SCHEMA_VERSION
-from .errors import ValidationError
+from ..bounded_process import run_bounded_process
+from ..database import SCHEMA_VERSION
+from ..errors import ValidationError
 
 RUNTIME_IDENTITY_FORMAT = "weave-jacquard-runtime-identity-v1"
 CONFIGURATION_VALUE_ID_FORMAT = "weave-jacquard-configuration-value-v1"
