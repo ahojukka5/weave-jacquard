@@ -3,6 +3,19 @@
 The `runtime_identity` MCP tool reports the exact Jacquard application and active
 execution components used by one server process.
 
+## Implementation boundary
+
+Runtime identity generation and runtime-evidence compatibility are owned by the
+public `weave_frontend.runtime` domain. Cross-domain callers import supported
+identity formats, comparison functions, errors, and `RuntimeIdentityService` from
+that boundary rather than implementation submodules.
+
+`mcp_runtime_identity.py` remains a thin MCP composition adapter: it binds the
+runtime-owned identity service to the active workspace, compiler, sandbox, and
+service graph and registers the public tool. It does not own the identity format
+or compatibility policy. No forwarding aliases for the former root-level runtime
+identity modules are retained.
+
 ## Purpose
 
 A stored build or audit is useful only when its producing software and runtime

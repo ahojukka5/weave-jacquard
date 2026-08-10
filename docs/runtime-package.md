@@ -2,8 +2,9 @@
 
 The process runtime is owned by `weave_frontend.runtime`. The package captures
 immutable startup configuration, owns process and task-local service lifecycles,
-selects scoped application runtimes, constructs the production sandbox, and
-provides the concrete quota-capable publisher types used by MCP composition.
+selects scoped application runtimes, constructs the production sandbox, provides
+the concrete quota-capable publisher types used by MCP composition, and owns
+runtime identity plus semantic compatibility of runtime evidence.
 
 ## Public boundary
 
@@ -14,7 +15,8 @@ from weave_frontend.runtime import RuntimeConfig, RuntimeServices
 ```
 
 Production code does not import `runtime.config`, `runtime.container`,
-`runtime.binding`, `runtime.sandbox`, or `runtime.publication` directly.
+`runtime.binding`, `runtime.sandbox`, `runtime.publication`, `runtime.identity`, or
+`runtime.compatibility` directly.
 
 ## Internal responsibilities
 
@@ -25,7 +27,10 @@ Production code does not import `runtime.config`, `runtime.container`,
 - `sandbox.py` constructs the environment-independent bubblewrap backend;
 - `publication.py` defines the concrete compiler, test-run, test-batch, and
   attestation publishers that compose base domains with aggregate quota
-  admission.
+  admission;
+- `identity.py` creates the redacted, content-derived live runtime identity;
+- `compatibility.py` validates and compares runtime identity and service-graph
+  evidence without changing their persisted format identifiers.
 
 ## Dependency direction
 
@@ -35,5 +40,10 @@ depend back on runtime. The runtime container constructs the concrete production
 compiler bridge directly; no object type mutation, upgrade adapter, forwarding
 module, or deprecated import path remains.
 
-Environment variables, service graph formats, cache evidence, sandbox behavior,
-MCP contracts, artifact formats, and publication semantics are unchanged.
+The MCP runtime-identity registration and the manifest compatibility CLI are thin
+consumers of the public `weave_frontend.runtime` boundary. They do not own runtime
+identity or compatibility implementation.
+
+Environment variables, runtime identity and service graph formats, compatibility
+classification formats, cache evidence, sandbox behavior, MCP contracts, artifact
+formats, and publication semantics are unchanged.
