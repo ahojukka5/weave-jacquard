@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..build_targets import BuildTargetRegistry as _BaseBuildTargetRegistry
 from ..compiler import normalize_evidence_profile
 from ..errors import NotFoundError, ValidationError
 from ..revision_limits import MAX_BUILD_DOCUMENTS
 from ..sexpr import validate_tree
+from .targets import BuildTargetRegistry as _BaseBuildTargetRegistry
 
 
 class BuildTargetRegistry(_BaseBuildTargetRegistry):
