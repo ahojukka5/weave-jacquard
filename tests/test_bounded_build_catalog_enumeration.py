@@ -5,12 +5,12 @@ from types import SimpleNamespace
 
 import pytest
 
-import weave_frontend.verified_build_discovery as discovery_module
+import weave_frontend.builds.catalog as discovery_module
+from weave_frontend.builds import BuildDiscoveryService
 from weave_frontend.errors import ValidationError
 from weave_frontend.mcp_build_discovery import (
     BuildDiscoveryService as ProductionBuildDiscoveryService,
 )
-from weave_frontend.verified_build_discovery import BuildDiscoveryService
 
 
 def _service(root: Path) -> BuildDiscoveryService:

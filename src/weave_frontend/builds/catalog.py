@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from .build_discovery import BuildDiscoveryService as _BuildDiscoveryService
-from .errors import ValidationError
+from ..errors import ValidationError
+from .discovery import BuildDiscoveryService as _BuildDiscoveryService
 
 MAX_BUILD_CATALOG_ENTRIES = 65_536
 

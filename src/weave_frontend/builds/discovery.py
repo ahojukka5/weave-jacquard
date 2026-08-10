@@ -8,8 +8,8 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
-from .compiler import BUILD_KEY_FORMAT, normalize_evidence_profile
-from .errors import NotFoundError, ValidationError
+from ..compiler import BUILD_KEY_FORMAT, normalize_evidence_profile
+from ..errors import NotFoundError, ValidationError
 
 BUILD_LIST_FORMAT = "weave-build-list-page-v1"
 BUILD_CATALOG_FORMAT = "weave-build-catalog-v1"

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from .builds import BuildDiscoveryService
 from .mcp_build import compiler_bridge
 from .mcp_server import _result, mcp
 from .runtime import runtime_service
-from .verified_build_discovery import BuildDiscoveryService
 
 
 @runtime_service("build_discovery", depends_on=("compiler_bridge",))
