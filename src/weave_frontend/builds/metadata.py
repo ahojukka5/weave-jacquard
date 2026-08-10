@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from .builds import ConcurrentBuildTargetRegistry as _BaseBuildTargetRegistry
-from .errors import NotFoundError, ValidationError
-from .project_metadata import is_project_metadata_document
-from .sexpr import JsonObject
-from .test_target_validation import require_build_target_not_referenced
+from ..errors import NotFoundError, ValidationError
+from ..project_metadata import is_project_metadata_document
+from ..sexpr import JsonObject
+from ..test_target_validation import require_build_target_not_referenced
+from .concurrency import BuildTargetRegistry as _BaseBuildTargetRegistry
 
 
 class BuildTargetRegistry(_BaseBuildTargetRegistry):

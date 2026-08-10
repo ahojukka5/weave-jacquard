@@ -7,7 +7,7 @@ import pytest
 
 from weave_frontend import SExpressionWorkspace, ValidationError
 from weave_frontend.batch_edit import EditBatchExecutor
-from weave_frontend.metadata_build_targets import BuildTargetRegistry
+from weave_frontend.builds import MetadataBuildTargetRegistry as BuildTargetRegistry
 from weave_frontend.project_metadata import TASK_CONTRACT_PREFIX
 from weave_frontend.task_contracts import TaskContractRegistry
 from weave_frontend.task_scoped_batch import TaskScopedBatchExecutor

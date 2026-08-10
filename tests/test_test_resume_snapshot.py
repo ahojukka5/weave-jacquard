@@ -6,8 +6,8 @@ import pytest
 
 from weave_frontend import SExpressionWorkspace, ValidationError
 from weave_frontend.agent_checkpoint import AgentCheckpointRegistry
+from weave_frontend.builds import MetadataBuildTargetRegistry as BuildTargetRegistry
 from weave_frontend.concurrent_merge_policy import MergePolicyRegistry
-from weave_frontend.metadata_build_targets import BuildTargetRegistry
 from weave_frontend.test_resume_snapshot import MAX_RESUME_TEST_TARGETS
 from weave_frontend.test_resume_snapshot import (
     TestResumeSnapshotService as _TestResumeSnapshotService,
