@@ -17,7 +17,7 @@ defaults:
 
 jobs:
   stress:
-    name: Run 1000-iteration termination matrix
+    name: "test: 1000-iteration bounded process termination stress"
     runs-on: self-hosted
     timeout-minutes: 15
 
