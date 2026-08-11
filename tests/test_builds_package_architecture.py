@@ -31,6 +31,7 @@ def test_build_catalog_implementation_is_not_flattened_into_package_root() -> No
         "build_discovery",
         "build_inspection",
         "build_target_validation",
+        "build_targets",
         "concurrent_build_targets",
         "metadata_build_targets",
         "verified_build_discovery",
@@ -77,8 +78,10 @@ def test_builds_public_boundary_is_explicit() -> None:
     assert {
         "BUILD_CATALOG_FORMAT",
         "BUILD_LIST_FORMAT",
+        "BUILD_TARGET_PREFIX",
         "BuildDiscoveryService",
         "BuildInspectionService",
+        "BuildTargetRegistry",
         "ConcurrentBuildTargetRegistry",
         "MAX_BUILD_CATALOG_ENTRIES",
         "MAX_BUILD_LIST_PAGE_SIZE",
