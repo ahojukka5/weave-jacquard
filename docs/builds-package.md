@@ -1,7 +1,7 @@
 # Builds package
 
-Immutable build discovery, retained diagnostic inspection, and build-target policy
-are owned by `weave_frontend.builds`.
+Immutable build discovery, retained diagnostic inspection, build-target policy, and
+compiler-facing target validation are owned by `weave_frontend.builds`.
 
 ## Public boundary
 
@@ -13,6 +13,7 @@ from weave_frontend.builds import (
     BuildDiscoveryService,
     BuildInspectionService,
     BuildTargetRegistry,
+    BuildTargetValidator,
     ConcurrentBuildTargetRegistry,
     MetadataBuildTargetRegistry,
     validate_build_target_references,
@@ -34,16 +35,17 @@ Production callers do not import implementation modules below `builds` directly.
 - `concurrency.py` extends the base registry with bounded document sets and
   compare-and-set branch publication for race-safe target writes;
 - `metadata.py` adds project-metadata exclusion and test-target reference safety;
-- `references.py` owns exact-state validation for build-target source references.
+- `references.py` owns exact-state validation for build-target source references;
+- `validation.py` validates the exact target revision and ordered source set through
+  the configured compiler frontend while retaining compiler capability identity.
 
 The public MCP tools, stored formats, validation codes, pagination behavior, hash
-checks, build-root limits, target serialization, metadata semantics, and
-concurrency behavior are unchanged. The former root-level `build_discovery.py`,
-`verified_build_discovery.py`, `build_inspection.py`, `build_targets.py`,
-`concurrent_build_targets.py`, `metadata_build_targets.py`, and
-`build_target_validation.py` modules are removed without forwarding aliases.
+checks, build-root limits, target serialization, metadata semantics, concurrency
+behavior, CLI commands, and compiler validation evidence are unchanged. The former
+root-level `build_discovery.py`, `verified_build_discovery.py`,
+`build_inspection.py`, `build_targets.py`, `concurrent_build_targets.py`,
+`metadata_build_targets.py`, `build_target_validation.py`, and
+`target_validation.py` modules are removed without forwarding aliases.
 
-Compiler-facing target validation, compiler publication, and the `weave-build`
-entry point remain cross-domain consumers for the next focused build-domain slice
-under refactor epic #197; their target-registry dependency already enters through
-the public builds boundary.
+Compiler publication and the `weave-build` entry point remain cross-domain
+adapters; all target-domain dependencies enter through the public builds boundary.
