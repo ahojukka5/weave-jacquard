@@ -10,9 +10,7 @@ from weave_frontend import (
     mcp_project_merge_queue,
     mcp_selected_merge_preflight_batch,
 )
-from weave_frontend.selected_merge_preflight_batch import (
-    SelectedMergePreflightBatchService,
-)
+from weave_frontend.merges import SelectedMergePreflightBatchService
 
 
 class _Batches:

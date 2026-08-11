@@ -7,8 +7,8 @@ from typing import Any
 from .mcp_preflight import merge_preflights
 from .mcp_project_merge_queue import project_merge_queues
 from .mcp_server import _result, mcp
+from .merges import SelectedMergePreflightBatchService
 from .runtime import runtime_service
-from .selected_merge_preflight_batch import SelectedMergePreflightBatchService
 
 
 @runtime_service(
