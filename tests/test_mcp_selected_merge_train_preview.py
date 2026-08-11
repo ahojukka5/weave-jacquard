@@ -9,9 +9,7 @@ from weave_frontend import (
     mcp_project_merge_queue,
     mcp_selected_merge_train_preview,
 )
-from weave_frontend.selected_merge_train_preview import (
-    SelectedMergeTrainPreviewService,
-)
+from weave_frontend.merges import SelectedMergeTrainPreviewService
 
 
 class _Trains:

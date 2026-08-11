@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import mcp_build as _build
-from . import selected_merge_train_preview as _train
+from . import merges as _train
 from .builds import MetadataBuildTargetRegistry as BuildTargetRegistry
 from .mcp_server import _result, mcp, workspace
 from .merges import (
@@ -14,7 +14,9 @@ from .merges import (
 from .merges import (
     MetadataMergeTargetImpactService as MergeTargetImpactService,
 )
-from .metadata_selected_merge_train_preview import SelectedMergeTrainPreviewService
+from .merges import (
+    MetadataSelectedMergeTrainPreviewService as SelectedMergeTrainPreviewService,
+)
 from .runtime import runtime_service
 from .test_target_views import (
     DEFAULT_TEST_TARGET_PAGE_SIZE,
