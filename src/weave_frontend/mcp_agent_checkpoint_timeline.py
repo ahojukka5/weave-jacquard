@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from .agent_checkpoint_timeline import AgentCheckpointTimelineService
 from .mcp_agent_checkpoint import agent_checkpoints
 from .mcp_server import _result, mcp
+from .resume import AgentCheckpointTimelineService
 from .runtime import runtime_service
 
 
