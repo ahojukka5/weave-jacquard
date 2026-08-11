@@ -6,7 +6,7 @@ from typing import Any
 
 from .mcp_agent_checkpoint import agent_checkpoints
 from .mcp_server import _result, mcp
-from .project_agent_status import ProjectAgentStatusService
+from .resume import ProjectAgentStatusService
 from .runtime import runtime_service
 
 

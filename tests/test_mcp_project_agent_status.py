@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from weave_frontend import mcp_project_agent_status
-from weave_frontend.project_agent_status import ProjectAgentStatusService
+from weave_frontend.resume import ProjectAgentStatusService
 
 
 class _Statuses:
