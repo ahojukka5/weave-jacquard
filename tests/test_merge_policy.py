@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from weave_frontend.errors import ValidationError
-from weave_frontend.merge_policy import MERGE_POLICY_FORMAT, MergePolicyRegistry
+from weave_frontend.merges import MERGE_POLICY_FORMAT, MergePolicyRegistry
 
 
 def test_default_policy_preserves_legacy_merge_compatibility(sexpr_workspace) -> None:
