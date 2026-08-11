@@ -1,4 +1,4 @@
-"""Public boundary for merge policy, preview, and qualification domains."""
+"""Public boundary for merge policy, preview, qualification, and orchestration domains."""
 
 from .candidate_build import (
     MERGE_CANDIDATE_BUILD_FORMAT,
@@ -6,6 +6,7 @@ from .candidate_build import (
     MERGE_CANDIDATE_NODE_MAP_FORMAT,
     MergeCandidateBuildService,
 )
+from .catalog import PROJECT_MERGE_CATALOG_FORMAT, ProjectMergeCatalogService
 from .concurrency import MergePolicyRegistry as ConcurrentMergePolicyRegistry
 from .impact import MERGE_TARGET_IMPACT_FORMAT, MergeTargetImpactService
 from .metadata_impact import MergeTargetImpactService as MetadataMergeTargetImpactService
@@ -31,6 +32,7 @@ __all__ = [
     "MERGE_TARGET_IMPACT_FORMAT",
     "MERGE_VALIDATION_FORMAT",
     "MERGE_VALIDATION_SET_FORMAT",
+    "PROJECT_MERGE_CATALOG_FORMAT",
     "MergeCandidateBuildService",
     "MergePolicyRegistry",
     "MergePreflightService",
@@ -40,4 +42,5 @@ __all__ = [
     "MergeValidationSetService",
     "MetadataMergePreviewService",
     "MetadataMergeTargetImpactService",
+    "ProjectMergeCatalogService",
 ]
