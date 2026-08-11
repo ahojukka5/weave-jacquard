@@ -6,8 +6,8 @@ from typing import Any
 
 from . import mcp_policy as _policy
 from . import mcp_preflight as _preflight
-from .concurrent_merge_policy import MergePolicyRegistry
 from .mcp_server import _result, mcp, workspace
+from .merges import ConcurrentMergePolicyRegistry as MergePolicyRegistry
 
 # Policy and preflight caches are lightweight service compositions. Replace the
 # registry implementation and clear any test-populated instances before calls.
