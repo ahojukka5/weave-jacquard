@@ -9,13 +9,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .builds import BuildTargetRegistry
+from .builds import BuildTargetRegistry, BuildTargetValidator
 from .compiler import CompilerBridge
 from .database import Database
 from .database_backup import DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS
 from .database_integrity import inspect_database
 from .errors import ConflictError, ValidationError, WeaveFrontendError
-from .target_validation import BuildTargetValidator
 from .verified_database_backup import DatabaseBackupService
 from .verified_workspace import SExpressionWorkspace
 
