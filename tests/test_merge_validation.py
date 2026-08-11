@@ -8,10 +8,10 @@ import pytest
 
 from weave_frontend.builds import BuildTargetRegistry
 from weave_frontend.errors import ConflictError, ValidationError
-from weave_frontend.merge_preview import MergePreviewService
-from weave_frontend.merge_validation import (
+from weave_frontend.merges import (
     MAX_VALIDATION_OUTPUT_CHARACTERS,
     MERGE_VALIDATION_FORMAT,
+    MergePreviewService,
     MergeValidationService,
 )
 
