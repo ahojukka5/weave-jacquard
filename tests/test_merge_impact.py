@@ -4,11 +4,11 @@ import pytest
 
 from weave_frontend.builds import BuildTargetRegistry
 from weave_frontend.errors import ConflictError, ValidationError
-from weave_frontend.merge_impact import (
+from weave_frontend.merges import (
     MERGE_TARGET_IMPACT_FORMAT,
+    MergePreviewService,
     MergeTargetImpactService,
 )
-from weave_frontend.merge_preview import MergePreviewService
 
 
 def _service(sexpr_workspace) -> MergeTargetImpactService:
