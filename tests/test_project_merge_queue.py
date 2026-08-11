@@ -5,18 +5,17 @@ from pathlib import Path
 import pytest
 
 from weave_frontend import SExpressionWorkspace, ValidationError
-from weave_frontend.agent_checkpoint import AgentCheckpointRegistry
-from weave_frontend.merge_preview import MergePreviewService
-from weave_frontend.project_agent_status import (
-    MAX_AGENT_STATUS_BRANCH_CATALOG,
-    ProjectAgentStatusService,
+from weave_frontend.merges import (
+    PROJECT_MERGE_QUEUE_FORMAT,
+    MergePreviewService,
+    ProjectMergeQueueService,
 )
-from weave_frontend.project_merge_queue import (
+from weave_frontend.resume import AgentCheckpointRegistry, ProjectAgentStatusService
+from weave_frontend.revision_limits import (
+    MAX_AGENT_STATUS_BRANCH_CATALOG,
     MAX_PROJECT_MERGE_QUEUE_CONFLICTS,
     MAX_PROJECT_MERGE_QUEUE_DOCUMENTS,
     MAX_PROJECT_MERGE_QUEUE_PAGE,
-    PROJECT_MERGE_QUEUE_FORMAT,
-    ProjectMergeQueueService,
 )
 
 
