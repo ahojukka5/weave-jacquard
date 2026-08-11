@@ -10,9 +10,7 @@ from weave_frontend import (
     mcp_project_merge_impact_queue,
     mcp_project_merge_queue,
 )
-from weave_frontend.project_merge_impact_queue import (
-    ProjectMergeImpactQueueService,
-)
+from weave_frontend.merges import ProjectMergeImpactQueueService
 
 
 class _Queues:
