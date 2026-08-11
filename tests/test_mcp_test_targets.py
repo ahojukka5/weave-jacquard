@@ -4,8 +4,12 @@ from typing import Any
 
 from weave_frontend import mcp_build, mcp_test_targets, selected_merge_train_preview
 from weave_frontend.builds import MetadataBuildTargetRegistry as BuildTargetRegistry
-from weave_frontend.metadata_merge_impact import MergeTargetImpactService
-from weave_frontend.metadata_merge_preview import MergePreviewService
+from weave_frontend.merges import (
+    MetadataMergePreviewService as MergePreviewService,
+)
+from weave_frontend.merges import (
+    MetadataMergeTargetImpactService as MergeTargetImpactService,
+)
 from weave_frontend.metadata_selected_merge_train_preview import (
     SelectedMergeTrainPreviewService,
 )
