@@ -7,6 +7,7 @@ from .candidate_build import (
 )
 from .concurrency import MergePolicyRegistry as ConcurrentMergePolicyRegistry
 from .impact import MERGE_TARGET_IMPACT_FORMAT, MergeTargetImpactService
+from .metadata_impact import MergeTargetImpactService as MetadataMergeTargetImpactService
 from .metadata_preview import MergePreviewService as MetadataMergePreviewService
 from .policy import MergePolicyRegistry
 from .preflight import MERGE_PREFLIGHT_FORMAT, MergePreflightService
@@ -36,4 +37,5 @@ __all__ = [
     "MergeValidationService",
     "MergeValidationSetService",
     "MetadataMergePreviewService",
+    "MetadataMergeTargetImpactService",
 ]
