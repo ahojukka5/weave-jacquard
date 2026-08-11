@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 
 from weave_frontend.errors import ValidationError
-from weave_frontend.merge_preflight import MergePreflightService
+from weave_frontend.merges import MergePreflightService
 
 
 class _Database:
