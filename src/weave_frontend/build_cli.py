@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .build_targets import BuildTargetRegistry
+from .builds import BuildTargetRegistry
 from .compiler import CompilerBridge
 from .database import Database
 from .database_backup import DEFAULT_DATABASE_BACKUP_TIMEOUT_SECONDS
