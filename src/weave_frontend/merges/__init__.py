@@ -14,6 +14,10 @@ from .metadata_preview import MergePreviewService as MetadataMergePreviewService
 from .policy import MergePolicyRegistry
 from .preflight import MERGE_PREFLIGHT_FORMAT, MergePreflightService
 from .preview import MERGE_PREVIEW_FORMAT, MergePreviewService
+from .project_impact_queue import (
+    PROJECT_MERGE_IMPACT_QUEUE_FORMAT,
+    ProjectMergeImpactQueueService,
+)
 from .project_queue import (
     PROJECT_MERGE_QUEUE_CATALOG_FORMAT,
     PROJECT_MERGE_QUEUE_FORMAT,
@@ -38,6 +42,7 @@ __all__ = [
     "MERGE_VALIDATION_FORMAT",
     "MERGE_VALIDATION_SET_FORMAT",
     "PROJECT_MERGE_CATALOG_FORMAT",
+    "PROJECT_MERGE_IMPACT_QUEUE_FORMAT",
     "PROJECT_MERGE_QUEUE_CATALOG_FORMAT",
     "PROJECT_MERGE_QUEUE_FORMAT",
     "MergeCandidateBuildService",
@@ -50,5 +55,6 @@ __all__ = [
     "MetadataMergePreviewService",
     "MetadataMergeTargetImpactService",
     "ProjectMergeCatalogService",
+    "ProjectMergeImpactQueueService",
     "ProjectMergeQueueService",
 ]
