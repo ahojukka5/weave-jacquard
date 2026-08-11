@@ -6,7 +6,7 @@ from typing import Any
 
 from .batch_edit import EditBatchExecutor
 from .branch_activity import BranchActivityService
-from .builds import BuildInspectionService, BuildTargetRegistry
+from .builds import BuildInspectionService, BuildTargetRegistry, BuildTargetValidator
 from .errors import ValidationError
 from .mcp_guidance import install_runtime_guidance
 from .mcp_server import _result, mcp, workspace
@@ -23,7 +23,6 @@ from .runtime import (
     runtime_service,
     runtime_services,
 )
-from .target_validation import BuildTargetValidator
 
 install_runtime_guidance(mcp)
 mcp.remove_tool("node_inspect")

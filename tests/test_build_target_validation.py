@@ -3,9 +3,8 @@ from __future__ import annotations
 import json
 import stat
 
-from weave_frontend.builds import BuildTargetRegistry
+from weave_frontend.builds import BuildTargetRegistry, BuildTargetValidator
 from weave_frontend.compiler import WeavecValidator
-from weave_frontend.target_validation import BuildTargetValidator
 
 MAIN_SOURCE = """(program
   (name "main")
