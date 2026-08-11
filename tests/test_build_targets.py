@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from weave_frontend.build_targets import BuildTargetRegistry
+from weave_frontend.builds import BuildTargetRegistry
 from weave_frontend.errors import ConflictError, NotFoundError, ValidationError
 from weave_frontend.sexpr import make_atom, make_form
 from weave_frontend.sexpr_service import SExpressionWorkspace

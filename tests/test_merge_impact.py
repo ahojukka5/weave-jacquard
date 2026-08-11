@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from weave_frontend.build_targets import BuildTargetRegistry
+from weave_frontend.builds import BuildTargetRegistry
 from weave_frontend.errors import ConflictError, ValidationError
 from weave_frontend.merge_impact import (
     MERGE_TARGET_IMPACT_FORMAT,
