@@ -7,6 +7,7 @@ from .checkpoint import (
     AGENT_CHECKPOINT_TITLE,
     AgentCheckpointRegistry,
 )
+from .checkpoint_snapshot import CheckpointResumeSnapshotService
 from .project_status import (
     MAX_AGENT_STATUS_BRANCH_CATALOG,
     MAX_AGENT_STATUS_CHECKPOINT_SCAN,
@@ -54,6 +55,7 @@ __all__ = [
     "RESUME_SNAPSHOT_FORMAT",
     "AgentCheckpointRegistry",
     "AgentCheckpointTimelineService",
+    "CheckpointResumeSnapshotService",
     "ProjectAgentStatusService",
     "ResumeSnapshotService",
 ]
