@@ -7,6 +7,7 @@ from .inspection import MAX_DIAGNOSTIC_PAGE_SIZE, BuildInspectionService
 from .metadata import BuildTargetRegistry as MetadataBuildTargetRegistry
 from .references import build_target_references, validate_build_target_references
 from .targets import BUILD_TARGET_PREFIX, BuildTargetRegistry
+from .validation import BuildTargetValidator
 
 __all__ = [
     "BUILD_CATALOG_FORMAT",
@@ -15,6 +16,7 @@ __all__ = [
     "BuildDiscoveryService",
     "BuildInspectionService",
     "BuildTargetRegistry",
+    "BuildTargetValidator",
     "ConcurrentBuildTargetRegistry",
     "MAX_BUILD_CATALOG_ENTRIES",
     "MAX_BUILD_LIST_PAGE_SIZE",
