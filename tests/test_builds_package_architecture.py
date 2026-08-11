@@ -34,6 +34,7 @@ def test_build_catalog_implementation_is_not_flattened_into_package_root() -> No
         "build_targets",
         "concurrent_build_targets",
         "metadata_build_targets",
+        "target_validation",
         "verified_build_discovery",
     ):
         assert not (PACKAGE_ROOT / f"{module}.py").exists()
@@ -82,6 +83,7 @@ def test_builds_public_boundary_is_explicit() -> None:
         "BuildDiscoveryService",
         "BuildInspectionService",
         "BuildTargetRegistry",
+        "BuildTargetValidator",
         "ConcurrentBuildTargetRegistry",
         "MAX_BUILD_CATALOG_ENTRIES",
         "MAX_BUILD_LIST_PAGE_SIZE",
