@@ -6,8 +6,7 @@ from typing import Any
 
 from .batch_edit import EditBatchExecutor
 from .branch_activity import BranchActivityService
-from .build_targets import BuildTargetRegistry
-from .builds import BuildInspectionService
+from .builds import BuildInspectionService, BuildTargetRegistry
 from .errors import ValidationError
 from .mcp_guidance import install_runtime_guidance
 from .mcp_server import _result, mcp, workspace
