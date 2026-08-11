@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from weave_frontend import mcp_concurrent_context, mcp_preflight
-from weave_frontend.concurrent_merge_policy import MergePolicyRegistry
+from weave_frontend.merges import ConcurrentMergePolicyRegistry as MergePolicyRegistry
 
 
 class _Workspace:
