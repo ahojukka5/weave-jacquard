@@ -6,7 +6,7 @@ from typing import Any
 
 from .builds import validate_build_target_references
 from .errors import ConflictError, NotFoundError, ValidationError
-from .merge_preview import MergePreviewService
+from .merges import MergePreviewService
 from .task_contracts import validate_task_contract_references
 from .test_target_validation import validate_test_target_references
 
