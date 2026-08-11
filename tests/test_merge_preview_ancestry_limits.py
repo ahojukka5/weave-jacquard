@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from weave_frontend import SExpressionWorkspace
-from weave_frontend.merge_preview import MergePreviewService
+from weave_frontend.merges import MergePreviewService
 from weave_frontend.revision_limits import (
     MAX_REVISION_DAG_EDGES,
     MAX_REVISION_DAG_NODES,
