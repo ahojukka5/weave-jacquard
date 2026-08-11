@@ -10,10 +10,12 @@ from .builds import BuildInspectionService, BuildTargetRegistry, BuildTargetVali
 from .errors import ValidationError
 from .mcp_guidance import install_runtime_guidance
 from .mcp_server import _result, mcp, workspace
-from .merge_impact import MergeTargetImpactService
-from .merge_preview import MergePreviewService
-from .merge_validation import MergeValidationService
-from .merge_validation_set import MergeValidationSetService
+from .merges import (
+    MergePreviewService,
+    MergeTargetImpactService,
+    MergeValidationService,
+    MergeValidationSetService,
+)
 from .revision_diff import RevisionNodeDiffService
 from .revision_inspection import RevisionNodeInspectionService
 from .runtime import (
