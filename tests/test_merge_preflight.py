@@ -7,11 +7,8 @@ from typing import Any
 import pytest
 
 from weave_frontend.errors import ValidationError
-from weave_frontend.merge_preflight import (
-    MAX_PREFLIGHT_IMPACT_TARGETS,
-    MERGE_PREFLIGHT_FORMAT,
-    MergePreflightService,
-)
+from weave_frontend.merges import MERGE_PREFLIGHT_FORMAT, MergePreflightService
+from weave_frontend.revision_limits import MAX_PREFLIGHT_IMPACT_TARGETS
 
 
 class _Database:
