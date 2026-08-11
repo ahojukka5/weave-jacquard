@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import stat
 
-from weave_frontend.build_targets import BuildTargetRegistry
+from weave_frontend.builds import BuildTargetRegistry
 from weave_frontend.compiler import WeavecValidator
 from weave_frontend.target_validation import BuildTargetValidator
 
