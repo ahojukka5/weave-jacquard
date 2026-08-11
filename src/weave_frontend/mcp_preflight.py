@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from .mcp_build import merge_impacts, merge_validation_sets
 from .mcp_server import _result, mcp, workspace
-from .merge_policy import MergePolicyRegistry
-from .merge_preflight import MergePreflightService
+from .merges import MergePolicyRegistry, MergePreflightService
 from .runtime import runtime_service
 
 
