@@ -1,5 +1,10 @@
 """Public boundary for merge policy, preview, and qualification domains."""
 
+from .candidate_build import (
+    MERGE_CANDIDATE_BUILD_FORMAT,
+    MERGE_CANDIDATE_SUBJECT_FORMAT,
+    MergeCandidateBuildService,
+)
 from .concurrency import MergePolicyRegistry as ConcurrentMergePolicyRegistry
 from .impact import MERGE_TARGET_IMPACT_FORMAT, MergeTargetImpactService
 from .metadata_preview import MergePreviewService as MetadataMergePreviewService
@@ -16,11 +21,14 @@ from .validation_set import (
 __all__ = [
     "ConcurrentMergePolicyRegistry",
     "MAX_AFFECTED_TARGET_VALIDATIONS",
+    "MERGE_CANDIDATE_BUILD_FORMAT",
+    "MERGE_CANDIDATE_SUBJECT_FORMAT",
     "MERGE_PREFLIGHT_FORMAT",
     "MERGE_PREVIEW_FORMAT",
     "MERGE_TARGET_IMPACT_FORMAT",
     "MERGE_VALIDATION_FORMAT",
     "MERGE_VALIDATION_SET_FORMAT",
+    "MergeCandidateBuildService",
     "MergePolicyRegistry",
     "MergePreflightService",
     "MergePreviewService",
