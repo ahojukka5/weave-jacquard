@@ -7,7 +7,7 @@ import pytest
 
 from weave_frontend import SExpressionWorkspace, ValidationError
 from weave_frontend.agent_checkpoint import AgentCheckpointRegistry
-from weave_frontend.build_targets import BuildTargetRegistry
+from weave_frontend.builds import BuildTargetRegistry
 from weave_frontend.merge_impact import MergeTargetImpactService
 from weave_frontend.merge_policy import MergePolicyRegistry
 from weave_frontend.merge_preview import MergePreviewService
