@@ -8,8 +8,12 @@ from . import mcp_build as _build
 from . import selected_merge_train_preview as _train
 from .builds import MetadataBuildTargetRegistry as BuildTargetRegistry
 from .mcp_server import _result, mcp, workspace
-from .metadata_merge_impact import MergeTargetImpactService
-from .metadata_merge_preview import MergePreviewService
+from .merges import (
+    MetadataMergePreviewService as MergePreviewService,
+)
+from .merges import (
+    MetadataMergeTargetImpactService as MergeTargetImpactService,
+)
 from .metadata_selected_merge_train_preview import SelectedMergeTrainPreviewService
 from .runtime import runtime_service
 from .test_target_views import (
