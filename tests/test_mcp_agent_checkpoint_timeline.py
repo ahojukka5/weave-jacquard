@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from weave_frontend import mcp_agent_checkpoint_timeline
-from weave_frontend.agent_checkpoint_timeline import AgentCheckpointTimelineService
+from weave_frontend.resume import AgentCheckpointTimelineService
 
 
 class _Timelines:
