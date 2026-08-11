@@ -6,15 +6,23 @@ from .metadata_preview import MergePreviewService as MetadataMergePreviewService
 from .policy import MergePolicyRegistry
 from .preview import MERGE_PREVIEW_FORMAT, MergePreviewService
 from .validation import MERGE_VALIDATION_FORMAT, MergeValidationService
+from .validation_set import (
+    MAX_AFFECTED_TARGET_VALIDATIONS,
+    MERGE_VALIDATION_SET_FORMAT,
+    MergeValidationSetService,
+)
 
 __all__ = [
     "ConcurrentMergePolicyRegistry",
+    "MAX_AFFECTED_TARGET_VALIDATIONS",
     "MERGE_PREVIEW_FORMAT",
     "MERGE_TARGET_IMPACT_FORMAT",
     "MERGE_VALIDATION_FORMAT",
+    "MERGE_VALIDATION_SET_FORMAT",
     "MergePolicyRegistry",
     "MergePreviewService",
     "MergeTargetImpactService",
     "MergeValidationService",
+    "MergeValidationSetService",
     "MetadataMergePreviewService",
 ]
