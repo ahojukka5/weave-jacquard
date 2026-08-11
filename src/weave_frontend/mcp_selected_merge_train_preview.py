@@ -6,8 +6,8 @@ from typing import Any
 
 from .mcp_project_merge_queue import project_merge_queues
 from .mcp_server import _result, mcp
+from .merges import SelectedMergeTrainPreviewService
 from .runtime import runtime_service
-from .selected_merge_train_preview import SelectedMergeTrainPreviewService
 
 
 @runtime_service(
