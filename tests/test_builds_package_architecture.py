@@ -9,23 +9,6 @@ PACKAGE_ROOT = ROOT / "src" / "weave_frontend"
 BUILDS_PACKAGE = PACKAGE_ROOT / "builds"
 
 
-def _module_name(path: Path) -> str:
-    relative = path.relative_to(ROOT / "src").with_suffix("")
-    return ".".join(relative.parts)
-
-
-def _resolve_import(path: Path, node: ast.ImportFrom) -> str:
-    module = node.module or ""
-    if node.level == 0:
-        return module
-    package = _module_name(path).split(".")[:-1]
-    keep = len(package) - (node.level - 1)
-    prefix = package[:keep]
-    if module:
-        prefix.extend(module.split("."))
-    return ".".join(prefix)
-
-
 def test_build_catalog_implementation_is_not_flattened_into_package_root() -> None:
     for module in (
         "build_discovery",
@@ -41,21 +24,15 @@ def test_build_catalog_implementation_is_not_flattened_into_package_root() -> No
         assert importlib.util.find_spec(f"weave_frontend.{module}") is None
 
 
-def test_cross_domain_code_uses_builds_public_boundary() -> None:
-    violations: list[str] = []
-    for path in PACKAGE_ROOT.rglob("*.py"):
-        if BUILDS_PACKAGE in path.parents:
-            continue
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom):
-                imported = _resolve_import(path, node)
-                if imported.startswith("weave_frontend.builds."):
-                    violations.append(f"{path.relative_to(ROOT)}:{node.lineno}")
-            elif isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name.startswith("weave_frontend.builds."):
-                        violations.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+def test_cross_domain_code_uses_builds_public_boundary(
+    package_import_inventory: tuple[tuple[Path, str, int], ...],
+) -> None:
+    violations = [
+        f"{path.relative_to(ROOT)}:{lineno}"
+        for path, imported, lineno in package_import_inventory
+        if BUILDS_PACKAGE not in path.parents
+        and imported.startswith("weave_frontend.builds.")
+    ]
     assert violations == []
 
 

@@ -44,21 +44,15 @@ def test_runtime_implementation_is_not_flattened_into_package_root() -> None:
         assert importlib.util.find_spec(f"weave_frontend.{module}") is None
 
 
-def test_cross_domain_code_uses_the_runtime_public_boundary() -> None:
-    violations: list[str] = []
-    for path in PACKAGE_ROOT.rglob("*.py"):
-        if RUNTIME_PACKAGE in path.parents:
-            continue
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom):
-                imported = _resolve_import(path, node)
-                if imported.startswith("weave_frontend.runtime."):
-                    violations.append(f"{path.relative_to(ROOT)}:{node.lineno}")
-            elif isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name.startswith("weave_frontend.runtime."):
-                        violations.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+def test_cross_domain_code_uses_the_runtime_public_boundary(
+    package_import_inventory: tuple[tuple[Path, str, int], ...],
+) -> None:
+    violations = [
+        f"{path.relative_to(ROOT)}:{lineno}"
+        for path, imported, lineno in package_import_inventory
+        if RUNTIME_PACKAGE not in path.parents
+        and imported.startswith("weave_frontend.runtime.")
+    ]
     assert violations == []
 
 
@@ -99,13 +93,12 @@ def test_runtime_public_boundary_is_explicit() -> None:
     }.issubset(exported)
 
 
-def test_runtime_constructs_concrete_publishers_without_upgrade_adapters() -> None:
-    publication_path = RUNTIME_PACKAGE / "publication.py"
-    publication = publication_path.read_text(encoding="utf-8")
+def test_runtime_constructs_concrete_publishers_without_upgrade_adapters(
+    package_python_sources: tuple[tuple[Path, str], ...],
+) -> None:
+    publication = (RUNTIME_PACKAGE / "publication.py").read_text(encoding="utf-8")
     container = (RUNTIME_PACKAGE / "container.py").read_text(encoding="utf-8")
-    repository_python = "\n".join(
-        path.read_text(encoding="utf-8") for path in PACKAGE_ROOT.rglob("*.py")
-    )
+    repository_python = "\n".join(source for _, source in package_python_sources)
 
     assert "install_quota_aware_compiler_bridge" not in repository_python
     assert ".__class__" not in publication
