@@ -2,7 +2,8 @@
 
 from .candidate_build import (
     MERGE_CANDIDATE_BUILD_FORMAT,
-    MERGE_CANDIDATE_SUBJECT_FORMAT,
+    MERGE_CANDIDATE_BUILD_KEY_FORMAT,
+    MERGE_CANDIDATE_NODE_MAP_FORMAT,
     MergeCandidateBuildService,
 )
 from .concurrency import MergePolicyRegistry as ConcurrentMergePolicyRegistry
@@ -23,7 +24,8 @@ __all__ = [
     "ConcurrentMergePolicyRegistry",
     "MAX_AFFECTED_TARGET_VALIDATIONS",
     "MERGE_CANDIDATE_BUILD_FORMAT",
-    "MERGE_CANDIDATE_SUBJECT_FORMAT",
+    "MERGE_CANDIDATE_BUILD_KEY_FORMAT",
+    "MERGE_CANDIDATE_NODE_MAP_FORMAT",
     "MERGE_PREFLIGHT_FORMAT",
     "MERGE_PREVIEW_FORMAT",
     "MERGE_TARGET_IMPACT_FORMAT",
