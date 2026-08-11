@@ -23,6 +23,12 @@ from .project_queue import (
     PROJECT_MERGE_QUEUE_FORMAT,
     ProjectMergeQueueService,
 )
+from .selected_preflight import (
+    MAX_SELECTED_MERGE_PREFLIGHT_DOCUMENTS,
+    MAX_SELECTED_MERGE_PREFLIGHT_SOURCES,
+    SELECTED_MERGE_PREFLIGHT_BATCH_FORMAT,
+    SelectedMergePreflightBatchService,
+)
 from .selected_train import (
     MAX_SELECTED_MERGE_TRAIN_SOURCES,
     SELECTED_MERGE_TRAIN_FORMAT,
@@ -38,6 +44,8 @@ from .validation_set import (
 __all__ = [
     "ConcurrentMergePolicyRegistry",
     "MAX_AFFECTED_TARGET_VALIDATIONS",
+    "MAX_SELECTED_MERGE_PREFLIGHT_DOCUMENTS",
+    "MAX_SELECTED_MERGE_PREFLIGHT_SOURCES",
     "MAX_SELECTED_MERGE_TRAIN_SOURCES",
     "MERGE_CANDIDATE_BUILD_FORMAT",
     "MERGE_CANDIDATE_BUILD_KEY_FORMAT",
@@ -51,6 +59,7 @@ __all__ = [
     "PROJECT_MERGE_IMPACT_QUEUE_FORMAT",
     "PROJECT_MERGE_QUEUE_CATALOG_FORMAT",
     "PROJECT_MERGE_QUEUE_FORMAT",
+    "SELECTED_MERGE_PREFLIGHT_BATCH_FORMAT",
     "SELECTED_MERGE_TRAIN_FORMAT",
     "MergeCandidateBuildService",
     "MergePolicyRegistry",
@@ -64,5 +73,6 @@ __all__ = [
     "ProjectMergeCatalogService",
     "ProjectMergeImpactQueueService",
     "ProjectMergeQueueService",
+    "SelectedMergePreflightBatchService",
     "SelectedMergeTrainPreviewService",
 ]
