@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .build_targets import BUILD_TARGET_PREFIX, BuildTargetRegistry
+from .builds import BUILD_TARGET_PREFIX, BuildTargetRegistry
 from .errors import ConflictError, ValidationError
 from .merge_preview import MergePreviewService
 from .revision_limits import (
