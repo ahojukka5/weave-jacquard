@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from weave_frontend import SExpressionWorkspace, ValidationError
-from weave_frontend.concurrent_merge_policy import MergePolicyRegistry
+from weave_frontend.merges import ConcurrentMergePolicyRegistry as MergePolicyRegistry
 
 
 def _table_count(workspace: SExpressionWorkspace, table: str) -> int:
