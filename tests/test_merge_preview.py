@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from weave_frontend.errors import ConflictError, ValidationError
-from weave_frontend.merge_preview import MERGE_PREVIEW_FORMAT, MergePreviewService
+from weave_frontend.merges import MERGE_PREVIEW_FORMAT, MergePreviewService
 
 
 def _clean_branches(sexpr_workspace):
