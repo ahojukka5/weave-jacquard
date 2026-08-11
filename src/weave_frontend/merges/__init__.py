@@ -2,5 +2,11 @@
 
 from .concurrency import MergePolicyRegistry as ConcurrentMergePolicyRegistry
 from .policy import MergePolicyRegistry
+from .preview import MERGE_PREVIEW_FORMAT, MergePreviewService
 
-__all__ = ["ConcurrentMergePolicyRegistry", "MergePolicyRegistry"]
+__all__ = [
+    "ConcurrentMergePolicyRegistry",
+    "MERGE_PREVIEW_FORMAT",
+    "MergePolicyRegistry",
+    "MergePreviewService",
+]
