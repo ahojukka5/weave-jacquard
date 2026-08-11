@@ -7,10 +7,12 @@ import pytest
 
 from weave_frontend.builds import BuildTargetRegistry
 from weave_frontend.errors import ValidationError
-from weave_frontend.merge_impact import MergeTargetImpactService
-from weave_frontend.merge_preview import MergePreviewService
-from weave_frontend.merge_validation import MergeValidationService
-from weave_frontend.merge_validation_set import MergeValidationSetService
+from weave_frontend.merges import (
+    MergePreviewService,
+    MergeTargetImpactService,
+    MergeValidationService,
+    MergeValidationSetService,
+)
 
 
 class _FakeValidator:
