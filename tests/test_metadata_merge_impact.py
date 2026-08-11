@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from weave_frontend.builds import MetadataBuildTargetRegistry as BuildTargetRegistry
-from weave_frontend.merge_preview import MergePreviewService
-from weave_frontend.metadata_merge_impact import MergeTargetImpactService
+from weave_frontend.merges import MergePreviewService
+from weave_frontend.merges import (
+    MetadataMergeTargetImpactService as MergeTargetImpactService,
+)
 from weave_frontend.project_metadata import TEST_TARGET_PREFIX
 from weave_frontend.test_targets import TestTargetRegistry as _TestTargetRegistry
 
