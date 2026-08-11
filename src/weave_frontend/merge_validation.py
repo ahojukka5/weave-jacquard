@@ -6,7 +6,7 @@ import hashlib
 from pathlib import Path
 from typing import Any, Protocol
 
-from .build_targets import BuildTargetRegistry
+from .builds import BuildTargetRegistry
 from .errors import ConflictError, NotFoundError, ValidationError
 from .merge_preview import MergePreviewService
 from .sexpr import render_node

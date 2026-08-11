@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .build_targets import BuildTargetRegistry
+from .builds import BuildTargetRegistry
 from .source_map import render_with_node_map
 
 
