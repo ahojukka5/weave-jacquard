@@ -8,7 +8,7 @@ from .mcp_build import merge_impacts
 from .mcp_preflight import merge_policies
 from .mcp_project_merge_queue import project_merge_queues
 from .mcp_server import _result, mcp
-from .project_merge_impact_queue import ProjectMergeImpactQueueService
+from .merges import ProjectMergeImpactQueueService
 from .runtime import runtime_service
 
 
