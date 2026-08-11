@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..merge_validation_set import MAX_AFFECTED_TARGET_VALIDATIONS
 from .policy import (
     MERGE_POLICY_FORMAT,
     MERGE_POLICY_OPERATION,
     MERGE_POLICY_TITLE,
 )
 from .policy import MergePolicyRegistry as _BaseMergePolicyRegistry
+from .validation_set import MAX_AFFECTED_TARGET_VALIDATIONS
 
 
 class MergePolicyRegistry(_BaseMergePolicyRegistry):

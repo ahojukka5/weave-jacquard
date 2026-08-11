@@ -7,7 +7,7 @@ from typing import Any
 from uuid import uuid4
 
 from ..errors import NotFoundError, ValidationError
-from ..merge_validation_set import MAX_AFFECTED_TARGET_VALIDATIONS
+from .validation_set import MAX_AFFECTED_TARGET_VALIDATIONS
 
 MERGE_POLICY_FORMAT = "weave-merge-policy-v1"
 MERGE_POLICY_TITLE = "Jacquard merge policy"
