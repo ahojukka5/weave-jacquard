@@ -14,23 +14,15 @@ def test_quarantine_implementation_is_not_flattened_into_package_root() -> None:
     assert importlib.util.find_spec("weave_frontend.artifact_quarantine") is None
 
 
-def test_cross_domain_code_uses_the_quarantine_public_boundary() -> None:
-    violations: list[str] = []
-    for path in PACKAGE_ROOT.rglob("*.py"):
-        if QUARANTINE_PACKAGE in path.parents:
-            continue
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom):
-                module = node.module or ""
-                if module.startswith("weave_frontend.artifacts.quarantine."):
-                    violations.append(f"{path.relative_to(ROOT)}:{node.lineno}")
-                if node.level == 1 and module.startswith("artifacts.quarantine."):
-                    violations.append(f"{path.relative_to(ROOT)}:{node.lineno}")
-            elif isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name.startswith("weave_frontend.artifacts.quarantine."):
-                        violations.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+def test_cross_domain_code_uses_the_quarantine_public_boundary(
+    package_import_inventory: tuple[tuple[Path, str, int], ...],
+) -> None:
+    violations = [
+        f"{path.relative_to(ROOT)}:{lineno}"
+        for path, imported, lineno in package_import_inventory
+        if QUARANTINE_PACKAGE not in path.parents
+        and imported.startswith("weave_frontend.artifacts.quarantine.")
+    ]
     assert violations == []
 
 
