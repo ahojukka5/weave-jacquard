@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from weave_frontend import mcp_agent_checkpoint, mcp_project_merge_queue
-from weave_frontend.project_merge_queue import ProjectMergeQueueService
+from weave_frontend.merges import ProjectMergeQueueService
 
 
 class _Queues:

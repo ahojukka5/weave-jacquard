@@ -7,7 +7,7 @@ from typing import Any
 from .mcp_build import merge_previews
 from .mcp_project_agent_status import project_agent_statuses
 from .mcp_server import _result, mcp
-from .project_merge_queue import ProjectMergeQueueService
+from .merges import ProjectMergeQueueService
 from .runtime import runtime_service
 
 
