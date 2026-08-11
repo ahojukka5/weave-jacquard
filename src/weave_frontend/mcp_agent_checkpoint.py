@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .agent_checkpoint import AgentCheckpointRegistry
 from .mcp_server import _result, mcp, workspace
+from .resume import AgentCheckpointRegistry
 from .runtime import runtime_service
 
 

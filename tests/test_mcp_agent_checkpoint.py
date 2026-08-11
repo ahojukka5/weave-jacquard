@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from weave_frontend import mcp_agent_checkpoint
-from weave_frontend.agent_checkpoint import AgentCheckpointRegistry
+from weave_frontend.resume import AgentCheckpointRegistry
 
 
 class _Checkpoints:
