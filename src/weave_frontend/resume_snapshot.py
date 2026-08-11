@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Any, Protocol
 
-from .build_targets import BUILD_TARGET_PREFIX, BuildTargetRegistry
+from .builds import BUILD_TARGET_PREFIX, BuildTargetRegistry
 from .errors import NotFoundError, ValidationError
 from .merge_policy import MergePolicyRegistry
 from .sexpr import head_symbol, walk_nodes
