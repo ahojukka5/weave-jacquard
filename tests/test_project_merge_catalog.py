@@ -5,26 +5,17 @@ from pathlib import Path
 import pytest
 
 from weave_frontend import SExpressionWorkspace, ValidationError
-from weave_frontend.agent_checkpoint import AgentCheckpointRegistry
-from weave_frontend.merge_preview import MergePreviewService
-from weave_frontend.project_agent_status import (
-    MAX_AGENT_STATUS_BRANCH_CATALOG,
-    ProjectAgentStatusService,
-)
-from weave_frontend.project_merge_catalog import (
+from weave_frontend.merges import (
     PROJECT_MERGE_CATALOG_FORMAT,
-    ProjectMergeCatalogService,
-)
-from weave_frontend.project_merge_queue import (
     PROJECT_MERGE_QUEUE_CATALOG_FORMAT,
+    MergePreviewService,
+    ProjectMergeCatalogService,
     ProjectMergeQueueService,
-)
-from weave_frontend.selected_merge_preflight_batch import (
     SelectedMergePreflightBatchService,
-)
-from weave_frontend.selected_merge_train_preview import (
     SelectedMergeTrainPreviewService,
 )
+from weave_frontend.resume import AgentCheckpointRegistry, ProjectAgentStatusService
+from weave_frontend.revision_limits import MAX_AGENT_STATUS_BRANCH_CATALOG
 
 
 def test_project_merge_catalog_is_deterministic_and_protocol_compatible(
