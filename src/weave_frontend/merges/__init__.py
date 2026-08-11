@@ -11,6 +11,9 @@ from .concurrency import MergePolicyRegistry as ConcurrentMergePolicyRegistry
 from .impact import MERGE_TARGET_IMPACT_FORMAT, MergeTargetImpactService
 from .metadata_impact import MergeTargetImpactService as MetadataMergeTargetImpactService
 from .metadata_preview import MergePreviewService as MetadataMergePreviewService
+from .metadata_selected_train import (
+    SelectedMergeTrainPreviewService as MetadataSelectedMergeTrainPreviewService,
+)
 from .policy import MergePolicyRegistry
 from .preflight import MERGE_PREFLIGHT_FORMAT, MergePreflightService
 from .preview import MERGE_PREVIEW_FORMAT, MergePreviewService
@@ -70,6 +73,7 @@ __all__ = [
     "MergeValidationSetService",
     "MetadataMergePreviewService",
     "MetadataMergeTargetImpactService",
+    "MetadataSelectedMergeTrainPreviewService",
     "ProjectMergeCatalogService",
     "ProjectMergeImpactQueueService",
     "ProjectMergeQueueService",
