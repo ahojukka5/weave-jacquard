@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from weave_frontend import ConflictError, ValidationError
-from weave_frontend.merge_test_impact import (
+from weave_frontend.merges import (
     MergeCandidateTestImpactService as _MergeCandidateTestImpactService,
 )
 
