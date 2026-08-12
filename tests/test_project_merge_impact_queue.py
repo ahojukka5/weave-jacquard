@@ -6,19 +6,20 @@ from typing import Any
 import pytest
 
 from weave_frontend import SExpressionWorkspace, ValidationError
-from weave_frontend.agent_checkpoint import AgentCheckpointRegistry
 from weave_frontend.builds import BuildTargetRegistry
-from weave_frontend.merge_impact import MergeTargetImpactService
-from weave_frontend.merge_policy import MergePolicyRegistry
-from weave_frontend.merge_preview import MergePreviewService
-from weave_frontend.project_agent_status import ProjectAgentStatusService
-from weave_frontend.project_merge_impact_queue import (
+from weave_frontend.merges import (
+    PROJECT_MERGE_IMPACT_QUEUE_FORMAT,
+    MergePolicyRegistry,
+    MergePreviewService,
+    MergeTargetImpactService,
+    ProjectMergeImpactQueueService,
+    ProjectMergeQueueService,
+)
+from weave_frontend.resume import AgentCheckpointRegistry, ProjectAgentStatusService
+from weave_frontend.revision_limits import (
     MAX_PROJECT_MERGE_IMPACT_QUEUE_DOCUMENTS,
     MAX_PROJECT_MERGE_IMPACT_QUEUE_PAGE,
-    PROJECT_MERGE_IMPACT_QUEUE_FORMAT,
-    ProjectMergeImpactQueueService,
 )
-from weave_frontend.project_merge_queue import ProjectMergeQueueService
 
 
 def _program_with_atoms(

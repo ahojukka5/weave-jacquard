@@ -1,5 +1,7 @@
 """Public boundary for merge policy, preview, qualification, and orchestration domains."""
 
+from ..merge_candidate_test_runs import MergeCandidateTestBatchService
+from ..merge_test_impact import MergeCandidateTestImpactService
 from .candidate_build import (
     MERGE_CANDIDATE_BUILD_FORMAT,
     MERGE_CANDIDATE_BUILD_KEY_FORMAT,
@@ -71,6 +73,8 @@ __all__ = [
     "SELECTED_MERGE_PREFLIGHT_BATCH_FORMAT",
     "SELECTED_MERGE_TRAIN_FORMAT",
     "MergeCandidateBuildService",
+    "MergeCandidateTestBatchService",
+    "MergeCandidateTestImpactService",
     "MergePolicyRegistry",
     "MergePreflightService",
     "MergePreviewService",
