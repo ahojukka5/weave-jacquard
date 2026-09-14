@@ -12,6 +12,7 @@ from weave_frontend.compiler import (
     CapabilityGrammarIndex,
     WeavecCapabilities,
 )
+from weave_frontend.compiler.capabilities import SUPPORTED_CORE_VERSIONS
 from weave_frontend.errors import ValidationError
 
 
@@ -19,7 +20,9 @@ def _registry(
     *,
     version: str = "0.1.0",
     target: str = "x86_64-unknown-linux-gnu",
+    wir_core_version: int = 2,
 ) -> dict[str, object]:
+    wir_protocol = f"weave-wir-core-v{wir_core_version}"
     protocols = [
         {
             "id": "weavec-capabilities-v1",
@@ -42,8 +45,8 @@ def _registry(
             "kind": "compilation-trace",
         },
         {
-            "id": "weave-wir-core-v2",
-            "version": 2,
+            "id": wir_protocol,
+            "version": wir_core_version,
             "kind": "intermediate-representation",
         },
     ]
@@ -62,7 +65,7 @@ def _registry(
             "grammar_id": "weave-surface-grammar-v1",
             "syntax": "s-expression",
             "case_sensitive": True,
-            "wir_core_version": 2,
+            "wir_core_version": wir_core_version,
         },
         "protocols": protocols,
         "commands": [
@@ -89,7 +92,7 @@ def _registry(
                 "spelling": "--frontend",
                 "audience": "compiler-tooling",
                 "status": "stable",
-                "protocols": ["weave-wir-core-v2"],
+                "protocols": [wir_protocol],
             },
         ],
         "targets": {
@@ -146,6 +149,7 @@ def _write_compiler(
     calls: Path | None = None,
 ) -> None:
     call_path = str(calls) if calls is not None else ""
+    wir_core_version = registry["language"]["wir_core_version"]  # type: ignore[index]
     path.write_text(
         "#!/usr/bin/env python3\n"
         "from pathlib import Path\n"
@@ -153,6 +157,7 @@ def _write_compiler(
         "import sys\n"
         f"REGISTRY = {registry!r}\n"
         f"CALLS = {call_path!r}\n"
+        f"WIR = '(core-module (core-version {wir_core_version}) (decls))\\n'\n"
         "if CALLS:\n"
         "    with Path(CALLS).open('a', encoding='utf-8') as stream:\n"
         "        stream.write(json.dumps(sys.argv[1:]) + '\\n')\n"
@@ -161,7 +166,7 @@ def _write_compiler(
         "elif sys.argv[1:] == ['--version']:\n"
         "    print('weavec test')\n"
         "elif len(sys.argv) >= 4 and sys.argv[1] == '--frontend':\n"
-        "    Path(sys.argv[2]).write_text('(core-module (core-version 2) (decls))\\n')\n"
+        "    Path(sys.argv[2]).write_text(WIR)\n"
         "else:\n"
         "    raise SystemExit(2)\n",
         encoding="utf-8",
@@ -183,8 +188,64 @@ def test_capability_registry_is_validated_and_cached_by_binary_hash(
     assert first["_jacquard_identity"] == second["_jacquard_identity"]
     assert first["compiler"]["public_variant"] == "final"
     assert first["language"]["wir_core_version"] == 2
+    assert first["_jacquard_identity"]["wir_core_version"] == 2
     recorded = calls.read_text(encoding="utf-8").splitlines()
     assert recorded == ['["capabilities", "--json"]']
+
+
+def test_handshake_accepts_every_supported_wir_core_version(tmp_path: Path) -> None:
+    for version in SUPPORTED_CORE_VERSIONS:
+        compiler = tmp_path / f"weavec-{version}"
+        _write_compiler(compiler, _registry(wir_core_version=version))
+        service = WeavecCapabilities(compiler, environment_fallback=False)
+
+        document = service.load()
+        identity = service.identity()
+        required = service.require(command="frontend")
+
+        assert document["language"]["wir_core_version"] == version
+        assert identity["wir_core_version"] == version
+        assert service.wir_core_protocol() == f"weave-wir-core-v{version}"
+        assert required["language"]["wir_core_version"] == version
+
+
+def test_handshake_rejects_unsupported_wir_core_version(tmp_path: Path) -> None:
+    compiler = tmp_path / "weavec"
+    _write_compiler(compiler, _registry(wir_core_version=1))
+
+    with pytest.raises(ValidationError) as captured:
+        WeavecCapabilities(compiler, environment_fallback=False).load()
+
+    assert captured.value.code == "WEAVEC_LANGUAGE_UNSUPPORTED"
+    assert "1" in captured.value.message
+
+
+def test_require_rejects_stale_wir_core_v2_pin(tmp_path: Path) -> None:
+    compiler = tmp_path / "weavec"
+    _write_compiler(compiler, _registry(wir_core_version=3))
+    capabilities = WeavecCapabilities(compiler, environment_fallback=False)
+
+    with pytest.raises(ValidationError) as captured:
+        capabilities.require(protocols=("weave-wir-core-v2",))
+
+    assert captured.value.code == "WEAVEC_PROTOCOL_UNSUPPORTED"
+    document = capabilities.require(protocols=(capabilities.wir_core_protocol(),))
+    assert document["language"]["wir_core_version"] == 3
+
+
+def test_handshake_rejects_mismatched_wir_core_protocol(tmp_path: Path) -> None:
+    compiler = tmp_path / "weavec"
+    registry = _registry(wir_core_version=3)
+    for item in registry["protocols"]:  # type: ignore[union-attr]
+        if str(item["id"]).startswith("weave-wir-core-"):
+            item["id"] = "weave-wir-core-v2"
+            item["version"] = 2
+    _write_compiler(compiler, registry)
+
+    with pytest.raises(ValidationError) as captured:
+        WeavecCapabilities(compiler, environment_fallback=False).load()
+
+    assert captured.value.code == "WEAVEC_PROTOCOL_UNSUPPORTED"
 
 
 def test_replacing_compiler_invalidates_cached_registry(tmp_path: Path) -> None:
@@ -264,7 +325,30 @@ def test_frontend_validation_records_capability_identity(tmp_path: Path) -> None
     assert result["available"] is True
     assert result["valid"] is True
     assert result["compiler_capabilities"]["format"] == "weavec-capabilities-v1"
+    assert result["compiler_capabilities"]["wir_core_version"] == 2
     assert result["wir"] == "(core-module (core-version 2) (decls))\n"
+
+
+def test_frontend_validation_records_advertised_core_version_three(
+    tmp_path: Path,
+) -> None:
+    compiler = tmp_path / "weavec"
+    _write_compiler(compiler, _registry(wir_core_version=3))
+    capabilities = WeavecCapabilities(compiler, environment_fallback=False)
+    validator = CapabilityAwareWeavecValidator(
+        compiler,
+        capabilities=capabilities,
+        max_output_bytes=MAX_COMPILER_OUTPUT_BYTES,
+        max_wir_bytes=MAX_WIR_BYTES,
+        environment_fallback=False,
+    )
+
+    result = validator.validate('(program (name "demo") (version "0.1"))\n')
+
+    assert result["available"] is True
+    assert result["valid"] is True
+    assert result["compiler_capabilities"]["wir_core_version"] == 3
+    assert result["wir"] == "(core-module (core-version 3) (decls))\n"
 
 
 def test_requested_protocol_uses_global_registry_authority(tmp_path: Path) -> None:

@@ -21,8 +21,9 @@ be valid UTF-8 JSON and must identify:
 
 - the final public `weavec` variant;
 - `weave-surface-v1` and `weave-surface-grammar-v1`;
-- WIR core version 2;
-- the capability, build-manifest, diagnostics, trace, and WIR protocols;
+- a WIR core version from Jacquard's supported set, currently 2 or 3;
+- the capability, build-manifest, diagnostics, trace, and matching WIR
+  protocol (`weave-wir-core-vN` for the advertised core version);
 - the public build and frontend commands;
 - at least one installed target including the declared default target;
 - a non-empty machine-readable surface-form registry.
@@ -51,13 +52,18 @@ is absent or contains no example of it.
 ## Validation and build admission
 
 Production frontend validation requires the installed compiler to advertise the
-`frontend` command and `weave-wir-core-v2` before source materialization.
+`frontend` command and the WIR protocol matching `language.wir_core_version`
+before source materialization. The handshake accepts any version in
+`SUPPORTED_CORE_VERSIONS` and records the version it found rather than a
+constant. Version 3 is admitted before the compiler registry emits it, so a
+Jacquard release that can consume the new contract already exists.
+
 Revisioned build-target validation also checks the requested target against the
 installed target inventory.
 
 Committed builds require the public `build` command and the build-manifest,
-diagnostics, trace, and WIR protocols before invoking the compiler. The returned
-build and validation evidence includes the path-free registry identity:
+diagnostics, trace, and matching WIR protocols before invoking the compiler. The
+returned build and validation evidence includes the path-free registry identity:
 
 - exact registry SHA-256 and byte count;
 - exact compiler binary SHA-256 and byte count;

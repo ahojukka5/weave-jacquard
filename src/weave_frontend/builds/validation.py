@@ -35,7 +35,6 @@ class BuildTargetValidator:
         if capabilities is not None:
             capability_registry = capabilities.require(
                 command="frontend",
-                protocols=("weave-wir-core-v2",),
                 target=config["compiler_target"],
             )
             capability_identity = capability_registry["_jacquard_identity"]

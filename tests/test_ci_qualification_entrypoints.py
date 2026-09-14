@@ -47,6 +47,8 @@ def test_native_ci_delegates_to_release_qualification() -> None:
     assert "WEAVEC_COMMIT: f5c1196b3a75c0b2721b3bd753edbcc8d1388244" in workflow
     assert 'git -C "$source_root" fetch --depth=1 origin "$WEAVEC_COMMIT"' in workflow
     assert '"$compiler_path" capabilities --json' in workflow
+    assert "from weave_frontend.compiler.capabilities import SUPPORTED_CORE_VERSIONS" in workflow
+    assert "wir_core_version\"] in SUPPORTED_CORE_VERSIONS" in workflow
     assert 'provider-metadata.json' in workflow
     assert 'capabilities.json' in workflow
     assert "if: always()" in workflow

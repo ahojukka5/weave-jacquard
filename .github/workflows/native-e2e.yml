@@ -88,6 +88,8 @@ jobs:
           import os
           from pathlib import Path
 
+          from weave_frontend.compiler.capabilities import SUPPORTED_CORE_VERSIONS
+
           stage = Path(os.environ["COMPILER_STAGE"])
           compiler = Path(os.environ["WEAVEC_BIN"])
           capabilities_path = stage / "capabilities.json"
@@ -95,7 +97,7 @@ jobs:
           capabilities = json.loads(capabilities_bytes)
           assert capabilities["format"] == "weavec-capabilities-v1"
           assert capabilities["compiler"]["public_variant"] == "final"
-          assert capabilities["language"]["wir_core_version"] == 2
+          assert capabilities["language"]["wir_core_version"] in SUPPORTED_CORE_VERSIONS
 
           metadata = {
               "format": "weave-jacquard-weavec-provider-v1",
