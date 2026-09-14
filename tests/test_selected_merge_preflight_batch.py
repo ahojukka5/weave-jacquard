@@ -6,17 +6,16 @@ from typing import Any
 import pytest
 
 from weave_frontend import SExpressionWorkspace, ValidationError
-from weave_frontend.agent_checkpoint import AgentCheckpointRegistry
 from weave_frontend.errors import ConflictError
-from weave_frontend.merge_preview import MergePreviewService
-from weave_frontend.project_agent_status import ProjectAgentStatusService
-from weave_frontend.project_merge_queue import ProjectMergeQueueService
-from weave_frontend.selected_merge_preflight_batch import (
+from weave_frontend.merges import (
     MAX_SELECTED_MERGE_PREFLIGHT_DOCUMENTS,
     MAX_SELECTED_MERGE_PREFLIGHT_SOURCES,
     SELECTED_MERGE_PREFLIGHT_BATCH_FORMAT,
+    MergePreviewService,
+    ProjectMergeQueueService,
     SelectedMergePreflightBatchService,
 )
+from weave_frontend.resume import AgentCheckpointRegistry, ProjectAgentStatusService
 
 
 def _batch_state(
