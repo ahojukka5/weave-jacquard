@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from weave_frontend.errors import ArtifactIntegrityError
-from weave_frontend.merge_candidate_test_runs import (
+from weave_frontend.merges import (
     MAX_MERGE_CANDIDATE_TEST_MANIFEST_BYTES,
     MergeCandidateTestBatchService,
 )
