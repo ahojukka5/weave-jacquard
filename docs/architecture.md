@@ -307,9 +307,9 @@ snapshots summarize pinned work state; they do not mutate branches.
 The production server can create and reverify content-derived online SQLite
 backups. Restore is deliberately offline and publishes only to a new absent path.
 Database backups join builds, tests, qualifications, and attestations in the shared
-aggregate retained-artifact quota. Artifact reconciliation, retention, guarded
-garbage collection, and remote recovery replication remain operator capabilities
-to implement.
+aggregate retained-artifact quota. Artifact reconciliation, retention planning,
+quarantine, and guarded garbage collection are implemented operator capabilities.
+Remote recovery replication remains unimplemented.
 
 ## 12. Resource limits
 
@@ -344,7 +344,7 @@ allocation remain separate operator policy.
 
 ## 13. Qualification
 
-The repository has one fail-closed qualification entry point:
+The repository has one fail-closed local qualification entry point:
 
 ```text
 scripts/qualify.sh python
@@ -355,14 +355,20 @@ scripts/qualify.sh full
 The runner owns compilation, Ruff, sandbox admission, pytest selection, skip
 rejection, coverage, JUnit validation, trace contracts, environment identity,
 compiler and sandbox binary hashes, completion evidence, and checksums.
+Evidence is staged and published atomically; a partial or failed run does not
+appear as a successful qualification directory.
 
-GitHub workflows only acquire prerequisites, invoke the same runner, and upload the
-completed evidence directory. Evidence is staged and published atomically; a
-partial or failed run does not appear as a successful qualification directory.
+GitHub workflows do not all invoke that runner. Portable pull-request CI
+(`.github/workflows/ci.yml`) acquires a Python environment, then runs
+`compileall`, Ruff, and `pytest -m "not real_e2e"` directly and uploads the
+evidence directory. Native packaged CI (`.github/workflows/native-e2e.yml`)
+builds a pinned `weavec` and invokes `scripts/qualify-release.sh native`, which
+wraps the same local native runner.
 
-`full` is the release-strength gate. It requires the final `weavec`, the complete
-MCP environment, the strict sandbox, zero skipped tests, and all required protocol
-and native traces.
+`full` is the release-strength local gate. It requires the final `weavec`, the
+complete MCP environment, the strict sandbox, zero skipped tests, and all
+required protocol and native traces. GitHub status is not a substitute for that
+retained `full` evidence.
 
 ## 14. Determinism
 
@@ -386,31 +392,30 @@ database, artifact roots, compiler selection, sandbox selection, and quota polic
 Applying configuration changes requires a new process and produces new runtime
 identity evidence.
 
-## 15. Remaining boundaries and next milestones
+## 15. Remaining boundaries
 
-The highest-value remaining work is:
+Open GitHub issues are the live remaining-work inventory. This section does not
+keep a second ranked copy of that list.
 
-1. **Runtime service-graph completion** — migrate dependent module-local caches into
-   typed container fields, add explicit construction phases, and replace the
-   remaining import-time service adaptation without changing MCP contracts.
-2. **Database and artifact integrity** — complete snapshot and root-hash
-   reconstruction, artifact reachability reconciliation, and bounded catalog
-   evidence.
-3. **Retention and storage operations** — explicit dry-run deletion plans, guarded
-   garbage collection, quarantine recovery, temporary/physical-space policy, and
-   live SQLite database-size policy.
-4. **Compiler capability contract** — consume a machine-readable grammar,
-   capability, target, and language-version registry from `weavec` and remove
-   observational corpus dependence.
-5. **Module interfaces and incremental compilation** — define revisioned interface
-   objects and dependency hashes, then measure real multi-module workloads before
-   introducing module caches.
-6. **Sandbox strengthening** — add platform-supported aggregate cgroup and seccomp
-   evidence without weakening the canonical fail-closed sandbox contract.
-7. **Scale** — evaluate storage deduplication and a database architecture beyond
-   SQLite only after measured workloads justify the complexity.
+These previously listed milestones have already shipped:
+
+- typed runtime service-graph composition;
+- bounded revision-state integrity and retained-artifact reconciliation;
+- retention planning, quarantine, and guarded garbage collection;
+- the Jacquard consumer of `weavec-capabilities-v1`.
+
+Durable frontiers that the current tree still does not finish:
+
+- leftover capability-contract policy beside the handshake: observational corpus
+  guidance still exists, and the consumer issue remains open until that leftover
+  is closed;
+- revisioned module interfaces and incremental compilation;
+- stronger sandbox backends without weakening the fail-closed contract;
+- physical filesystem and live SQLite size policy, plus remote recovery
+  replication;
+- storage and database architecture beyond SQLite, only after measured need;
+- the first evidence-backed release candidate.
 
 More MCP convenience tools are not the current priority. Jacquard already has a
-broad public capability graph; the next phase is to complete explicit runtime
-composition, operations, storage, and compiler integration with the same rigor as
-its revision and qualification contracts.
+broad public capability graph; remaining work belongs in issues, not in a
+snapshot of closed milestones.
