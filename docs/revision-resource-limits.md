@@ -7,8 +7,10 @@ result, or workflow summary after an internal completeness limit is exceeded.
 
 The active ceilings are collected in `weave_frontend.revision_limits` and exposed
 through `REVISION_RESOURCE_LIMITS` for deterministic inspection and tests. Services
-that retain compatibility constants are covered by synchronization tests so their
-public bounds cannot drift from the catalog silently.
+that retain independently defined compatibility constants are covered by
+synchronization tests so those public bounds cannot drift from the catalog
+silently. Package modules that import the catalog names are guarded by
+import-direction tests rather than alias equality.
 
 ## Current ceilings
 
@@ -126,7 +128,7 @@ maximum page size, returned count, truncation state, and continuation cursor.
 Checkpoint timelines, project agent-status pages, and queue checkpoint orientation
 already validate independent page and first-parent scan bounds. Their active values
 are now part of the central resource catalog, with synchronization tests preserving
-the existing public constants and response formats.
+independently defined public constants and response formats.
 
 ## Node reads, diff, and impact
 
@@ -154,8 +156,9 @@ limits, effective ceilings, and truncation flags are identity-bound.
 
 Selected merge-train and selected preflight operations also validate their source,
 document, conflict, and validation-result bounds. These values are included in the
-central catalog and checked against the compatibility constants used by their
-existing public services.
+central catalog. Independently defined compatibility constants on the existing
+public services stay synchronized by equality tests; package implementations that
+import the catalog are required to keep that import direction.
 
 Resume snapshots separate complete counts from returned prefixes for programs,
 targets, target sources, test targets, task contracts, contexts, branches, history,
