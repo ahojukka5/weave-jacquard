@@ -1,6 +1,9 @@
 """Public boundary for merge policy, preview, qualification, and orchestration domains."""
 
-from ..merge_candidate_test_runs import MergeCandidateTestBatchService
+from ..merge_candidate_test_runs import (
+    MAX_MERGE_CANDIDATE_TEST_MANIFEST_BYTES,
+    MergeCandidateTestBatchService,
+)
 from ..merge_test_impact import MergeCandidateTestImpactService
 from .candidate_build import (
     MERGE_CANDIDATE_BUILD_FORMAT,
@@ -53,6 +56,7 @@ from .validation_set import (
 __all__ = [
     "ConcurrentMergePolicyRegistry",
     "MAX_AFFECTED_TARGET_VALIDATIONS",
+    "MAX_MERGE_CANDIDATE_TEST_MANIFEST_BYTES",
     "MAX_SELECTED_MERGE_PREFLIGHT_DOCUMENTS",
     "MAX_SELECTED_MERGE_PREFLIGHT_SOURCES",
     "MAX_SELECTED_MERGE_TRAIN_SOURCES",
