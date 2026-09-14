@@ -17,6 +17,7 @@ from .project_status import (
     ProjectAgentStatusService,
 )
 from .snapshot import (
+    MAX_CONTEXT_PREVIEW_CHARS,
     MAX_RESUME_BRANCHES,
     MAX_RESUME_CONTEXTS,
     MAX_RESUME_DOCUMENTS,
@@ -43,6 +44,7 @@ __all__ = [
     "MAX_AGENT_STATUS_BRANCH_CATALOG",
     "MAX_AGENT_STATUS_CHECKPOINT_SCAN",
     "MAX_AGENT_STATUS_PAGE",
+    "MAX_CONTEXT_PREVIEW_CHARS",
     "MAX_RESUME_BRANCHES",
     "MAX_RESUME_CONTEXTS",
     "MAX_RESUME_DOCUMENTS",
