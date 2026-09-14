@@ -58,7 +58,6 @@ class CompilerBridge(_CompilerBridge):
                 "weavec-build-manifest-v1",
                 "weavec-diagnostics-v1",
                 "weavec-compilation-trace-v1",
-                "weave-wir-core-v2",
             ),
             target=target,
         )

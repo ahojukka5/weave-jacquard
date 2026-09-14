@@ -24,14 +24,38 @@ CAPABILITIES_TIMEOUT_SECONDS = 5
 MAX_CAPABILITIES_BYTES = 1024 * 1024
 EXPECTED_SURFACE_VERSION = "weave-surface-v1"
 EXPECTED_GRAMMAR_ID = "weave-surface-grammar-v1"
-EXPECTED_WIR_CORE_VERSION = 2
+# Every WIR core version Jacquard will admit in the compiler handshake.
+# Jacquard does not parse WIR; it only checks the advertised contract before
+# invoking weavec. Version 3 is accepted before the compiler registry emits it.
+SUPPORTED_CORE_VERSIONS: tuple[int, ...] = (2, 3)
 REQUIRED_PROTOCOLS = {
     "weavec-capabilities-v1": 1,
     "weavec-build-manifest-v1": 1,
     "weavec-diagnostics-v1": 1,
     "weavec-compilation-trace-v1": 1,
-    "weave-wir-core-v2": 2,
 }
+
+
+def describe_supported_core_versions() -> str:
+    """Render the supported WIR core versions for a diagnostic message."""
+
+    versions = [str(version) for version in SUPPORTED_CORE_VERSIONS]
+    if len(versions) == 1:
+        return versions[0]
+    return f"{', '.join(versions[:-1])} or {versions[-1]}"
+
+
+def wir_core_protocol_id(version: int) -> str:
+    """Return the compiler protocol identifier for one WIR core version."""
+
+    return f"weave-wir-core-v{version}"
+
+
+def _required_protocols(wir_core_version: int) -> dict[str, int]:
+    return {
+        **REQUIRED_PROTOCOLS,
+        wir_core_protocol_id(wir_core_version): wir_core_version,
+    }
 
 
 def _invalid(code: str, message: str) -> ValidationError:
@@ -220,6 +244,12 @@ class WeavecCapabilities:
                 )
         return document
 
+    def wir_core_protocol(self) -> str:
+        """Return the WIR protocol advertised by the validated compiler registry."""
+
+        document = self.load()
+        return wir_core_protocol_id(document["language"]["wir_core_version"])
+
     def form(self, head: str) -> Mapping[str, Any] | None:
         """Return one compiler-authoritative surface form by exact head."""
 
@@ -375,14 +405,24 @@ class WeavecCapabilities:
             or language.get("grammar_id") != EXPECTED_GRAMMAR_ID
             or language.get("syntax") != "s-expression"
             or language.get("case_sensitive") is not True
-            or language.get("wir_core_version") != EXPECTED_WIR_CORE_VERSION
         ):
             raise _invalid(
                 "WEAVEC_LANGUAGE_UNSUPPORTED",
                 "installed weavec language or WIR contract is incompatible",
             )
+        wir_core_version = language.get("wir_core_version")
+        if wir_core_version not in SUPPORTED_CORE_VERSIONS:
+            raise _invalid(
+                "WEAVEC_LANGUAGE_UNSUPPORTED",
+                "installed weavec language or WIR contract is incompatible: "
+                f"wir_core_version {wir_core_version!r} is not one of "
+                f"{describe_supported_core_versions()}",
+            )
 
-        protocols = cls._validate_protocols(document.get("protocols"))
+        protocols = cls._validate_protocols(
+            document.get("protocols"),
+            wir_core_version=wir_core_version,
+        )
         commands = cls._validate_commands(document.get("commands"), protocols)
         targets = cls._validate_targets(document.get("targets"))
         features = cls._validate_features(document.get("features"))
@@ -399,9 +439,10 @@ class WeavecCapabilities:
         }
 
     @staticmethod
-    def _validate_protocols(raw: Any) -> list[dict[str, Any]]:
+    def _validate_protocols(raw: Any, *, wir_core_version: int) -> list[dict[str, Any]]:
         protocols: list[dict[str, Any]] = []
         seen: set[str] = set()
+        required = _required_protocols(wir_core_version)
         for index, raw_item in enumerate(_sequence(raw, "protocols")):
             item = _mapping(raw_item, f"protocols[{index}]")
             protocol_id = _nonempty_string(item.get("id"), f"protocols[{index}].id")
@@ -414,13 +455,13 @@ class WeavecCapabilities:
                 )
             seen.add(protocol_id)
             protocols.append(dict(item))
-            expected = REQUIRED_PROTOCOLS.get(protocol_id)
+            expected = required.get(protocol_id)
             if expected is not None and version != expected:
                 raise _invalid(
                     "WEAVEC_PROTOCOL_UNSUPPORTED",
                     f"compiler protocol {protocol_id!r} has incompatible version {version}",
                 )
-        for protocol_id in REQUIRED_PROTOCOLS:
+        for protocol_id in required:
             if protocol_id not in seen:
                 raise _invalid(
                     "WEAVEC_PROTOCOL_UNSUPPORTED",
@@ -734,10 +775,7 @@ class CapabilityAwareWeavecValidator(WeavecValidator):
 
     def validate_sources(self, sources: list[tuple[str, str]]) -> dict[str, Any]:
         try:
-            registry = self.capabilities.require(
-                command="frontend",
-                protocols=("weave-wir-core-v2",),
-            )
+            registry = self.capabilities.require(command="frontend")
         except ValidationError as exc:
             return {
                 "available": False,
@@ -760,5 +798,8 @@ __all__ = [
     "CapabilityAwareWeavecValidator",
     "CapabilityGrammarIndex",
     "MAX_CAPABILITIES_BYTES",
+    "SUPPORTED_CORE_VERSIONS",
     "WeavecCapabilities",
+    "describe_supported_core_versions",
+    "wir_core_protocol_id",
 ]
