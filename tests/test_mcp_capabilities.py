@@ -75,6 +75,8 @@ def test_public_capabilities_have_unique_dependency_order() -> None:
         "runtime_identity",
     ):
         assert capability in names
+    assert names.index("revision_reads") < names.index("edit_candidates")
+    assert names.index("edit_candidates") < names.index("runtime_identity")
     assert names.index("concurrent_targets") < names.index("test_targets")
     assert names.index("test_targets") < names.index("test_runs")
     assert names.index("test_runs") < names.index("test_batches")

@@ -32,6 +32,10 @@ _RELATIONAL_TABLES = (
     "documents",
     "revision_documents",
 )
+_V4_TABLES = (
+    "edit_candidates",
+    "candidate_qualifications",
+)
 _RELATIONAL_INVARIANTS = (
     "foreign_keys",
     "revision_parent_project_ownership",
@@ -54,6 +58,12 @@ _REQUIRED_TABLES = (
     *_RELATIONAL_TABLES,
     "module_snapshots_compressed",
 )
+
+
+def _required_tables(schema_version: int) -> tuple[str, ...]:
+    if schema_version >= 4:
+        return (*_REQUIRED_TABLES, *_V4_TABLES)
+    return _REQUIRED_TABLES
 
 
 class _Issues:
@@ -139,7 +149,8 @@ def inspect_connection(
     """Return bounded relational and semantic integrity evidence."""
 
     current_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-    names = (*_REQUIRED_TABLES, "module_snapshots")
+    required_tables = _required_tables(current_version)
+    names = (*required_tables, "module_snapshots")
     placeholders = ",".join("?" for _ in names)
     object_rows = connection.execute(
         f"SELECT name, type FROM sqlite_master WHERE name IN ({placeholders})",
@@ -151,7 +162,7 @@ def inspect_connection(
     skipped_invariants: list[str] = []
 
     missing_tables = [
-        name for name in _REQUIRED_TABLES if objects.get(name) != "table"
+        name for name in required_tables if objects.get(name) != "table"
     ]
     if missing_tables:
         issues.append(
@@ -266,7 +277,7 @@ def require_migration_integrity(connection: sqlite3.Connection) -> None:
     if blocking:
         codes = ", ".join(str(issue["code"]) for issue in blocking)
         raise RuntimeError(
-            "database integrity check failed before schema v3 migration: " + codes
+            "database integrity check failed before schema migration: " + codes
         )
 
 

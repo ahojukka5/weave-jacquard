@@ -12,14 +12,28 @@ class WeaveFrontendError(Exception):
 class ValidationError(WeaveFrontendError):
     """Raised when a proposed AST mutation is invalid."""
 
-    def __init__(self, code: str, message: str, *, node_id: str | None = None) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        node_id: str | None = None,
+        **details: Any,
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
         self.node_id = node_id
+        self.details = details
 
     def as_dict(self) -> dict[str, Any]:
-        return {"code": self.code, "message": self.message, "node_id": self.node_id}
+        result = {
+            "code": self.code,
+            "message": self.message,
+            "node_id": self.node_id,
+        }
+        result.update(self.details)
+        return result
 
 
 class DatabaseBusyError(ValidationError):

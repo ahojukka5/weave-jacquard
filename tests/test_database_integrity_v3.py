@@ -70,9 +70,9 @@ def test_new_database_reports_valid_schema_v3(tmp_path: Path) -> None:
         database.initialize_project("demo")
         report = database.integrity_report()
 
-    assert SCHEMA_VERSION == 3
+    assert SCHEMA_VERSION == 4
     assert report["format"] == "weave-database-integrity-v1"
-    assert report["schema_version"] == 3
+    assert report["schema_version"] == 4
     assert report["valid"] is True
     assert report["issue_count"] == 0
     assert report["issues"] == []
@@ -206,7 +206,7 @@ def test_corrupt_legacy_database_is_not_partially_migrated(tmp_path: Path) -> No
 
     with pytest.raises(
         RuntimeError,
-        match="database integrity check failed before schema v3 migration",
+        match="database integrity check failed before schema migration",
     ):
         Database(path)
 

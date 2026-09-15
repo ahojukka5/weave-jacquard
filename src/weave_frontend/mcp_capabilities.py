@@ -159,6 +159,11 @@ PUBLIC_CAPABILITIES: tuple[Capability, ...] = (
         ("concurrent_nodes",),
     ),
     Capability(
+        "edit_candidates",
+        "weave_frontend.mcp_edit_candidates",
+        ("revision_reads",),
+    ),
+    Capability(
         "database_backup",
         "weave_frontend.mcp_database_backup",
         ("concurrent_nodes",),

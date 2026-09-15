@@ -283,6 +283,9 @@ inference without changing the public MCP API.
 - `src/weave_frontend/mcp_policy.py`: final policy-enforced merge registration.
 - `src/weave_frontend/mcp_revision_reads.py`: final historical read registration.
 - `src/weave_frontend/mcp_build_discovery.py`: verified build-list registration.
+- `src/weave_frontend/entity_catalog.py`: compact declaration observation.
+- `src/weave_frontend/edit_candidates.py`: unpublished working revisions.
+- `src/weave_frontend/mcp_edit_candidates.py`: candidate MCP tools.
 - `src/weave_frontend/grammar_help.py`: guidance derived from compiler examples.
 - `src/weave_frontend/weavec.py`: authoritative frontend validation adapter.
 - `src/weave_frontend/compiler_*.py`: native compiler and artifact boundary.
@@ -292,6 +295,8 @@ inference without changing the public MCP API.
 - `docs/mcp.md`: MCP workflow and public tool contract.
 - `docs/single-node-concurrency.md`: race-safe structural write contract.
 - `docs/edit-transactions.md`: bounded batch request and publication contract.
+- `docs/structural-identities.md`: identity survival, invalidation, and ambiguity.
+- `docs/edit-candidates.md`: unpublished candidate lifecycle and publication.
 - `docs/revision-reads.md`: historical rendering and search response contract.
 - `docs/build-discovery.md`: verified stored-build recovery and pagination.
 - `docs/merge-policy.md`: revisioned target-authoritative admission rules.

@@ -253,3 +253,12 @@ def test_build_help_preserves_discovery_and_repair_contract() -> None:
     assert "current branch" in help_value["repair"]
     assert "structural tool" in help_value["repair"]
     assert "new revision" in help_value["repair"]
+
+
+def test_candidate_help_describes_unpublished_qualification_workflow() -> None:
+    help_value = weave_help("candidates")["help"]
+    assert "candidate_open from an explicit base revision" in help_value["workflow"]
+    assert "candidate_publish only the qualified head" in help_value["workflow"][-1]
+    assert "PUBLICATION_RACE" in help_value["failures"]
+    assert "STALE_QUALIFICATION" in help_value["failures"]
+    assert "candidate content change" in help_value["invalidation"][0]
