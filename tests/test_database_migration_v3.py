@@ -35,7 +35,7 @@ def test_clean_schema_v2_database_migrates_to_v3(tmp_path: Path) -> None:
     _downgrade_metadata_to_v2(path)
 
     with Database(path) as migrated:
-        assert migrated.connection.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert migrated.connection.execute("PRAGMA user_version").fetchone()[0] == 4
         assert migrated.integrity_report()["valid"] is True
         guards = {
             str(row[0])

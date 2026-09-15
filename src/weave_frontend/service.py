@@ -347,54 +347,19 @@ class RevisionWorkspace:
                 prepared_operations.extend(dynamic_operations)
                 document_ids.update(dynamic_document_ids)
 
-            connection.execute(
-                """INSERT INTO revisions(
-                       id, project_id, parent1_id, parent2_id, message, author, root_hash
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    revision_id,
-                    project_id,
-                    parent1,
-                    parent2,
-                    message,
-                    author,
-                    root_hash,
-                ),
+            self._insert_revision(
+                connection,
+                revision_id=revision_id,
+                project_id=project_id,
+                parent1=parent1,
+                parent2=parent2,
+                message=message,
+                author=author,
+                root_hash=root_hash,
+                modules=modules,
+                operations=prepared_operations,
+                extra_document_ids=document_ids,
             )
-            for module_name, ast in sorted(modules.items()):
-                canonical = self.db.canonical_json(ast)
-                connection.execute(
-                    """INSERT INTO module_snapshots(
-                           revision_id, qualified_name, ast_json, ast_hash
-                       ) VALUES (?, ?, ?, ?)""",
-                    (
-                        revision_id,
-                        module_name,
-                        canonical,
-                        self.db.hash_value(ast),
-                    ),
-                )
-            for sequence, (kind, target, payload) in enumerate(prepared_operations):
-                connection.execute(
-                    """INSERT INTO operations(
-                           id, revision_id, sequence_number, operation_kind,
-                           target, payload_json
-                       ) VALUES (?, ?, ?, ?, ?, ?)""",
-                    (
-                        str(uuid4()),
-                        revision_id,
-                        sequence,
-                        kind,
-                        target,
-                        self.db.canonical_json(payload),
-                    ),
-                )
-            for document_id in sorted(document_ids):
-                connection.execute(
-                    """INSERT INTO revision_documents(revision_id, document_id)
-                       VALUES (?, ?)""",
-                    (revision_id, document_id),
-                )
             if expected_branch_heads is None:
                 connection.execute(
                     """UPDATE branches SET head_revision_id = ?
@@ -413,6 +378,80 @@ class RevisionWorkspace:
                         f"branch {branch!r} advanced while publishing the revision",
                     )
         return revision_id
+
+    def _insert_revision(
+        self,
+        connection: Any,
+        *,
+        revision_id: str,
+        project_id: str,
+        parent1: str | None,
+        parent2: str | None,
+        message: str,
+        author: str,
+        root_hash: str,
+        modules: dict[str, JsonObject],
+        operations: Iterable[CommitOperation],
+        extra_document_ids: Iterable[str],
+    ) -> None:
+        """Write one immutable revision, snapshots, operations, and document links."""
+
+        document_ids = {
+            str(row["document_id"])
+            for row in connection.execute(
+                "SELECT document_id FROM revision_documents WHERE revision_id = ?",
+                (parent1,),
+            ).fetchall()
+        } if parent1 is not None else set()
+        document_ids.update(extra_document_ids)
+        connection.execute(
+            """INSERT INTO revisions(
+                   id, project_id, parent1_id, parent2_id, message, author, root_hash
+               ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                revision_id,
+                project_id,
+                parent1,
+                parent2,
+                message,
+                author,
+                root_hash,
+            ),
+        )
+        for module_name, ast in sorted(modules.items()):
+            canonical = self.db.canonical_json(ast)
+            connection.execute(
+                """INSERT INTO module_snapshots(
+                       revision_id, qualified_name, ast_json, ast_hash
+                   ) VALUES (?, ?, ?, ?)""",
+                (
+                    revision_id,
+                    module_name,
+                    canonical,
+                    self.db.hash_value(ast),
+                ),
+            )
+        for sequence, (kind, target, payload) in enumerate(operations):
+            connection.execute(
+                """INSERT INTO operations(
+                       id, revision_id, sequence_number, operation_kind,
+                       target, payload_json
+                   ) VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    str(uuid4()),
+                    revision_id,
+                    sequence,
+                    kind,
+                    target,
+                    self.db.canonical_json(payload),
+                ),
+            )
+        for document_id in sorted(document_ids):
+            connection.execute(
+                """INSERT INTO revision_documents(revision_id, document_id)
+                   VALUES (?, ?)""",
+                (revision_id, document_id),
+            )
 
     def _parents(self, revision: str) -> tuple[str | None, str | None]:
         row = self.db.connection.execute(

@@ -22,7 +22,7 @@ from .snapshot_codec import (
     hash_value as _hash_value,
 )
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 DEFAULT_DATABASE_BUSY_TIMEOUT_MS = 5_000
 MAX_DATABASE_BUSY_TIMEOUT_MS = 2_147_483_647
 
@@ -213,7 +213,73 @@ BEGIN
     );
 END;
 
-PRAGMA user_version = 3;
+CREATE TABLE IF NOT EXISTS edit_candidates (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id),
+    name TEXT NOT NULL,
+    base_revision_id TEXT NOT NULL REFERENCES revisions(id),
+    head_revision_id TEXT NOT NULL REFERENCES revisions(id),
+    status TEXT NOT NULL,
+    published_branch TEXT,
+    published_revision_id TEXT REFERENCES revisions(id),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_open_edit_candidates
+ON edit_candidates(project_id, name) WHERE status = 'open';
+
+CREATE TABLE IF NOT EXISTS candidate_qualifications (
+    id TEXT PRIMARY KEY,
+    candidate_id TEXT NOT NULL REFERENCES edit_candidates(id),
+    revision_id TEXT NOT NULL REFERENCES revisions(id),
+    level TEXT NOT NULL,
+    status TEXT NOT NULL,
+    compiler_identity_json TEXT NOT NULL,
+    evidence_json TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_candidate_qualifications_candidate
+ON candidate_qualifications(candidate_id, created_at);
+
+CREATE TRIGGER IF NOT EXISTS edit_candidates_validate_insert
+BEFORE INSERT ON edit_candidates
+BEGIN
+    SELECT RAISE(ABORT, 'candidate revisions must belong to project')
+    WHERE NOT EXISTS (
+        SELECT 1 FROM revisions base
+        WHERE base.id = NEW.base_revision_id
+          AND base.project_id = NEW.project_id
+    )
+    OR NOT EXISTS (
+        SELECT 1 FROM revisions head
+        WHERE head.id = NEW.head_revision_id
+          AND head.project_id = NEW.project_id
+    );
+    SELECT RAISE(ABORT, 'candidate status is invalid')
+    WHERE NEW.status NOT IN ('open', 'abandoned', 'published');
+END;
+
+CREATE TRIGGER IF NOT EXISTS edit_candidates_validate_update
+BEFORE UPDATE OF project_id, base_revision_id, head_revision_id, status,
+    published_revision_id ON edit_candidates
+BEGIN
+    SELECT RAISE(ABORT, 'candidate revisions must belong to project')
+    WHERE NOT EXISTS (
+        SELECT 1 FROM revisions base
+        WHERE base.id = NEW.base_revision_id
+          AND base.project_id = NEW.project_id
+    )
+    OR NOT EXISTS (
+        SELECT 1 FROM revisions head
+        WHERE head.id = NEW.head_revision_id
+          AND head.project_id = NEW.project_id
+    );
+    SELECT RAISE(ABORT, 'candidate status is invalid')
+    WHERE NEW.status NOT IN ('open', 'abandoned', 'published');
+END;
+
+PRAGMA user_version = 4;
 """
 
 

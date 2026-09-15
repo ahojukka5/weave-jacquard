@@ -11,6 +11,8 @@ that creates or advances a branch.
 - `program_import`;
 - all six single-node structural mutations;
 - `node_apply_batch`;
+- `candidate_apply_batch` (does not advance a branch);
+- `candidate_publish`;
 - `build_target_set`;
 - `build_target_delete`;
 - `context_add`;

@@ -184,6 +184,19 @@ def find_node(root: JsonObject, node_id: str) -> JsonObject:
     raise NotFoundError(f"node {node_id!r} not found")
 
 
+def require_node(root: JsonObject, node_id: str) -> JsonObject:
+    """Return a node or fail with a machine-readable missing-target code."""
+
+    try:
+        return find_node(root, node_id)
+    except NotFoundError as exc:
+        raise ValidationError(
+            "MISSING_STRUCTURAL_TARGET",
+            f"node {node_id!r} does not exist in this revision",
+            node_id=node_id,
+        ) from exc
+
+
 def find_parent(root: JsonObject, node_id: str) -> tuple[JsonObject, int]:
     for node in walk_nodes(root):
         if node.get("kind") != "list":

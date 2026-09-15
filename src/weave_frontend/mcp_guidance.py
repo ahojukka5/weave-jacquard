@@ -31,9 +31,13 @@ immutable build with build_get. When a build fails, read mapped errors through
 build_diagnostics_page instead of assuming access to server-local artifact paths.
 Pass the failed build revision_id to node_inspect when the branch may have
 advanced, then use revision_diff_page to compare that failing state with the
-current branch head before repairing. Use branch_history_page for complete
-bounded history reads, revision_operations_page for exact grouped-edit audit
-rows, and branch_activity_summary to measure revision and operation grouping.
+current branch head before repairing. Prefer candidate_open for unpublished
+working edits: accumulate structural operations, qualify the exact candidate
+head, and publish only that qualified revision. Use program_import only for
+textual work such as comments, documentation, formatting, or migration. Use
+branch_history_page for complete bounded history reads, revision_operations_page
+for exact grouped-edit audit rows, and branch_activity_summary to measure
+revision and operation grouping.
 """.strip()
 
 
@@ -46,6 +50,9 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "single-node tools while exploring or repairing",
             "node_apply_batch for one coherent known structure",
             "node_inspect after each coherent local structure",
+            "entity_list or entity_inspect for compact structural observation",
+            "candidate_open for unpublished working edits",
+            "candidate_apply_batch, candidate_qualify, then candidate_publish",
             "program_validate for a coherent single document",
             "build_target_set for a reusable multi-document program",
             "build_target_validate before a named-target build",
@@ -76,6 +83,13 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "node_apply_batch": (
                 "Apply up to 256 flat ordinary node operations as one revision. "
                 "Use @aliases for nodes created earlier in the same batch."
+            ),
+            "candidate_apply_batch": (
+                "Apply the same structural operations to an unpublished candidate."
+            ),
+            "program_import": (
+                "Textual source replacement for comments, documentation, formatting, "
+                "and migration. It does not preserve structural-edit guarantees."
             ),
             "merge_policy_set": (
                 "Publish an immutable target-branch admission policy. Policy changes "
@@ -150,6 +164,18 @@ _TOPICS: dict[str, dict[str, Any]] = {
                 "aggregate pass, failure, availability, and coverage evidence."
             ),
             "node_find": "Find stable IDs by form head, atom kind, or value.",
+            "entity_list": (
+                "List named declarations such as fn and entry without rendering the file."
+            ),
+            "entity_inspect": (
+                "Inspect one declaration by stable ID or unique name, including signature."
+            ),
+            "identity_inspect": (
+                "Report whether a stable node ID is present or invalid at a revision."
+            ),
+            "candidate_inspect": (
+                "Read an unpublished candidate's base, head, edits, and qualification."
+            ),
             "program_render": "Render canonical source or an annotated agent view.",
             "program_source_list": (
                 "List compiler source documents at a branch head or revision."
@@ -296,6 +322,8 @@ _TOPICS: dict[str, dict[str, Any]] = {
             "moving a node preserves its ID",
             "new forms and atoms receive new IDs",
             "batch aliases resolve to stable IDs",
+            "deleting a node invalidates its ID; name lookup never guesses",
+            "duplicate names return AMBIGUOUS_TARGET with every matching ID",
             "branches preserve base IDs",
             "annotated renderings expose IDs without changing program meaning",
         ],
@@ -380,9 +408,39 @@ _TOPICS: dict[str, dict[str, Any]] = {
     "bulk": {
         "tool": "program_import",
         "warning": (
-            "Bulk source import exists for migration and fixtures. Agents should use "
-            "structural single-node or transactional batch tools for normal construction."
+            "Bulk source import exists for migration, comments, documentation, and "
+            "formatting. Agents should use structural single-node or transactional "
+            "batch tools for normal construction. Textual edits do not inherit "
+            "stable-ID or candidate-qualification guarantees."
         ),
+    },
+    "candidates": {
+        "workflow": [
+            "candidate_open from an explicit base revision",
+            "entity_list / entity_inspect / identity_inspect on that revision",
+            "candidate_apply_batch for structural edits",
+            "candidate_qualify at syntactic or compiler level",
+            "candidate_publish only the qualified head, or candidate_abandon",
+        ],
+        "rule": (
+            "A candidate is an unpublished immutable revision chain. Qualification "
+            "and publication must name the same candidate head."
+        ),
+        "invalidation": [
+            "candidate content change stale-qualifies prior evidence",
+            "a different compiler identity is recorded, not silently reused",
+            "abandoned or published candidates reject further edits",
+        ],
+        "failures": [
+            "STALE_REVISION",
+            "MISSING_STRUCTURAL_TARGET",
+            "AMBIGUOUS_TARGET",
+            "INVALID_EDIT",
+            "CANDIDATE_CONFLICT",
+            "QUALIFICATION_FAILURE",
+            "STALE_QUALIFICATION",
+            "PUBLICATION_RACE",
+        ],
     },
 }
 

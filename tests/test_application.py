@@ -333,6 +333,9 @@ def test_public_entrypoint_exposes_one_composed_application() -> None:
     assert "revision_evidence_page" in public_entrypoint.PUBLIC_TOOL_MANIFEST["tool_names"]
     assert "branch_revert_preview" in public_entrypoint.PUBLIC_TOOL_MANIFEST["tool_names"]
     assert "branch_revert" in public_entrypoint.PUBLIC_TOOL_MANIFEST["tool_names"]
+    assert "entity_list" in public_entrypoint.PUBLIC_TOOL_MANIFEST["tool_names"]
+    assert "candidate_open" in public_entrypoint.PUBLIC_TOOL_MANIFEST["tool_names"]
+    assert "candidate_publish" in public_entrypoint.PUBLIC_TOOL_MANIFEST["tool_names"]
     assert all(
         tool["input_schema"]["type"] == "object"
         for tool in public_entrypoint.PUBLIC_TOOL_MANIFEST["tools"]
