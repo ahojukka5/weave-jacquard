@@ -3,10 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from weave_frontend import SExpressionWorkspace
-from weave_frontend.agent_checkpoint import AgentCheckpointRegistry
 from weave_frontend.builds import ConcurrentBuildTargetRegistry as BuildTargetRegistry
-from weave_frontend.checkpoint_resume_snapshot import CheckpointResumeSnapshotService
-from weave_frontend.concurrent_merge_policy import MergePolicyRegistry
+from weave_frontend.merges import ConcurrentMergePolicyRegistry as MergePolicyRegistry
+from weave_frontend.resume import AgentCheckpointRegistry, CheckpointResumeSnapshotService
 
 
 def _service(

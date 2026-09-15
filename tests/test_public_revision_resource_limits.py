@@ -8,14 +8,16 @@ from typing import Any
 import pytest
 
 import weave_frontend.branch_activity as branch_activity_module
-import weave_frontend.merge_preflight as merge_preflight_module
+import weave_frontend.merges.preflight as merge_preflight_module
 from weave_frontend.branch_activity import BranchActivityService
 from weave_frontend.errors import ValidationError
-from weave_frontend.merge_impact import MergeTargetImpactService
-from weave_frontend.merge_preflight import MergePreflightService
-from weave_frontend.project_merge_impact_queue import ProjectMergeImpactQueueService
-from weave_frontend.project_merge_queue import ProjectMergeQueueService
-from weave_frontend.resume_snapshot import ResumeSnapshotService
+from weave_frontend.merges import (
+    MergePreflightService,
+    MergeTargetImpactService,
+    ProjectMergeImpactQueueService,
+    ProjectMergeQueueService,
+)
+from weave_frontend.resume import ResumeSnapshotService
 from weave_frontend.revision_diff import RevisionNodeDiffService
 from weave_frontend.revision_inspection import RevisionNodeInspectionService
 from weave_frontend.revision_limits import (

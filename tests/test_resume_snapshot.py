@@ -7,8 +7,8 @@ import pytest
 
 from weave_frontend import NotFoundError, SExpressionWorkspace, ValidationError
 from weave_frontend.builds import ConcurrentBuildTargetRegistry as BuildTargetRegistry
-from weave_frontend.concurrent_merge_policy import MergePolicyRegistry
-from weave_frontend.resume_snapshot import (
+from weave_frontend.merges import ConcurrentMergePolicyRegistry as MergePolicyRegistry
+from weave_frontend.resume import (
     MAX_CONTEXT_PREVIEW_CHARS,
     RESUME_SNAPSHOT_FORMAT,
     ResumeSnapshotService,
