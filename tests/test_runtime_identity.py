@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from weave_frontend.database import SCHEMA_VERSION
 from weave_frontend.errors import ValidationError
 from weave_frontend.mcp_capabilities import PUBLIC_CAPABILITIES
 from weave_frontend.mcp_revert_guidance import weave_help
@@ -93,7 +94,7 @@ def test_runtime_identity_binds_application_and_active_components() -> None:
         assert report["jacquard"]["tool_count"] == 7
         assert report["jacquard"]["capability_count"] == 1
         assert report["database"] == {
-            "schema_version": 3,
+            "schema_version": SCHEMA_VERSION,
             "busy_timeout_ms": 25,
             "journal_mode": "memory",
             "foreign_keys": True,

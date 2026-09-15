@@ -422,6 +422,11 @@ stable. See [`revision-diff.md`](revision-diff.md).
 Other reads:
 
 - `node_find`: locate stable IDs by head, kind, or exact value;
+- `entity_list`: list named declarations at a revision;
+- `entity_inspect`: inspect one declaration by ID or unique name;
+- `identity_inspect`: report whether a stable ID is still valid;
+- `candidate_open` / `candidate_inspect` / `candidate_apply_batch` /
+  `candidate_qualify` / `candidate_publish`: unpublished working revisions;
 - `build_diagnostics_page`: bounded mapped diagnostics from verified builds;
 - `context_add`: publish scoped immutable design context;
 - `context_get`: retrieve context visible at current revision.

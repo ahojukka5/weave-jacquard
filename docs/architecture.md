@@ -6,7 +6,7 @@ A coding agent should not have to regenerate and reconcile complete source files
 Jacquard gives agents a versioned structural programming environment:
 
 ```text
-DISCOVER → INSPECT → MUTATE → CHECKPOINT → PREFLIGHT → BUILD → TEST → MERGE
+DISCOVER → INSPECT → CANDIDATE → QUALIFY → PREFLIGHT → BUILD → TEST → MERGE
 ```
 
 Jacquard owns stable syntax-tree identity, immutable revisions, transactional
@@ -49,7 +49,8 @@ The core persistent graph is:
 ```text
 project
 ├── branches ────────────────┐
-├── immutable revisions ◄────┘
+├── unpublished edit candidates ───┐
+├── immutable revisions ◄──────────┘
 │   ├── parent1
 │   ├── optional parent2
 │   ├── compressed module snapshots
@@ -61,12 +62,14 @@ project
 └── external verified artifact stores
 ```
 
-A branch is the only mutable pointer in the program graph. Revisions, snapshots,
-operations, and content documents are immutable evidence.
+A branch is the published mutable pointer in the program graph. An unpublished
+edit candidate is a second mutable pointer used only for pre-publication work.
+Revisions, snapshots, operations, and content documents are immutable evidence.
 
-SQLite schema version 3 enforces project-local parent and branch-head integrity,
-unique operation order, foreign keys, and compressed snapshots. Startup refuses a
-newer unsupported schema and checks existing data before migration.
+SQLite schema version 4 adds candidate tables to the version 3 revision core.
+It continues to enforce project-local parent and branch-head integrity, unique
+operation order, foreign keys, and compressed snapshots. Startup refuses a newer
+unsupported schema and checks existing data before migration.
 
 Direct branch checkout remains an internal recovery primitive. It is exposed by
 neither MCP nor the public `weave_jacquard.SExpressionWorkspace` facade. Public
@@ -88,6 +91,7 @@ capabilities. The graph currently covers:
 - target-authoritative policy and preflight;
 - project agent status, merge queues, impact queues, and merge-train previews;
 - resume snapshots and bounded revision reads;
+- unpublished working edit candidates and exact-head qualification;
 - verified online database backup;
 - aggregate artifact storage accounting and quota admission;
 - content-derived runtime identity.
@@ -119,17 +123,27 @@ of source lines or byte offsets.
 Agents normally use bounded local operations:
 
 - inspect a local subtree;
+- list named declarations without rendering a whole file;
 - find nodes by structural properties;
 - create one form or atom;
 - update, move, wrap, or delete one node;
-- apply one coherent bounded edit batch.
+- apply one coherent bounded edit batch;
+- accumulate those edits on an unpublished candidate revision.
 
-A single edit publishes one immutable revision. `node_apply_batch` applies 1–256
-flat ordered operations in memory, validates once, writes one snapshot and ordered
-audit rows, and advances the branch with one compare-and-set.
+A single edit on a branch publishes one immutable revision. `node_apply_batch`
+applies 1–256 flat ordered operations in memory, validates once, writes one
+snapshot and ordered audit rows, and advances the branch with one compare-and-set.
 
-Bulk source import exists for migration and fixtures. It is bounded and parsed into
-the same validated tree representation; it is not the normal agent-writing path.
+Working candidates use the same operations without moving a published branch.
+`candidate_open` captures an explicit base revision. Later edits create new
+immutable revisions whose only mutable pointer is the candidate head.
+Qualification records bind to that exact head. `candidate_publish` fast-forwards
+a branch to the qualified head only when the branch is still at the recorded
+base and required qualification still names that head.
+
+Bulk source import exists for migration, comments, documentation, formatting, and
+fixtures. It is bounded and parsed into the same validated tree representation; it
+is not the normal agent-writing path and does not claim structural-edit guarantees.
 
 Every structural publication enforces:
 

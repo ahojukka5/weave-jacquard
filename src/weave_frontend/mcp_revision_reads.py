@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .entity_catalog import EntityCatalogService
 from .mcp_server import _result, mcp, workspace
 from .revision_reads import RevisionReadService
 from .runtime import runtime_service
@@ -15,6 +16,11 @@ for _tool_name in ("branch_history", "node_find", "program_render"):
 @runtime_service("revision_reads", depends_on=("workspace",))
 def revision_reads() -> RevisionReadService:
     return RevisionReadService(workspace())
+
+
+@runtime_service("entity_catalog", depends_on=("workspace",))
+def entity_catalog() -> EntityCatalogService:
+    return EntityCatalogService(workspace())
 
 
 @mcp.tool()
@@ -77,7 +83,75 @@ def program_render(
             branch,
             document,
             annotated=annotated,
-            annotate_atoms=annotate_atoms,
+            revision_id=revision_id,
+        )
+    )
+
+
+@mcp.tool()
+def entity_list(
+    project: str,
+    branch: str,
+    document: str,
+    head: str | None = None,
+    revision_id: str | None = None,
+) -> dict[str, Any]:
+    """List named declarations without rendering the whole document."""
+
+    return _result(
+        lambda: entity_catalog().list_entities(
+            project,
+            branch,
+            document,
+            head=head,
+            revision_id=revision_id,
+        )
+    )
+
+
+@mcp.tool()
+def entity_inspect(
+    project: str,
+    branch: str,
+    document: str,
+    node_id: str | None = None,
+    kind: str | None = None,
+    name: str | None = None,
+    revision_id: str | None = None,
+    depth: int = 2,
+) -> dict[str, Any]:
+    """Inspect one declaration by stable ID or unique name."""
+
+    return _result(
+        lambda: entity_catalog().inspect_entity(
+            project,
+            branch,
+            document,
+            node_id=node_id,
+            kind=kind,
+            name=name,
+            revision_id=revision_id,
+            depth=depth,
+        )
+    )
+
+
+@mcp.tool()
+def identity_inspect(
+    project: str,
+    branch: str,
+    document: str,
+    node_id: str,
+    revision_id: str | None = None,
+) -> dict[str, Any]:
+    """Report whether a stable node ID is present or invalid at a revision."""
+
+    return _result(
+        lambda: entity_catalog().inspect_identity(
+            project,
+            branch,
+            document,
+            node_id,
             revision_id=revision_id,
         )
     )

@@ -66,9 +66,10 @@ pinned committed build   candidate build and tests
      verified artifacts and evidence
 ```
 
-A branch is the only mutable pointer in the program graph. Existing-branch writes
-recheck the expected head inside the same SQLite transaction that publishes all
-immutable consequences.
+A branch is the published mutable pointer in the program graph. Unpublished
+working candidates are a second pointer used only before publication.
+Existing-branch writes recheck the expected head inside the same SQLite
+transaction that publishes all immutable consequences.
 
 The supported public workspace is `weave_jacquard.SExpressionWorkspace`. Direct
 historical checkout is intentionally absent. Create a branch at an immutable
@@ -137,21 +138,25 @@ A normal agent workflow is:
 project_initialize
 → program_create
 → grammar_help for unfamiliar forms
-→ node_inspect / node_find
-→ single-node edits while exploring
-→ node_apply_batch for one coherent known structure
+→ node_inspect / entity_list / entity_inspect
+→ candidate_open for unpublished working edits
+→ candidate_apply_batch for one coherent known structure
+→ candidate_qualify
+→ candidate_publish when qualification still names that head
 → program_validate
 → checkpoint and task evidence
 ```
 
-Every successful single-node edit creates one immutable revision.
-`node_apply_batch` accepts 1–256 flat ordered structural operations, supports
-temporary aliases for nodes created earlier in the request, validates the final
-tree once, and publishes one revision or nothing.
+Every successful single-node edit on a branch creates one immutable revision.
+Working candidates use the same operations without moving the published branch.
+`node_apply_batch` and `candidate_apply_batch` accept 1–256 flat ordered
+structural operations, support temporary aliases for nodes created earlier in
+the request, validate the final tree once, and publish one revision or nothing.
 
-Bulk `program_import` exists for migration and fixtures. It is bounded and parsed
-into the same validated tree representation; normal agents should prefer
-structural operations.
+Bulk `program_import` exists for migration, comments, documentation, formatting, and
+fixtures. It is bounded and parsed into the same validated tree representation.
+Textual imports do not inherit structural-edit or candidate-qualification
+guarantees.
 
 ## Build and test workflow
 

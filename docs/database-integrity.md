@@ -1,6 +1,7 @@
 # Database integrity
 
-Jacquard schema version 3 combines SQLite relational constraints with bounded
+Jacquard schema version 4 adds unpublished working-candidate tables to the version 3
+relational core. Inspection still combines SQLite constraints with bounded
 semantic verification of immutable program history.
 
 ## Read-only inspection

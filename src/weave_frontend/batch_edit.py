@@ -9,6 +9,7 @@ from uuid import uuid4
 from .errors import NotFoundError, ValidationError
 from .sexpr import (
     ATOM_KINDS,
+    NODE_ID_PATTERN,
     JsonObject,
     find_node,
     find_parent,
@@ -69,17 +70,6 @@ class EditBatchExecutor:
         author: str = "agent",
         include_operation_results: bool = False,
     ) -> dict[str, Any]:
-        if not isinstance(operations, list) or not operations:
-            raise ValidationError(
-                "EMPTY_EDIT_BATCH",
-                "operations must contain at least one structural edit",
-            )
-        if len(operations) > MAX_BATCH_OPERATIONS:
-            raise ValidationError(
-                "EDIT_BATCH_TOO_LARGE",
-                f"at most {MAX_BATCH_OPERATIONS} operations are allowed per batch",
-            )
-
         base_revision_id = self.workspace.branch_head(project, branch)
         if (
             expected_revision_id is not None
@@ -92,12 +82,55 @@ class EditBatchExecutor:
 
         state = self.workspace._state_at_revision(base_revision_id)
         root = self.workspace._document(state, document)
+        transformed = self.transform(root, operations)
+        self.workspace._validate_state(state)
+        revision_id = self._commit_if_head(
+            project,
+            branch,
+            state,
+            base_revision_id=base_revision_id,
+            message=message or f"apply {len(operations)} structural edits",
+            author=author,
+            operations=transformed["operation_log"],
+        )
+        response: dict[str, Any] = {
+            "revision_id": revision_id,
+            "base_revision_id": base_revision_id,
+            "branch": branch,
+            "document": document,
+            "root_node_id": root["id"],
+            "operation_count": transformed["operation_count"],
+            "created_node_count": transformed["created_node_count"],
+            "deleted_node_count": transformed["deleted_node_count"],
+            "node_count": sum(1 for _ in walk_nodes(root)),
+            "aliases": transformed["aliases"],
+        }
+        if include_operation_results:
+            response["operation_results"] = transformed["operation_results"]
+        return response
+
+    def transform(
+        self,
+        root: JsonObject,
+        operations: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Apply operations in memory without publishing a revision."""
+
+        if not isinstance(operations, list) or not operations:
+            raise ValidationError(
+                "EMPTY_EDIT_BATCH",
+                "operations must contain at least one structural edit",
+            )
+        if len(operations) > MAX_BATCH_OPERATIONS:
+            raise ValidationError(
+                "EDIT_BATCH_TOO_LARGE",
+                f"at most {MAX_BATCH_OPERATIONS} operations are allowed per batch",
+            )
         aliases: dict[str, str] = {}
         operation_log: list[tuple[str, str | None, JsonObject]] = []
         operation_results: list[dict[str, Any]] = []
         created_count = 0
         deleted_count = 0
-
         for index, raw in enumerate(operations):
             operation_name = raw.get("op") if isinstance(raw, dict) else None
             try:
@@ -121,7 +154,7 @@ class EditBatchExecutor:
                 ) from exc
             except NotFoundError as exc:
                 raise BatchOperationError(
-                    "NOT_FOUND",
+                    "MISSING_STRUCTURAL_TARGET",
                     str(exc),
                     operation_index=index,
                     operation=(
@@ -132,33 +165,15 @@ class EditBatchExecutor:
             operation_results.append(result)
             created_count += created
             deleted_count += deleted
-
         validate_tree(root)
-        self.workspace._validate_state(state)
-        revision_id = self._commit_if_head(
-            project,
-            branch,
-            state,
-            base_revision_id=base_revision_id,
-            message=message or f"apply {len(operations)} structural edits",
-            author=author,
-            operations=operation_log,
-        )
-        response: dict[str, Any] = {
-            "revision_id": revision_id,
-            "base_revision_id": base_revision_id,
-            "branch": branch,
-            "document": document,
-            "root_node_id": root["id"],
+        return {
+            "operation_log": operation_log,
+            "operation_results": operation_results,
             "operation_count": len(operations),
             "created_node_count": created_count,
             "deleted_node_count": deleted_count,
-            "node_count": sum(1 for _ in walk_nodes(root)),
             "aliases": dict(sorted(aliases.items())),
         }
-        if include_operation_results:
-            response["operation_results"] = operation_results
-        return response
 
     def _apply_one(
         self,
@@ -210,12 +225,12 @@ class EditBatchExecutor:
         *,
         index: int,
     ) -> tuple[dict[str, Any], tuple[str, str | None, JsonObject], int, int]:
-        self._reject_unknown(raw, {"op", "parent", "head", "position", "as"})
+        self._reject_unknown(raw, {"op", "parent", "head", "position", "as", "node_id"})
         parent_id = self._resolve_reference(raw.get("parent"), aliases)
         head = self._required_string(raw, "head")
         parent = find_node(root, parent_id)
         self._require_list(parent)
-        node = make_form(head)
+        node = make_form(head, node_id=self._replay_node_id(root, raw))
         position = self._insert_child(parent, node, raw.get("position"))
         alias = self._register_alias(raw.get("as"), node["id"], aliases)
         payload: JsonObject = {
@@ -248,7 +263,7 @@ class EditBatchExecutor:
     ) -> tuple[dict[str, Any], tuple[str, str | None, JsonObject], int, int]:
         self._reject_unknown(
             raw,
-            {"op", "parent", "kind", "value", "position", "as"},
+            {"op", "parent", "kind", "value", "position", "as", "node_id"},
         )
         parent_id = self._resolve_reference(raw.get("parent"), aliases)
         kind = self._required_string(raw, "kind")
@@ -261,7 +276,7 @@ class EditBatchExecutor:
             raise ValidationError("MISSING_VALUE", "add_atom requires value")
         parent = find_node(root, parent_id)
         self._require_list(parent)
-        node = make_atom(kind, raw["value"])
+        node = make_atom(kind, raw["value"], node_id=self._replay_node_id(root, raw))
         position = self._insert_child(parent, node, raw.get("position"))
         alias = self._register_alias(raw.get("as"), node["id"], aliases)
         payload: JsonObject = {
@@ -378,7 +393,7 @@ class EditBatchExecutor:
         *,
         index: int,
     ) -> tuple[dict[str, Any], tuple[str, str | None, JsonObject], int, int]:
-        self._reject_unknown(raw, {"op", "node", "head", "as"})
+        self._reject_unknown(raw, {"op", "node", "head", "as", "node_id"})
         node_id = self._resolve_reference(raw.get("node"), aliases)
         head = self._required_string(raw, "head")
         if root["id"] == node_id:
@@ -387,7 +402,7 @@ class EditBatchExecutor:
                 "the document root cannot be wrapped in place",
             )
         parent, position = find_parent(root, node_id)
-        wrapper = make_form(head)
+        wrapper = make_form(head, node_id=self._replay_node_id(root, raw))
         wrapper["children"].append(parent["children"][position])
         parent["children"][position] = wrapper
         alias = self._register_alias(raw.get("as"), wrapper["id"], aliases)
@@ -592,6 +607,27 @@ class EditBatchExecutor:
             )
         aliases[value] = node_id
         return value
+
+    @staticmethod
+    def _replay_node_id(root: JsonObject, raw: dict[str, Any]) -> str | None:
+        node_id = raw.get("node_id")
+        if node_id is None:
+            return None
+        if not isinstance(node_id, str) or not NODE_ID_PATTERN.match(node_id):
+            raise ValidationError(
+                "INVALID_NODE_ID",
+                "replay node_id must match n_[A-Za-z0-9_-]+",
+                node_id=node_id if isinstance(node_id, str) else None,
+            )
+        try:
+            find_node(root, node_id)
+        except NotFoundError:
+            return node_id
+        raise ValidationError(
+            "DUPLICATE_NODE_ID",
+            f"node id {node_id} already exists in this revision",
+            node_id=node_id,
+        )
 
     @staticmethod
     def _reject_unknown(raw: dict[str, Any], allowed: set[str]) -> None:
