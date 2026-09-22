@@ -18,21 +18,16 @@ unimplemented acceptance criterion. A partial implementation may be committed
 and tested in a draft, but it must not be described or marked as ready for
 review.
 
-A pull request remains a draft while any required CI job for its exact final head
-is queued, running, cancelled, or red. Do not stop after starting CI. Wait for
-all required jobs to reach a terminal result and inspect that result.
-
-When CI is red, the work is unfinished. Diagnose the failure, fix the defect,
-rerun the required checks, and continue until the exact final head is green.
-Never treat a previously green head, a superseded run, or a locally passing
-subset as final evidence.
+Follow Fast development in `~/dev/AGENTS.md`. The local test of the change is
+the gate. A queued, running, or red GitHub job does not keep the pull request
+in draft and is not the next task.
 
 Mark a pull request ready for review only when all of the following are true:
 
 1. the pull request fully implements the referenced issue and its acceptance
    criteria;
 2. the pull request body contains `Closes #<issue>` for that issue;
-3. all required portable and packaged CI jobs pass on the exact final head;
+3. the local test of the change has passed, and that command is recorded;
 4. the full final diff and commit structure have been reviewed;
 5. the validation record in the pull request body matches the exact final head.
 
