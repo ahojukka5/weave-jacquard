@@ -12,3 +12,16 @@ local-qualification/
 *.db
 *.db-shm
 *.db-wal
+
+# Generated local state. Not source.
+Manifest.toml
+Manifest-*.toml
+LocalPreferences.toml
+*.mem
+.quarto/
+_build/
+runs/
+*.out
+*.err
+run.log
+inst.log
