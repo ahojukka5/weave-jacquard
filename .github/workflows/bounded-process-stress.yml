@@ -18,7 +18,7 @@ defaults:
 jobs:
   stress:
     name: "test: 1000-iteration bounded process termination stress"
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
@@ -41,7 +41,7 @@ jobs:
               exit 0
             fi
           done
-          echo "::error::Python 3.11 or newer is required on the self-hosted runner."
+          echo "::error::Python 3.11 or newer is required on the GitHub-hosted runner."
           exit 1
 
       - name: Run bounded process stress matrix
