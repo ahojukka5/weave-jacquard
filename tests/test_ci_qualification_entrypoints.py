@@ -12,7 +12,8 @@ def _workflow(name: str) -> str:
 def test_python_ci_runs_portable_qualification() -> None:
     workflow = _workflow("ci.yml")
 
-    assert "runs-on: self-hosted" in workflow
+    assert "runs-on: ubuntu-latest" in workflow
+    assert "runs-on: self-hosted" not in workflow
     assert 'qualification_dir="$GITHUB_WORKSPACE/qualification-evidence"' in workflow
     assert 'virtualenv_dir="$GITHUB_WORKSPACE/.venv-ci"' in workflow
     assert '"$SYSTEM_PYTHON_BIN" -m venv "$VIRTUALENV_DIR"' in workflow
