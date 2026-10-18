@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
@@ -20,8 +20,7 @@ concurrency:
 jobs:
   qualification:
     name: "test: lint, compile & pytest"
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
@@ -54,7 +53,7 @@ jobs:
               exit 0
             fi
           done
-          echo "::error::Python 3.11 or newer is required on the self-hosted runner."
+          echo "::error::Python 3.11 or newer is required on the GitHub-hosted runner."
           exit 1
 
       - name: Create qualification virtual environment
