@@ -32,6 +32,8 @@ Mark a pull request ready for review only when all of the following are true:
 5. the validation record in the pull request body matches the exact final head.
 
 If any item is not true, keep working and keep the pull request in draft.
+Unfinished issue acceptance criteria or local validation remain a draft gate;
+a queued or red remote GitHub run alone does not override Fast development.
 
 ## Compatibility discipline
 
