@@ -268,7 +268,9 @@ class CompilerArtifactMixin:
                 "INVALID_BUILD_MANIFEST",
                 "build manifest ID does not match its artifact directory",
             )
-        if manifest.get("status") not in {"succeeded", "failed"}:
+        if not isinstance(manifest.get("status"), str) or manifest["status"] not in {
+            "succeeded", "failed"
+        }:
             raise ValidationError(
                 "INVALID_BUILD_MANIFEST",
                 "build manifest status must be 'succeeded' or 'failed'",

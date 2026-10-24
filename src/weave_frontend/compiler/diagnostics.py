@@ -153,7 +153,7 @@ def _validate_document(
         )
 
     status = document.get("status")
-    if status not in {"succeeded", "failed"}:
+    if not isinstance(status, str) or status not in {"succeeded", "failed"}:
         errors.append("compiler diagnostics status must be 'succeeded' or 'failed'")
     phase = document.get("phase")
     if not isinstance(phase, str) or not phase:
@@ -169,7 +169,7 @@ def _validate_document(
         errors.append(
             "compiler diagnostics exit_code does not match process return code"
         )
-    if _is_int(exit_code) and status in {"succeeded", "failed"}:
+    if _is_int(exit_code) and isinstance(status, str) and status in {"succeeded", "failed"}:
         expected_status = "succeeded" if exit_code == 0 else "failed"
         if status != expected_status:
             errors.append("compiler diagnostics status does not match its exit_code")
@@ -216,7 +216,7 @@ def _validate_entry(value: Any, *, index: int) -> list[str]:
         errors.append(f"{prefix} source must be a string or null")
 
     span_origin = value.get("span_origin")
-    if span_origin not in SPAN_ORIGINS:
+    if not isinstance(span_origin, str) or span_origin not in SPAN_ORIGINS:
         errors.append(
             f"{prefix} span_origin must be one of {sorted(SPAN_ORIGINS)}"
         )
@@ -224,7 +224,7 @@ def _validate_entry(value: Any, *, index: int) -> list[str]:
     span = value.get("span")
     if span_origin == "none" and span is not None:
         errors.append(f"{prefix} span must be null when span_origin is 'none'")
-    if span_origin in {
+    if isinstance(span_origin, str) and span_origin in {
         "compiler-preflight",
         "propagated-wir-location",
         "inferred-unique-token",

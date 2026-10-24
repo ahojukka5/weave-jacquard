@@ -229,8 +229,15 @@ def decode_snapshot_text(
         )
     try:
         try:
-            parsed = json.loads(value)
-        except (json.JSONDecodeError, RecursionError) as exc:
+            def object_fields(pairs):
+                result = {}
+                for key, child in pairs:
+                    if key in result:
+                        raise ValueError("duplicate snapshot key")
+                    result[key] = child
+                return result
+            parsed = json.loads(value, object_pairs_hook=object_fields)
+        except (ValueError, RecursionError) as exc:
             raise SnapshotIntegrityError(
                 "SNAPSHOT_JSON_INVALID",
                 "snapshot JSON cannot be decoded",
