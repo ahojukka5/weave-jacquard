@@ -18,8 +18,7 @@ class RetainedArtifactTooLarge(RetainedArtifactReadError):
 
     def __init__(self, path: Path, *, limit: int, observed: int) -> None:
         super().__init__(
-            f"retained artifact {path.name!r} exceeds {limit} bytes "
-            f"(observed at least {observed})"
+            f"retained artifact {path.name!r} exceeds {limit} bytes (observed at least {observed})"
         )
         self.path = path
         self.limit = limit
@@ -32,7 +31,7 @@ def read_bounded_regular_bytes(path: Path, *, max_bytes: int) -> bytes:
     if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes <= 0:
         raise ValueError("max_bytes must be a positive integer")
 
-    flags = os.O_RDONLY
+    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0)
     if hasattr(os, "O_CLOEXEC"):
         flags |= os.O_CLOEXEC
     if hasattr(os, "O_NOFOLLOW"):
@@ -41,14 +40,17 @@ def read_bounded_regular_bytes(path: Path, *, max_bytes: int) -> bytes:
     try:
         before = path.lstat()
     except OSError as exc:
-        raise RetainedArtifactReadError(f"cannot inspect retained artifact: {exc}") from exc
+        raise RetainedArtifactReadError("cannot inspect retained artifact") from exc
     if stat.S_ISLNK(before.st_mode):
         raise RetainedArtifactReadError("retained artifact must not be a symlink")
+
+    if not stat.S_ISREG(before.st_mode):
+        raise RetainedArtifactReadError("retained artifact must be a regular file")
 
     try:
         descriptor = os.open(path, flags)
     except OSError as exc:
-        raise RetainedArtifactReadError(f"cannot open retained artifact: {exc}") from exc
+        raise RetainedArtifactReadError("cannot open retained artifact") from exc
 
     try:
         opened = os.fstat(descriptor)
@@ -80,11 +82,20 @@ def read_bounded_regular_json(path: Path, *, max_bytes: int) -> Any:
     """Read and decode one bounded non-symlink UTF-8 JSON artifact."""
 
     payload = read_bounded_regular_bytes(path, max_bytes=max_bytes)
+
+    def object_fields(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise RetainedArtifactReadError("duplicate retained artifact JSON key")
+            result[key] = value
+        return result
+
     try:
         text = payload.decode("utf-8")
-        return json.loads(text)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RetainedArtifactReadError(f"invalid retained artifact JSON: {exc}") from exc
+        return json.loads(text, object_pairs_hook=object_fields)
+    except (UnicodeError, ValueError, RecursionError) as exc:
+        raise RetainedArtifactReadError("invalid retained artifact JSON") from exc
 
 
 __all__ = [

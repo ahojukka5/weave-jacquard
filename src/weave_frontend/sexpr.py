@@ -65,7 +65,7 @@ def validate_node(node: Any) -> None:
                 node_id=node_id,
             )
         return
-    if kind not in ATOM_KINDS:
+    if not isinstance(kind, str) or kind not in ATOM_KINDS:
         raise ValidationError(
             "INVALID_NODE_KIND",
             f"unsupported node kind {kind!r}",
@@ -81,7 +81,7 @@ def validate_node(node: Any) -> None:
     if kind == "float" and (
         isinstance(value, bool)
         or not isinstance(value, (int, float))
-        or not math.isfinite(value)
+        or (isinstance(value, float) and not math.isfinite(value))
     ):
         raise ValidationError(
             "INVALID_VALUE",
@@ -94,7 +94,12 @@ def validate_node(node: Any) -> None:
             "boolean value must be true or false",
             node_id=node_id,
         )
-    value_bytes = _atom_value_bytes(kind, value)
+    try:
+        value_bytes = _atom_value_bytes(kind, value)
+    except (UnicodeError, ValueError, OverflowError) as exc:
+        raise ValidationError(
+            "INVALID_VALUE", "atom value is not representable", node_id=node_id
+        ) from exc
     if value_bytes > MAX_ATOM_VALUE_BYTES:
         raise ValidationError(
             "ATOM_VALUE_TOO_LARGE",
@@ -370,7 +375,10 @@ def parse_source(source: str) -> JsonObject:
 
     if not isinstance(source, str):
         raise ValidationError("INVALID_SOURCE", "source must be a string")
-    source_bytes = len(source.encode("utf-8"))
+    try:
+        source_bytes = len(source.encode("utf-8"))
+    except UnicodeError as exc:
+        raise ValidationError("INVALID_SOURCE", "source must be valid UTF-8") from exc
     if source_bytes > MAX_SOURCE_BYTES:
         raise ValidationError(
             "SOURCE_TOO_LARGE",
@@ -459,7 +467,12 @@ def _parse_atom(value: str) -> JsonObject:
     if value == "false":
         return make_atom("boolean", False)
     if re.fullmatch(r"[-+]?\d+", value):
-        return make_atom("integer", int(value))
+        try:
+            return make_atom("integer", int(value))
+        except ValueError as exc:
+            raise ValidationError(
+                "INVALID_VALUE", "integer literal exceeds supported precision"
+            ) from exc
     if re.fullmatch(
         r"[-+]?(?:(?:\d+\.\d*|\d*\.\d+)(?:[eE][-+]?\d+)?|\d+[eE][-+]?\d+)",
         value,
