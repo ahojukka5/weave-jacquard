@@ -1,5 +1,11 @@
 # Contributing
 
+[OodiHandbook](https://github.com/ahojukka5/OodiHandbook/blob/v0.1.0/index.qmd)
+is the source of common rules. Follow the repository's explicitly adopted
+immutable release (AUTH-003). Use [reviewed master guidance](https://github.com/ahojukka5/OodiHandbook/blob/master/index.qmd)
+as a voluntary improvement target (AUTH-006). Local instructions provide
+technical details and do not override the Handbook.
+
 Thank you for contributing to `weave-jacquard`.
 
 ## Mandatory detailed guidance
@@ -18,27 +24,14 @@ review. The pull request body must contain `Closes #<issue>` only when every
 acceptance criterion is implemented or the issue owner has explicitly removed
 it from scope.
 
-Do not stop after starting CI. Wait until every required job for the exact final
-head reaches a terminal result.
+Keep incomplete implementation or unmet acceptance criteria in draft.
+After relevant local validation, open a reviewable PR and report the exact head,
+commands, results and limitations (ENG-008). Pending or failing non-required CI
+does not prevent review. Do not poll or repair CI unless requested.
 
-- If a required job is queued or running, keep the pull request in draft and
-  continue checking.
-- If a required job is red or cancelled, the work is unfinished. Diagnose the
-  failure, fix it, rerun the checks, and continue until they are green.
-- Do not rely on a green run from a superseded commit.
-- Do not mark a pull request ready while validation evidence is incomplete.
-
-A pull request may be marked ready for review only after:
-
-1. it fully closes the issue named in its body;
-2. its exact final head passes compileall, Ruff, the full required pytest suite,
-   and every required packaged/native qualification;
-3. all evidence uploads and required workflow finalization steps succeed;
-4. its final diff and commit history have been reviewed and cleaned up;
-5. its description records validation from that exact final head.
-
-When any condition is unmet, keep working rather than handing off an incomplete
-pull request.
+Before an authorized rebase-merge, inspect the actual diff and review comments
+and require every check enforced by an active ruleset to pass on that head
+(ENG-007, ENG-018). Report a blocked required check; never bypass it.
 
 ## Compatibility discipline
 
@@ -46,4 +39,3 @@ Internal modules and import paths are not compatibility commitments. Do not add
 aliases, forwarding modules, duplicate paths, or deprecation shims unless an
 explicit supported public compatibility requirement demands them. Migrate all
 repository callers and remove obsolete internal paths in the same change.
-
