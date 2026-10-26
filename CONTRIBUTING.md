@@ -18,15 +18,17 @@ in this file. Those rules remain mandatory.
 ## Pull-request completion and CI gate
 
 Keep a pull request in draft until it fully implements and closes its referenced
-issue. Green CI for a partial slice does not make the pull request ready for
-review. The pull request body must contain `Closes #<issue>` only when every
-acceptance criterion is implemented or the issue owner has explicitly removed
-it from scope.
+issue. Unfinished acceptance criteria stay in draft. Green CI for a partial
+slice does not make the pull request ready for review. The pull request body
+must contain `Closes #<issue>` only when every acceptance criterion is
+implemented or the issue owner has explicitly removed it from scope.
 
 Keep incomplete implementation or unmet acceptance criteria in draft.
-After relevant local validation, open a reviewable PR and report the exact head,
-commands, results and limitations (ENG-008). Pending or failing non-required CI
-does not prevent review. Do not poll or repair CI unless requested.
+After relevant local validation, open a reviewable PR and report the
+exact final head, commands, results and limitations (ENG-008). A queued or red
+non-required
+GitHub run does not prevent review and does not by itself keep the pull request
+in draft. Do not poll or repair CI unless requested.
 
 Before an authorized rebase-merge, inspect the actual diff and review comments
 and require every check enforced by an active ruleset to pass on that head
