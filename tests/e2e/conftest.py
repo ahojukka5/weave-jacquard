@@ -9,6 +9,7 @@ import pytest
 _CAPABILITY_TEST_FILES = {
     "test_real_mcp_revision_evidence.py": True,
     "test_real_mcp_selected_merge_preflight_batch.py": False,
+    "test_real_mcp_test_runs.py": True,
 }
 
 

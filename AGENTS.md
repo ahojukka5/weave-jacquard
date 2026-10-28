@@ -1,10 +1,9 @@
 # AGENTS.md
 
-[OodiHandbook](https://github.com/ahojukka5/OodiHandbook/blob/v0.1.0/index.qmd)
-is the source of common rules. Follow the repository's explicitly adopted
-immutable release (AUTH-003). Use [reviewed master guidance](https://github.com/ahojukka5/OodiHandbook/blob/master/index.qmd)
-as a voluntary improvement target (AUTH-006). Local instructions provide
-technical details and do not override the Handbook.
+Common process rules come from the latest approved
+[OodiHandbook](https://github.com/ahojukka5/OodiHandbook) tag (AUTH-007).
+Reviewed master guidance may apply ahead of a tag (AUTH-006). Local instructions
+provide repository technical facts within that authority.
 
 ## Mandatory detailed guidance
 
@@ -24,9 +23,8 @@ unimplemented acceptance criterion. A partial implementation may be committed
 and tested in a draft, but it must not be described or marked as ready for
 review.
 
-Follow Fast development in `~/dev/AGENTS.md`. The local test of the change is
-the gate. A queued, running, or red GitHub job does not keep the pull request
-in draft and is not the next task.
+For local development and evidence, follow the Handbook
+`guides/ENG/local-development.qmd` and `guides/ENG/contributing.qmd`.
 
 Mark a pull request ready for review only when all of the following are true:
 

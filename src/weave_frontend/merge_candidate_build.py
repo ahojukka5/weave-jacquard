@@ -480,7 +480,15 @@ class MergeCandidateBuildService(CompilerArtifactMixin):
             "source_head_revision_id": source_revision,
         }
         if self.workspace.db.hash_value(preview_payload) != subject["preview_id"]:
-            raise ArtifactIntegrityError("merge candidate preview identity is invalid")
+            # Published v1 records also exist from before ancestry evidence
+            # joined the preview hash. Keep that exact identity above; current
+            # records must bind the proof derived from these immutable heads.
+            ancestry = getattr(self.workspace, "_common_ancestor_analysis", None)
+            if ancestry is None:
+                raise ArtifactIntegrityError("merge candidate preview identity is invalid")
+            preview_payload["ancestry"] = ancestry(target_revision, source_revision).evidence()
+            if self.workspace.db.hash_value(preview_payload) != subject["preview_id"]:
+                raise ArtifactIntegrityError("merge candidate preview identity is invalid")
         base_state = self.workspace._state_at_revision(base_revision)
         target_state = self.workspace._state_at_revision(target_revision)
         source_state = self.workspace._state_at_revision(source_revision)

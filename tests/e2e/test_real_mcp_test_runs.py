@@ -13,6 +13,8 @@ import pytest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+from weave_frontend.compiler.capabilities import WeavecCapabilities
+
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT = "sandboxed-test-runs"
 RUN_TOOLS = {
@@ -223,7 +225,7 @@ async def _run(tmp_path: Path, compiler: Path) -> list[dict[str, Any]]:
         assert capabilities["policy"]["network"] == "deny"
         assert capabilities["policy"]["filesystem"] == "isolated"
         assert capabilities["policy"]["seccomp"] is False
-        assert capabilities["resource_limits"]["process_count"] is False
+        assert capabilities["resource_limits"]["process_count"] is True
 
         await _call(session, trace, "project_initialize", project=PROJECT)
         initial = _main_head(
@@ -496,6 +498,15 @@ def _verify_retained_evidence(tmp_path: Path) -> None:
     assert len({batch["revision_id"] for batch in batches}) == 2
     for batch in batches:
         assert {item["run_id"] for item in batch["results"]}.issubset(run_ids)
+
+
+def test_behavioral_compiler_fixture_supports_public_handshake(tmp_path: Path) -> None:
+    compiler = _fake_compiler(tmp_path / "weavec")
+    capabilities = WeavecCapabilities(compiler).require(
+        command="build",
+        protocols=["weavec-build-manifest-v1", "weavec-diagnostics-v1"],
+    )
+    assert capabilities["compiler"]["public_variant"] == "final"
 
 
 @pytest.mark.real_mcp
