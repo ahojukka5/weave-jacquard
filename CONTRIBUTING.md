@@ -1,10 +1,9 @@
 # Contributing
 
-[OodiHandbook](https://github.com/ahojukka5/OodiHandbook/blob/v0.1.0/index.qmd)
-is the source of common rules. Follow the repository's explicitly adopted
-immutable release (AUTH-003). Use [reviewed master guidance](https://github.com/ahojukka5/OodiHandbook/blob/master/index.qmd)
-as a voluntary improvement target (AUTH-006). Local instructions provide
-technical details and do not override the Handbook.
+Common process rules come from the latest approved
+[OodiHandbook](https://github.com/ahojukka5/OodiHandbook) tag (AUTH-007).
+Reviewed master guidance may apply ahead of a tag (AUTH-006). Local instructions
+provide repository technical facts within that authority.
 
 Thank you for contributing to `weave-jacquard`.
 

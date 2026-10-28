@@ -90,6 +90,12 @@ re-runs structural merge validation, and checks the merged root hash. It then
 verifies the target definition, source hashes, content-derived build ID, compiler
 protocol evidence, and every referenced artifact hash.
 
+Current preview identities include the bounded ancestry evidence. Retained v1
+subjects from before that addition keep their original identity: reads accept
+only the exact original payload hash or the exact current ancestry-bound hash.
+Both paths still verify project-owned immutable revisions, the common base and
+the reconstructed merged root. Neither accepts arbitrary or stale-current IDs.
+
 Use:
 
 - `branch_merge_build_target` to build one target explicitly;
