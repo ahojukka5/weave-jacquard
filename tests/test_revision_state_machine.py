@@ -17,8 +17,7 @@ from weave_frontend import SExpressionWorkspace, ValidationError, WeaveFrontendE
 from weave_frontend.agent_checkpoint import AgentCheckpointRegistry
 from weave_frontend.batch_edit import EditBatchExecutor
 from weave_frontend.builds import MetadataBuildTargetRegistry
-from weave_frontend.merge_policy import MergePolicyRegistry
-from weave_frontend.merges import MergePreviewService
+from weave_frontend.merges import MergePolicyRegistry, MergePreviewService
 from weave_frontend.revert import RevertService
 from weave_frontend.task_contracts import TaskContractRegistry
 from weave_frontend.test_targets import TestTargetRegistry

@@ -17,11 +17,11 @@ from .compiler import (
     validate_compiler_manifest,
 )
 from .errors import ArtifactIntegrityError, ValidationError
-from .merge_candidate_build import (
+from .merges import (
     MERGE_CANDIDATE_BUILD_FORMAT,
     MERGE_CANDIDATE_BUILD_KEY_FORMAT,
 )
-from .merge_candidate_build import (
+from .merges import (
     MergeCandidateBuildService as _BaseMergeCandidateBuildService,
 )
 from .test_target_validation import validate_test_target_references

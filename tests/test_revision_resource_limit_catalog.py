@@ -24,7 +24,6 @@ from weave_frontend.agent_checkpoint_timeline import (
     MAX_CHECKPOINT_PAGE,
     MAX_CHECKPOINT_REVISION_SCAN,
 )
-from weave_frontend.merge_validation_set import MAX_AFFECTED_TARGET_VALIDATIONS
 from weave_frontend.project_agent_status import (
     MAX_AGENT_STATUS_BRANCH_CATALOG,
     MAX_AGENT_STATUS_CHECKPOINT_SCAN,
@@ -38,13 +37,6 @@ from weave_frontend.resume_snapshot import (
     MAX_RESUME_OPERATIONS,
     MAX_RESUME_TARGET_SOURCES,
     MAX_RESUME_TARGETS,
-)
-from weave_frontend.selected_merge_preflight_batch import (
-    MAX_SELECTED_MERGE_PREFLIGHT_DOCUMENTS,
-    MAX_SELECTED_MERGE_PREFLIGHT_SOURCES,
-)
-from weave_frontend.selected_merge_train_preview import (
-    MAX_SELECTED_MERGE_TRAIN_SOURCES,
 )
 from weave_frontend.task_resume_snapshot import MAX_RESUME_TASKS
 from weave_frontend.test_resume_snapshot import MAX_RESUME_TEST_TARGETS
@@ -126,32 +118,6 @@ def test_resume_limits_match_the_central_catalog() -> None:
     assert MAX_RESUME_OPERATIONS == revision_limits.MAX_RESUME_OPERATIONS
     assert MAX_RESUME_TEST_TARGETS == revision_limits.MAX_RESUME_TEST_TARGETS
     assert MAX_RESUME_TASKS == revision_limits.MAX_RESUME_TASKS
-
-
-def test_queue_and_preflight_limits_match_the_central_catalog() -> None:
-    """Independent merge-service compatibility ceilings vs catalog names.
-
-    Failure class: root validation-set, selected-train, or selected-preflight
-    modules keep their own literals after the catalog changes. Package
-    modules that import the catalog are not equality-tested here.
-    """
-
-    assert (
-        MAX_AFFECTED_TARGET_VALIDATIONS
-        == revision_limits.MAX_AFFECTED_TARGET_VALIDATIONS
-    )
-    assert (
-        MAX_SELECTED_MERGE_TRAIN_SOURCES
-        == revision_limits.MAX_SELECTED_MERGE_TRAIN_SOURCES
-    )
-    assert (
-        MAX_SELECTED_MERGE_PREFLIGHT_SOURCES
-        == revision_limits.MAX_SELECTED_MERGE_PREFLIGHT_SOURCES
-    )
-    assert (
-        MAX_SELECTED_MERGE_PREFLIGHT_DOCUMENTS
-        == revision_limits.MAX_SELECTED_MERGE_PREFLIGHT_DOCUMENTS
-    )
 
 
 def test_selected_merge_package_sources_limits_from_the_central_catalog() -> None:

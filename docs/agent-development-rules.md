@@ -273,12 +273,12 @@ inference without changing the public MCP API.
 - `src/weave_frontend/revision_reads.py`: exact-revision render and node search.
 - `src/weave_frontend/revision_diff.py`: bounded stable-node revision diffs.
 - `src/weave_frontend/build_discovery.py`: verified stored-build catalog pages.
-- `src/weave_frontend/merge_preview.py`: deterministic two-phase merge previews.
-- `src/weave_frontend/merge_impact.py`: named-target and coverage impact analysis.
-- `src/weave_frontend/merge_validation.py`: one exact-candidate compiler validation.
-- `src/weave_frontend/merge_validation_set.py`: complete affected-target gate.
-- `src/weave_frontend/merge_policy.py`: revisioned first-parent policy registry.
-- `src/weave_frontend/merge_preflight.py`: policy-aware one-call review composition.
+- `src/weave_frontend/merges/preview.py`: deterministic two-phase merge previews.
+- `src/weave_frontend/merges/impact.py`: named-target and coverage impact analysis.
+- `src/weave_frontend/merges/validation.py`: one exact-candidate compiler validation.
+- `src/weave_frontend/merges/validation_set.py`: complete affected-target gate.
+- `src/weave_frontend/merges/policy.py`: revisioned first-parent policy registry.
+- `src/weave_frontend/merges/preflight.py`: policy-aware one-call review composition.
 - `src/weave_frontend/mcp_preflight.py`: production preflight MCP registration.
 - `src/weave_frontend/mcp_policy.py`: final policy-enforced merge registration.
 - `src/weave_frontend/mcp_revision_reads.py`: final historical read registration.

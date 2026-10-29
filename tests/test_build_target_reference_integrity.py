@@ -10,7 +10,7 @@ from weave_frontend.builds import (
     build_target_references,
     validate_build_target_references,
 )
-from weave_frontend.metadata_merge_preview import MergePreviewService
+from weave_frontend.merges import MetadataMergePreviewService as MergePreviewService
 
 
 def _workspace(path: Path) -> tuple[SExpressionWorkspace, str]:
