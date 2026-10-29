@@ -8,7 +8,7 @@ from typing import Any, Protocol
 
 from .builds import BUILD_TARGET_PREFIX, BuildTargetRegistry
 from .errors import NotFoundError, ValidationError
-from .merge_policy import MergePolicyRegistry
+from .merges import MergePolicyRegistry
 from .sexpr import head_symbol, walk_nodes
 from .source_map import render_with_node_map
 
