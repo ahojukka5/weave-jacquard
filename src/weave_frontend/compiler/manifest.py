@@ -42,7 +42,7 @@ def validate_compiler_manifest(
         )
 
     status = document.get("status")
-    if status not in {"succeeded", "failed"}:
+    if not isinstance(status, str) or status not in {"succeeded", "failed"}:
         errors.append("compiler build manifest status must be 'succeeded' or 'failed'")
     phase = document.get("phase")
     if not isinstance(phase, str) or not phase:
@@ -53,7 +53,7 @@ def validate_compiler_manifest(
         errors.append("failed compiler build manifest phase must not be 'complete'")
 
     expected_status = "succeeded" if returncode == 0 else "failed"
-    if status in {"succeeded", "failed"} and status != expected_status:
+    if isinstance(status, str) and status in {"succeeded", "failed"} and status != expected_status:
         errors.append("compiler build manifest status does not match process return code")
     if diagnostics_status in {"succeeded", "failed"} and status != diagnostics_status:
         errors.append("compiler build manifest status does not match compiler diagnostics")
